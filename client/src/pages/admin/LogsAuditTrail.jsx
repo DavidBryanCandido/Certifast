@@ -143,11 +143,7 @@ function formatDate() {
     return new Date().toLocaleDateString("en-US", {
         weekday: "long",
         year: "numeric",
-    return new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+        month: "long",
         day: "numeric",
     });
 }
