@@ -407,13 +407,7 @@ export default function AdminLogin() {
                 {/* Card header */}
                 <div style={s.cardHeader}>
                     <div style={s.sealWrap}>
-                        {/* TODO: Replace Shield icon with actual barangay seal */}
-                        {/* <img src="/logo.png" alt="Barangay Seal" style={{ width: 86, height: 86, borderRadius: "50%", objectFit: "cover" }} /> */}
-                        <Shield
-                            size={36}
-                            color="rgba(201,162,39,0.6)"
-                            strokeWidth={1.2}
-                        />
+                        <img src="/logo.png" alt="Barangay Seal" style={{ width: 86, height: 86, borderRadius: "50%", objectFit: "cover" }} />
                     </div>
                     <p style={s.republicLabel}>Republic of the Philippines</p>
                     <p style={s.barangayName}>Barangay East Tapinac</p>

@@ -30,6 +30,11 @@ import {
     Menu,
 } from "lucide-react";
 
+import {
+    AdminSidebar,
+    AdminMobileSidebar,
+} from "../../components/AdminSidebar";
+
 // TODO: import { useAdminAuth } from "../../context/AdminAuthContext";
 // TODO: import { getResidents, getResidentById } from "../../services/residentService";
 
@@ -79,7 +84,6 @@ if (!document.head.querySelector("[data-cf-rr]")) {
     /* Table rows */
     .rr-res-row {
   display: grid;
-  grid-template-columns: 1.5fr 2fr 140px 140px 90px 110px 90px;
   align-items: center;
   padding: 13px 22px;
   border-bottom: 1px solid #f0ece4;
@@ -391,265 +395,6 @@ function calcAge(dob) {
     } catch {
         return "—";
     }
-}
-
-// =============================================================
-// Sidebar
-// =============================================================
-function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
-    const isSA = admin?.role === "superadmin";
-    const nav = [
-        { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
-        { key: "walkIn", label: "Walk-in Issuance", Icon: FilePlus },
-        {
-            key: "manageRequests",
-            label: "Manage Requests",
-            Icon: FileText,
-            badge: "12",
-        },
-        { key: "residentRecords", label: "Resident Records", Icon: Users },
-        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
-    ];
-    const sa = [
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "settings", label: "System Settings", Icon: Settings },
-    ];
-    const NavBtn = ({ item }) =>
-        collapsed ? (
-            <button
-                className={`rr-nav-item-icon${activePage === item.key ? " active" : ""}`}
-                onClick={() => onNavigate(item.key)}
-                title={item.label}
-            >
-                <item.Icon size={18} opacity={0.7} />
-            </button>
-        ) : (
-            <button
-                className={`rr-nav-item${activePage === item.key ? " active" : ""}`}
-                onClick={() => onNavigate(item.key)}
-            >
-                <item.Icon size={15} opacity={0.7} />
-                {item.label}
-                {item.badge && <span style={sd.navBadge}>{item.badge}</span>}
-            </button>
-        );
-    return (
-        <aside style={{ ...sd.sidebar, width: collapsed ? 60 : 240 }}>
-            <div
-                style={{
-                    ...sd.brand,
-                    justifyContent: collapsed ? "center" : "flex-start",
-                    padding: collapsed ? "18px 0" : "20px 20px 16px",
-                }}
-            >
-                <div style={sd.brandSeal}>
-                    <span
-                        style={{ fontSize: 14, color: "rgba(201,162,39,0.6)" }}
-                    >
-                        ⚜
-                    </span>
-                </div>
-                {!collapsed && (
-                    <div>
-                        <div style={sd.brandName}>CertiFast</div>
-                        <div style={sd.brandSub}>East Tapinac</div>
-                    </div>
-                )}
-            </div>
-            <div style={sd.goldBar} />
-            {!collapsed && <div style={sd.sectionLabel}>Main Menu</div>}
-            {nav.map((item) => (
-                <NavBtn key={item.key} item={item} />
-            ))}
-            {isSA && (
-                <div style={sd.superAdminSection}>
-                    {!collapsed && (
-                        <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
-                            Superadmin
-                        </div>
-                    )}
-                    {sa.map((item) => (
-                        <NavBtn key={item.key} item={item} />
-                    ))}
-                </div>
-            )}
-            <div
-                style={{
-                    ...sd.userRow,
-                    justifyContent: collapsed ? "center" : "flex-start",
-                    padding: collapsed ? "14px 0" : "14px 20px",
-                }}
-            >
-                <div style={sd.userAvatar}>{initials(admin?.name || "DA")}</div>
-                {!collapsed && (
-                    <>
-                        <div style={sd.userInfo}>
-                            <div style={sd.userName}>
-                                {admin?.name || "Dante Administrador"}
-                            </div>
-                            <div style={sd.userRole}>
-                                {admin?.role || "Superadmin"}
-                            </div>
-                        </div>
-                        <button className="rr-logout-btn" onClick={onLogout}>
-                            <LogOut size={14} />
-                        </button>
-                    </>
-                )}
-            </div>
-        </aside>
-    );
-}
-
-// =============================================================
-// Mobile sidebar overlay
-// =============================================================
-function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
-    const isSA = admin?.role === "superadmin";
-    const nav = [
-        { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
-        { key: "walkIn", label: "Walk-in Issuance", Icon: FilePlus },
-        {
-            key: "manageRequests",
-            label: "Manage Requests",
-            Icon: FileText,
-            badge: "12",
-        },
-        { key: "residentRecords", label: "Resident Records", Icon: Users },
-        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
-    ];
-    const sa = [
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "settings", label: "System Settings", Icon: Settings },
-    ];
-    useEffect(() => {
-        document.body.style.overflow = "hidden";
-        return () => {
-            document.body.style.overflow = "";
-        };
-    }, []);
-    return (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 200,
-                display: "flex",
-            }}
-        >
-            <div
-                style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "rgba(0,0,0,0.5)",
-                }}
-                onClick={onClose}
-            />
-            <aside
-                style={{
-                    ...sd.sidebar,
-                    width: 260,
-                    position: "relative",
-                    animation: "sidebarSlideIn 0.22s ease both",
-                    zIndex: 1,
-                }}
-            >
-                <div style={{ ...sd.brand, justifyContent: "space-between" }}>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                        }}
-                    >
-                        <div style={sd.brandSeal}>
-                            <span
-                                style={{
-                                    fontSize: 14,
-                                    color: "rgba(201,162,39,0.6)",
-                                }}
-                            >
-                                ⚜
-                            </span>
-                        </div>
-                        <div>
-                            <div style={sd.brandName}>CertiFast</div>
-                            <div style={sd.brandSub}>East Tapinac</div>
-                        </div>
-                    </div>
-                    <button
-                        style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "rgba(255,255,255,0.5)",
-                            padding: 4,
-                        }}
-                        onClick={onClose}
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-                <div style={sd.goldBar} />
-                <div style={sd.sectionLabel}>Main Menu</div>
-                {nav.map((item) => (
-                    <button
-                        key={item.key}
-                        className={`rr-nav-item${activePage === item.key ? " active" : ""}`}
-                        onClick={() => {
-                            onNavigate(item.key);
-                            onClose();
-                        }}
-                    >
-                        <item.Icon size={15} opacity={0.7} />
-                        {item.label}
-                        {item.badge && (
-                            <span style={sd.navBadge}>{item.badge}</span>
-                        )}
-                    </button>
-                ))}
-                {isSA && (
-                    <div style={sd.superAdminSection}>
-                        <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
-                            Superadmin
-                        </div>
-                        {sa.map((item) => (
-                            <button
-                                key={item.key}
-                                className={`rr-nav-item${activePage === item.key ? " active" : ""}`}
-                                onClick={() => {
-                                    onNavigate(item.key);
-                                    onClose();
-                                }}
-                            >
-                                <item.Icon size={15} opacity={0.7} />
-                                {item.label}
-                                <span style={sd.navBadgeSA}>SA</span>
-                            </button>
-                        ))}
-                    </div>
-                )}
-                <div style={sd.userRow}>
-                    <div style={sd.userAvatar}>
-                        {initials(admin?.name || "DA")}
-                    </div>
-                    <div style={sd.userInfo}>
-                        <div style={sd.userName}>
-                            {admin?.name || "Dante Administrador"}
-                        </div>
-                        <div style={sd.userRole}>
-                            {admin?.role || "Superadmin"}
-                        </div>
-                    </div>
-                    <button className="rr-logout-btn" onClick={onLogout}>
-                        <LogOut size={14} />
-                    </button>
-                </div>
-            </aside>
-        </div>
-    );
 }
 
 // =============================================================
@@ -1683,7 +1428,7 @@ export default function ResidentRecords({
     return (
         <div className="rr-root">
             {!isMobile && (
-                <Sidebar
+                <AdminSidebar
                     admin={
                         admin || {
                             name: "Dante Administrador",
@@ -1697,7 +1442,7 @@ export default function ResidentRecords({
                 />
             )}
             {showMobileSidebar && (
-                <MobileSidebar
+                <AdminMobileSidebar
                     admin={
                         admin || {
                             name: "Dante Administrador",
@@ -2009,7 +1754,7 @@ export default function ResidentRecords({
                                 style={{
                                     display: "grid",
                                     gridTemplateColumns:
-                                        "1.5fr 2fr 140px 140px 90px 110px 90px",
+                                        "1.4fr 1.4fr 1fr 1.1fr 0.7fr 0.9fr 0.6fr",
                                     background: "#f8f6f1",
                                     borderBottom: "1px solid #e4dfd4",
                                     padding: "10px 22px",
@@ -2022,7 +1767,7 @@ export default function ResidentRecords({
                                     "Date Registered",
                                     "Requests",
                                     "Status",
-                                    "",
+                                    "Action",
                                 ].map((h) => (
                                     <div
                                         key={h}
@@ -2062,6 +1807,10 @@ export default function ResidentRecords({
                                         <div
                                             key={r.id}
                                             className="rr-res-row"
+                                            style={{
+                                                gridTemplateColumns:
+                                                    "1.4fr 1.4fr 1fr 1.1fr 0.7fr 0.9fr 0.6fr",
+                                            }}
                                             onClick={() =>
                                                 setSelectedResident(r)
                                             }
