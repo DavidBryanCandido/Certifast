@@ -799,7 +799,7 @@ function StatIcon({ color, type, size = 18 }) {
 // =============================================================
 // Dashboard
 // =============================================================
-export default function Dashboard({ admin, onLogout }) {
+export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const navigate = useNavigate();
     const width = useWindowSize();
     const isMobile = width < 768;
@@ -815,7 +815,7 @@ export default function Dashboard({ admin, onLogout }) {
 
     const handleNavigate = (page) => {
         setActivePage(page);
-        // TODO: navigate(`/admin/${page}`) when all pages are built
+        if (navProp) navProp(page);
         console.log("Navigate to:", page);
     };
 

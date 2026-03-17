@@ -27,6 +27,7 @@ import {
     TriangleAlert,
     KeyRound,
 } from "lucide-react";
+import authService from "../../services/authService";
 
 // TODO: Import your auth context when ready
 // import { useAdminAuth } from "../../context/AdminAuthContext";
@@ -353,18 +354,25 @@ export default function AdminLogin() {
 
         setIsLoading(true);
         try {
-            // TODO: Replace with actual API call
-            // const response = await adminLogin(formData.username, formData.password);
-            // login(response.token, response.admin);
-            // navigate("/admin/dashboard");
+            const response = await authService.adminLogin({
+                username: formData.username,
+                password: formData.password,
+            });
 
-            // TEMP: remove when backend is connected
-            await new Promise((res) => setTimeout(res, 1200));
-            console.log("Login attempted:", formData);
-            // navigate("/admin/dashboard");
+            if (response?.token) {
+                localStorage.setItem("certifast_admin_token", response.token);
+                localStorage.setItem(
+                    "certifast_admin_auth",
+                    JSON.stringify({ token: response.token, admin: response.data }),
+                );
+            }
+
+            navigate("/admin/dashboard");
         } catch (err) {
-            // setError(err.response?.data?.message || "Invalid credentials. Please try again.");
-            setError("Invalid credentials. Please try again.");
+            setError(
+                err?.response?.data?.message ||
+                    "Invalid credentials. Please try again.",
+            );
         } finally {
             setIsLoading(false);
         }
