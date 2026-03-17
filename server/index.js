@@ -14,7 +14,9 @@ const logsRoutes = require('./routes/logsRoutes');
 const walkInRoutes = require('./routes/walkInRoutes');
 
 const app = express();
-const PORT = Number(process.env.PORT || 5000);
+const parsedPort = Number(process.env.PORT);
+const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 5000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.use(cors());
 app.use(express.json());
@@ -47,8 +49,8 @@ app.get('/', (req, res) => {
   res.json({ message: 'CertiFast server is running' });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server listening on ${HOST}:${PORT}`);
 });
 
 const shutdown = async () => {
