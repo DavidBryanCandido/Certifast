@@ -140,7 +140,16 @@ if (!document.head.querySelector("[data-cf-logs]")) {
 // Helpers
 // =============================================================
 function formatDate() {
-    return new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    return new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+    return new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+        day: "numeric",
+    });
 }
 function formatDateShort() {
     return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
