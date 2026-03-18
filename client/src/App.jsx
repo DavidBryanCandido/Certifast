@@ -120,7 +120,7 @@ function ResidentQrRoute() {
 export default function App() {
     return (
         <Routes>
-            <Route path="/" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/" element={<Navigate to="/resident/login" replace />} />
 
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route
@@ -185,7 +185,7 @@ export default function App() {
             <Route path="/resident/my-requests" element={<MyRequests />} />
             <Route path="/resident/my-qr" element={<ResidentQrRoute />} />
 
-            <Route path="*" element={<Navigate to="/admin/login" replace />} />
+            <Route path="*" element={<Navigate to="/resident/login" replace />} />
         </Routes>
     );
 }
