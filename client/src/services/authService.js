@@ -1,29 +1,40 @@
-import axios from 'axios';
+import axios from "axios";
 
-const baseURL =
-	import.meta.env.VITE_API_BASE_URL ||
-	import.meta.env.VITE_API_URL ||
-	'http://localhost:5000/api';
-
-const api = axios.create({
-	baseURL,
-});
+const API = "http://localhost:5000/api";
 
 const authService = {
-	async adminLogin(payload) {
-		const response = await api.post('/admin-auth/login', payload);
-		return response.data;
-	},
+    // Resident Register
+    residentRegister: async (formData) => {
+        const res = await axios.post(`${API}/auth/resident/register`, formData);
+        return res.data;
+    },
 
-	async residentLogin(payload) {
-		const response = await api.post('/resident-auth/login', payload);
-		return response.data;
-	},
+    // Resident Login
+    residentLogin: async (formData) => {
+        const res = await axios.post(`${API}/auth/resident/login`, formData);
+        return res.data; // ResidentLogin.jsx handles localStorage
+    },
 
-	async residentRegister(payload) {
-		const response = await api.post('/resident-auth/register', payload);
-		return response.data;
-	},
+    // Admin Login
+    adminLogin: async (formData) => {
+        const res = await axios.post(`${API}/auth/admin/login`, formData);
+        return res.data; // AdminLogin.jsx handles localStorage
+    },
+
+    // Logout helpers
+    residentLogout: () => {
+        localStorage.removeItem("certifast_resident_token");
+        localStorage.removeItem("certifast_resident_auth");
+    },
+
+    adminLogout: () => {
+        localStorage.removeItem("certifast_admin_token");
+        localStorage.removeItem("certifast_admin_auth");
+    },
+
+    // Get tokens for protected requests
+    getResidentToken: () => localStorage.getItem("certifast_resident_token"),
+    getAdminToken: () => localStorage.getItem("certifast_admin_token"),
 };
 
 export default authService;

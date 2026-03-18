@@ -170,7 +170,7 @@ export default function App() {
                 path="/admin/settings"
                 element={<AdminPage Component={Settings} adminOnly />}
             />
-
+            <Route path="/resident/login" element={<ResidentLoginRoute />} />
             <Route
                 path="/resident/register"
                 element={<ResidentRegisterRoute />}

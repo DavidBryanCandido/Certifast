@@ -1,27 +1,17 @@
-import axios from 'axios';
+import axios from "axios";
+import authService from "./authService";
 
-const baseURL =
-	import.meta.env.VITE_API_BASE_URL ||
-	import.meta.env.VITE_API_URL ||
-	'http://localhost:5000/api';
+const API = "http://localhost:5000/api";
 
-const api = axios.create({
-	baseURL,
+const getAdminHeaders = () => ({
+    headers: { Authorization: `Bearer ${authService.getAdminToken()}` },
 });
 
-function adminHeaders(token) {
-	return {
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
-	};
-}
-
 const accountService = {
-	async getAccounts(token) {
-		const response = await api.get('/accounts', adminHeaders(token));
-		return response.data;
-	},
+    getAccounts: async () => {
+        const res = await axios.get(`${API}/accounts`, getAdminHeaders());
+        return res.data;
+    },
 };
 
 export default accountService;
