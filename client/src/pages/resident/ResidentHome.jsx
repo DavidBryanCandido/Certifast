@@ -2,7 +2,7 @@
 // FILE: client/src/pages/resident/ResidentHome.jsx
 // =============================================================
 // TODO (Backend Dev):
-//   - GET /api/resident/requests?limit=5 → recent requests
+//   - GET /api/resident/requests?limit=5 → recent requests (last 5)
 //   - GET /api/resident/stats → { total, pending, released, rejected }
 //   - All endpoints require residentToken in Authorization header
 // =============================================================
@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import {
     FileText, Clock, CheckCircle, XCircle, Plus,
     QrCode, ChevronRight, LogOut, Bell, Menu, X,
-    FileCheck, AlertCircle, Home,
+    FileCheck, AlertCircle, Home, UserCircle,
 } from "lucide-react";
 
 // ─── Inject styles ────────────────────────────────────────────
@@ -169,7 +169,7 @@ export default function ResidentHome({ resident, onLogout }) {
         rejected:   requests.filter(r => r.status === "rejected").length,
     };
 
-    const recentRequests = requests.slice(0, 3);
+    const recentRequests = requests.slice(0, 5);
 
     return (
         <div className="rh-root">
@@ -193,19 +193,30 @@ export default function ResidentHome({ resident, onLogout }) {
                             <button onClick={() => navigate("/resident/my-qr")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.7)", fontFamily: "'Source Serif 4', serif", fontSize: 12, cursor: "pointer" }}>
                                 <QrCode size={13} /> My QR
                             </button>
+                            <button onClick={() => navigate("/resident/profile")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.7)", fontFamily: "'Source Serif 4', serif", fontSize: 12, cursor: "pointer" }}>
+                                <UserCircle size={13} /> My Profile
+                            </button>
                         </div>
                     )}
 
                     {/* User + logout */}
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(201,162,39,0.15)", border: "1.5px solid rgba(201,162,39,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#c9a227", flexShrink: 0 }}>
+                        {/* Avatar — clickable on both desktop and mobile */}
+                        <button
+                            onClick={() => navigate("/resident/profile")}
+                            title="My Profile"
+                            style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(201,162,39,0.15)", border: "1.5px solid rgba(201,162,39,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#c9a227", flexShrink: 0, cursor: "pointer", transition: "background 0.15s" }}
+                        >
                             {firstName[0]?.toUpperCase()}
-                        </div>
+                        </button>
                         {!isMobile && (
-                            <div>
+                            <button
+                                onClick={() => navigate("/resident/profile")}
+                                style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}
+                            >
                                 <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{name}</div>
-                                <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 1 }}>Resident</div>
-                            </div>
+                                <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 1 }}>Resident · View Profile</div>
+                            </button>
                         )}
                         <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 11, fontFamily: "'Source Serif 4', serif", transition: "all 0.15s" }}
                             title="Log out">
@@ -221,23 +232,43 @@ export default function ResidentHome({ resident, onLogout }) {
             {/* ── CONTENT ── */}
             <div style={{ maxWidth: 1000, margin: "0 auto", padding: isMobile ? "20px 16px 80px" : "28px 24px 40px" }}>
 
-                {/* Welcome banner */}
+                {/* Welcome banner — with office hours on the right */}
                 <div className="rh-fadein" style={{ background: "linear-gradient(135deg, #0e2554 0%, #163066 60%, #1a3a7a 100%)", borderRadius: 10, padding: isMobile ? "22px 20px" : "26px 32px", marginBottom: 22, position: "relative", overflow: "hidden" }}>
                     <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
                     <div style={{ position: "absolute", top: -20, right: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.1)" }} />
-                    <div style={{ position: "relative" }}>
-                        <p style={{ fontSize: 11, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: "'Source Serif 4', serif", margin: "0 0 6px" }}>
-                            Good day,
-                        </p>
-                        <p style={{ fontFamily: "'Playfair Display', serif", fontSize: isMobile ? 20 : 24, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>
-                            {name}
-                        </p>
-                        <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.55)", fontFamily: "'Source Serif 4', serif", margin: "0 0 18px" }}>
-                            Barangay East Tapinac · City of Olongapo
-                        </p>
-                        <button onClick={() => navigate("/resident/submit-request")} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 22px", background: "linear-gradient(135deg, #c9a227, #9a7515)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}>
-                            <Plus size={14} /> Request a Certificate
-                        </button>
+                    <div style={{ position: "relative", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: 20, flexDirection: isMobile ? "column" : "row" }}>
+
+                        {/* Left — greeting */}
+                        <div>
+                            <p style={{ fontSize: 11, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: "'Source Serif 4', serif", margin: "0 0 6px" }}>
+                                Good day,
+                            </p>
+                            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: isMobile ? 20 : 24, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>
+                                {name}
+                            </p>
+                            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.55)", fontFamily: "'Source Serif 4', serif", margin: "0 0 18px" }}>
+                                Barangay East Tapinac · City of Olongapo
+                            </p>
+                            <button onClick={() => navigate("/resident/submit-request")} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 22px", background: "linear-gradient(135deg, #c9a227, #9a7515)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}>
+                                <Plus size={14} /> Request a Certificate
+                            </button>
+                        </div>
+
+                        {/* Right — office hours */}
+                        <div style={{ flexShrink: 0, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(201,162,39,0.2)", borderRadius: 8, padding: "14px 18px", minWidth: isMobile ? "100%" : 210 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
+                                <Bell size={12} color="#c9a227" />
+                                <span style={{ fontSize: 10, fontWeight: 700, color: "#c9a227", letterSpacing: "1.2px", textTransform: "uppercase" }}>Office Hours</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", lineHeight: 1.9, fontFamily: "'Source Serif 4', serif" }}>
+                                <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, display: "inline-block", width: 72 }}>Mon – Fri</span>8:00 AM – 5:00 PM</div>
+                                <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, display: "inline-block", width: 72 }}>Saturday</span>8:00 AM – 12:00 PM</div>
+                                <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, display: "inline-block", width: 72 }}>Sun & Hol.</span>Closed</div>
+                            </div>
+                            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(201,162,39,0.15)", fontSize: 10.5, color: "rgba(255,255,255,0.38)", lineHeight: 1.5 }}>
+                                54 - 14th St. cor. Gallagher St., Olongapo City
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -331,21 +362,7 @@ export default function ResidentHome({ resident, onLogout }) {
 
                         </div>
 
-                        {/* Info panel */}
-                        <div style={{ background: "#f5edce", border: "1px solid #e0d4a8", borderRadius: 8, padding: 16 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                                <Bell size={13} color="#9a7515" />
-                                <span style={{ fontSize: 11, fontWeight: 700, color: "#7a6530", letterSpacing: 1, textTransform: "uppercase" }}>Office Hours</span>
-                            </div>
-                            <p style={{ fontSize: 12, color: "#7a6530", lineHeight: 1.7, margin: "0 0 6px", fontFamily: "'Source Serif 4', serif" }}>
-                                <strong>Mon – Fri:</strong> 8:00 AM – 5:00 PM<br />
-                                <strong>Saturday:</strong> 8:00 AM – 12:00 PM<br />
-                                <strong>Sunday & Holidays:</strong> Closed
-                            </p>
-                            <p style={{ fontSize: 11, color: "#9a7515", margin: 0, fontFamily: "'Source Serif 4', serif" }}>
-                                54 - 14th Street corner Gallagher Street, Olongapo City
-                            </p>
-                        </div>
+
                     </div>
                 </div>
             </div>
@@ -354,10 +371,11 @@ export default function ResidentHome({ resident, onLogout }) {
             {isMobile && (
                 <div className="rh-bottom-nav">
                     {[
-                        { key: "home",    icon: Home,     label: "Home",     path: "/resident/home"           },
-                        { key: "request", icon: Plus,     label: "Request",  path: "/resident/submit-request" },
-                        { key: "history", icon: FileText, label: "History",  path: "/resident/my-requests"    },
-                        { key: "qr",      icon: QrCode,   label: "My QR",    path: "/resident/my-qr"          },
+                        { key: "home",    icon: Home,        label: "Home",    path: "/resident/home"           },
+                        { key: "request", icon: Plus,        label: "Request", path: "/resident/submit-request" },
+                        { key: "history", icon: FileText,    label: "History", path: "/resident/my-requests"    },
+                        { key: "qr",      icon: QrCode,      label: "My QR",   path: "/resident/my-qr"          },
+                        { key: "profile", icon: UserCircle,  label: "Profile", path: "/resident/profile"        },
                     ].map(({ key, icon: Icon, label, path }) => (
                         <button key={key} className={`rh-nav-btn${activeNav === key ? " active" : ""}`} onClick={() => { setActiveNav(key); navigate(path); }}>
                             <Icon size={20} strokeWidth={1.8} />

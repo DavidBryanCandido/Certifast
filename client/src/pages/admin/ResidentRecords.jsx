@@ -12,6 +12,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { QRCodeSVG } from "qrcode.react";
 import {
     LayoutDashboard,
     FilePlus,
@@ -27,6 +28,8 @@ import {
     ChevronRight,
     X,
     Printer,
+    Scissors,
+    AlertCircle,
     Menu,
 } from "lucide-react";
 
@@ -159,12 +162,36 @@ if (!document.head.querySelector("[data-cf-rr]")) {
     .rr-view-btn:hover { background:#0e2554; color:#fff; border-color:#0e2554; }
     /* Print card btn */
     .rr-print-card-btn {
-      display:inline-flex; align-items:center; gap:7px; padding:8px 16px;
-      background:#0e2554; color:#fff; border:none; border-radius:4px;
-      font-size:12px; font-weight:600; cursor:pointer; font-family:'Source Serif 4',serif;
-      transition:background .15s;
+      display:inline-flex; align-items:center; gap:7px; padding:10px 18px;
+      background:linear-gradient(135deg,#163066,#091a3e); color:#fff; border:none; border-radius:4px;
+      font-size:12px; font-weight:700; cursor:pointer; font-family:'Playfair Display',serif;
+      letter-spacing:1px; text-transform:uppercase; transition:opacity .15s;
     }
-    .rr-print-card-btn:hover { background:#163066; }
+    .rr-print-card-btn:hover { opacity:.88; }
+
+    /* ── Admin-side QR print sheet (hidden on screen, shown on print) ── */
+    #rr-qr-print-sheet { display: none; }
+    @media print {
+        .rr-root { display: none !important; }
+        #rr-qr-print-sheet { display: block !important; }
+        @page { size: A4 portrait; margin: 10mm; }
+        #rr-qr-print-sheet { font-family: 'Source Serif 4', Georgia, serif; }
+        .rr-ps-title  { font-size:9pt; color:#666; text-align:center; margin-bottom:4mm; }
+        .rr-ps-hint   { font-size:7.5pt; color:#999; text-align:center; margin-bottom:6mm; }
+        .rr-ps-grid   { display:grid; grid-template-columns:repeat(3,54mm); grid-template-rows:repeat(2,85.6mm); gap:5mm; justify-content:center; }
+        .rr-wc        { width:54mm; height:85.6mm; border:1px dashed #bbb; border-radius:3mm; overflow:hidden; display:flex; flex-direction:column; background:#fff; page-break-inside:avoid; }
+        .rr-wc-head   { background:#0e2554; padding:2mm 3mm; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+        .rr-wc-brand  { font-size:7pt; font-weight:700; color:#fff; font-family:Georgia,serif; line-height:1.2; }
+        .rr-wc-sub    { font-size:5pt; color:rgba(201,162,39,0.9); letter-spacing:.4px; text-transform:uppercase; margin-top:.3mm; }
+        .rr-wc-gold   { height:1.2mm; background:linear-gradient(90deg,#c9a227,#f0d060,#c9a227); flex-shrink:0; }
+        .rr-wc-body   { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.5mm 2.5mm 1.5mm; gap:1.8mm; }
+        .rr-wc-name   { font-size:7.5pt; font-weight:700; color:#0e2554; text-align:center; line-height:1.2; font-family:Georgia,serif; }
+        .rr-wc-id     { font-size:5.5pt; color:#888; text-align:center; }
+        .rr-wc-qr     { padding:1.5mm; border:.5px solid #ddd; border-radius:1mm; background:#fff; }
+        .rr-wc-addr   { font-size:5pt; color:#888; text-align:center; line-height:1.3; }
+        .rr-wc-foot   { background:#f8f6f1; border-top:.5px solid #e4dfd4; padding:1.2mm 2.5mm; font-size:4.8pt; color:#aaa; text-align:center; line-height:1.4; flex-shrink:0; }
+        .rr-ps-cut    { font-size:7pt; color:#bbb; text-align:center; margin-top:5mm; padding-top:3mm; border-top:1px dashed #ddd; }
+    }
     /* QR Card wallet */
     .rr-wallet-card {
       width:420px; height:265px; border-radius:10px; overflow:hidden;
@@ -398,14 +425,40 @@ function calcAge(dob) {
 }
 
 // =============================================================
-// QR Card Print Modal
+// WalletCard — one CR80 card used inside the admin print sheet
+// =============================================================
+function WalletCard({ name, residentId, qrValue }) {
+    return (
+        <div className="rr-wc">
+            <div className="rr-wc-head">
+                <div>
+                    <div className="rr-wc-brand">CertiFast</div>
+                    <div className="rr-wc-sub">Brgy. East Tapinac</div>
+                </div>
+                <img src="/logo.png" alt="" style={{ width: "6mm", height: "6mm", borderRadius: "50%", objectFit: "cover", opacity: 0.9 }} />
+            </div>
+            <div className="rr-wc-gold" />
+            <div className="rr-wc-body">
+                <div className="rr-wc-name">{name}</div>
+                <div className="rr-wc-id">ID: {residentId}</div>
+                <div className="rr-wc-qr">
+                    <QRCodeSVG value={qrValue} size={108} level="H" includeMargin={false} fgColor="#0e2554" bgColor="#ffffff" />
+                </div>
+                <div className="rr-wc-addr">Olongapo City, Zambales</div>
+            </div>
+            <div className="rr-wc-foot">Show to staff when claiming certificate.</div>
+        </div>
+    );
+}
+
+// =============================================================
+// QRCardModal — previews the resident-side QR card design
+// and prints 6 wallet cards on A4 via window.print()
 // =============================================================
 function QRCardModal({ resident, onClose }) {
     useEffect(() => {
         document.body.style.overflow = "hidden";
-        const fn = (e) => {
-            if (e.key === "Escape") onClose();
-        };
+        const fn = (e) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", fn);
         return () => {
             document.body.style.overflow = "";
@@ -413,430 +466,111 @@ function QRCardModal({ resident, onClose }) {
         };
     }, [onClose]);
 
+    const qrValue = `certifast:resident:${resident.id}`;
+
     return (
+        <>
+        {/* ── Modal ── */}
         <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(9,26,62,.6)",
-                zIndex: 600,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 16,
-            }}
+            style={{ position: "fixed", inset: 0, background: "rgba(9,26,62,.6)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div
-                style={{
-                    background: "#fff",
-                    borderRadius: 8,
-                    width: "100%",
-                    maxWidth: 680,
-                    overflow: "hidden",
-                    boxShadow: "0 16px 48px rgba(0,0,0,.22)",
-                    animation: "modalFadeIn .2s ease both",
-                }}
-            >
+            <div style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 480, overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,.22)", animation: "modalFadeIn .2s ease both" }}>
+
                 {/* Header */}
-                <div
-                    style={{
-                        padding: "18px 24px",
-                        borderBottom: "1px solid #e4dfd4",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                    }}
-                >
-                    <div
-                        style={{
-                            fontFamily: "'Playfair Display',serif",
-                            fontSize: 16,
-                            fontWeight: 700,
-                            color: "#0e2554",
-                        }}
-                    >
-                        Print QR Card —{" "}
-                        <span style={{ color: "#4a4a6a", fontSize: 14 }}>
-                            {resident.name}
-                        </span>
+                <div style={{ padding: "18px 24px", borderBottom: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(135deg, #0e2554, #163066)" }}>
+                    <div>
+                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: "#fff" }}>Resident QR Card</div>
+                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{resident.name} · {resident.id}</div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "#9090aa",
-                            padding: 4,
-                            display: "flex",
-                        }}
-                    >
+                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, display: "flex" }}>
                         <X size={18} />
                     </button>
                 </div>
+                <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)" }} />
 
-                {/* Body */}
-                <div style={{ padding: "20px 24px" }}>
-                    <p
-                        style={{
-                            fontSize: 10.5,
-                            color: "#9090aa",
-                            textAlign: "center",
-                            marginBottom: 16,
-                            lineHeight: 1.6,
-                        }}
-                    >
-                        Print on card stock, cut along the dashed border, then
-                        laminate. The back is intentionally blank.
-                    </p>
-
-                    {/* Card sheet */}
-                    <div
-                        style={{
-                            background: "#f0ece4",
-                            border: "1px solid #e4dfd4",
-                            borderRadius: 6,
-                            padding: "28px 32px",
-                            display: "flex",
-                            gap: 28,
-                            alignItems: "flex-start",
-                            justifyContent: "center",
-                            overflowX: "auto",
-                        }}
-                    >
-                        {/* Front */}
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: 6,
-                                flexShrink: 0,
-                            }}
-                        >
-                            <div
-                                style={{
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    color: "#9090aa",
-                                    letterSpacing: "1.5px",
-                                    textTransform: "uppercase",
-                                }}
-                            >
-                                ▲ Front Side
+                {/* Card preview — same design as resident's My QR page */}
+                <div style={{ padding: "24px 24px 16px" }}>
+                    <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 10, overflow: "hidden", marginBottom: 14, maxWidth: 340, margin: "0 auto 14px" }}>
+                        {/* Card header */}
+                        <div style={{ background: "linear-gradient(135deg, #0e2554, #163066)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div>
+                                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: "#fff" }}>CertiFast</div>
+                                <div style={{ fontSize: 8, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", marginTop: 1 }}>Barangay East Tapinac</div>
                             </div>
-                            <div className="rr-wallet-card">
-                                <div className="rr-card-front">
-                                    {/* Top: seal + barangay name */}
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 8,
-                                            marginBottom: 6,
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        <div
-                                            style={{
-                                                width: 32,
-                                                height: 32,
-                                                borderRadius: "50%",
-                                                border: "1.5px solid #0e2554",
-                                                overflow: "hidden",
-                                                flexShrink: 0,
-                                                background: "#eee",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                            }}
-                                        >
-                                            {/* TODO: replace with <img src="/logo.png" /> */}
-                                            <span
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: "#0e2554",
-                                                }}
-                                            >
-                                                ⚜
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <div
-                                                style={{
-                                                    fontFamily:
-                                                        "'Playfair Display',serif",
-                                                    fontSize: 9,
-                                                    fontWeight: 700,
-                                                    color: "#0e2554",
-                                                    lineHeight: 1.2,
-                                                }}
-                                            >
-                                                Barangay East Tapinac
-                                            </div>
-                                            <div
-                                                style={{
-                                                    fontSize: 6,
-                                                    color: "#9090aa",
-                                                    letterSpacing: ".8px",
-                                                    textTransform: "uppercase",
-                                                    marginTop: 1,
-                                                }}
-                                            >
-                                                City of Olongapo · Republic of
-                                                the Philippines
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div
-                                        style={{
-                                            height: 1.5,
-                                            background: "#c0392b",
-                                            flexShrink: 0,
-                                            marginBottom: 1,
-                                        }}
-                                    />
-                                    <div
-                                        style={{
-                                            height: 2,
-                                            background:
-                                                "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
-                                            flexShrink: 0,
-                                        }}
-                                    />
-
-                                    {/* Body */}
-                                    <div
-                                        style={{
-                                            flex: 1,
-                                            display: "flex",
-                                            gap: 10,
-                                            marginTop: 8,
-                                        }}
-                                    >
-                                        {/* Info side */}
-                                        <div
-                                            style={{
-                                                flex: 1,
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                justifyContent: "space-between",
-                                            }}
-                                        >
-                                            <div>
-                                                <div
-                                                    style={{
-                                                        fontSize: 5.5,
-                                                        fontWeight: 700,
-                                                        color: "#9090aa",
-                                                        letterSpacing: "1.2px",
-                                                        textTransform:
-                                                            "uppercase",
-                                                        marginBottom: 2,
-                                                    }}
-                                                >
-                                                    Resident Name
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        fontFamily:
-                                                            "'Playfair Display',serif",
-                                                        fontSize: 12,
-                                                        fontWeight: 700,
-                                                        color: "#0e2554",
-                                                        lineHeight: 1.2,
-                                                    }}
-                                                >
-                                                    {resident.name}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div
-                                                    style={{
-                                                        fontSize: 5.5,
-                                                        fontWeight: 700,
-                                                        color: "#9090aa",
-                                                        letterSpacing: "1.2px",
-                                                        textTransform:
-                                                            "uppercase",
-                                                        marginBottom: 2,
-                                                    }}
-                                                >
-                                                    Address
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        fontSize: 7,
-                                                        color: "#4a4a6a",
-                                                        lineHeight: 1.5,
-                                                    }}
-                                                >
-                                                    {resident.addr}, Olongapo
-                                                    City
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <div
-                                                    style={{
-                                                        fontSize: 5.5,
-                                                        fontWeight: 700,
-                                                        color: "#9090aa",
-                                                        letterSpacing: "1.2px",
-                                                        textTransform:
-                                                            "uppercase",
-                                                        marginBottom: 2,
-                                                    }}
-                                                >
-                                                    Resident ID
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        fontFamily:
-                                                            "'Courier New',monospace",
-                                                        fontSize: 8,
-                                                        color: "#0e2554",
-                                                        fontWeight: 700,
-                                                    }}
-                                                >
-                                                    {resident.id}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {/* QR side — empty rectangle placeholder */}
-                                        {/* TODO: Replace this placeholder with actual generated QR code image using the qrcode npm package */}
-                                        {/* Example: <img src={generateQRDataURL(resident.qr)} width={72} height={72} /> */}
-                                        <div
-                                            style={{
-                                                flexShrink: 0,
-                                                width: 76,
-                                                display: "flex",
-                                                flexDirection: "column",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                gap: 4,
-                                            }}
-                                        >
-                                            <div
-                                                style={{
-                                                    width: 72,
-                                                    height: 72,
-                                                    border: "1.5px solid #333",
-                                                    borderRadius: 3,
-                                                    background: "#fff",
-                                                }}
-                                            />
-                                            <div
-                                                style={{
-                                                    fontFamily:
-                                                        "'Courier New',monospace",
-                                                    fontSize: 5,
-                                                    color: "#9090aa",
-                                                    textAlign: "center",
-                                                }}
-                                            >
-                                                {resident.qr}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden" }}>
+                                <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             </div>
                         </div>
+                        <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)" }} />
 
-                        {/* Divider */}
-                        <div
-                            style={{
-                                width: 1,
-                                background: "#e4dfd4",
-                                alignSelf: "stretch",
-                                margin: "0 4px",
-                            }}
-                        />
-
-                        {/* Back — intentionally blank */}
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: 6,
-                                flexShrink: 0,
-                            }}
-                        >
-                            <div
-                                style={{
-                                    fontSize: 9,
-                                    fontWeight: 700,
-                                    color: "#9090aa",
-                                    letterSpacing: "1.5px",
-                                    textTransform: "uppercase",
-                                }}
-                            >
-                                ▲ Back Side (Blank)
+                        {/* QR + name */}
+                        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                            <div style={{ textAlign: "center" }}>
+                                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#0e2554" }}>{resident.name}</div>
+                                <div style={{ fontSize: 10, color: "#9090aa", marginTop: 2 }}>ID: <span style={{ fontWeight: 600, color: "#4a4a6a" }}>{resident.id}</span></div>
                             </div>
-                            <div className="rr-wallet-card">
-                                <div className="rr-card-back" />
+                            {/* QR with gold corner brackets */}
+                            <div style={{ padding: 12, background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.06)", position: "relative" }}>
+                                {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
+                                    <div key={v+h} style={{ position: "absolute", [v]: 6, [h]: 6, width: 14, height: 14, [`border${v[0].toUpperCase()+v.slice(1)}`]: "2px solid #c9a227", [`border${h[0].toUpperCase()+h.slice(1)}`]: "2px solid #c9a227", borderRadius: v==="top"&&h==="left"?"2px 0 0 0":v==="top"&&h==="right"?"0 2px 0 0":v==="bottom"&&h==="left"?"0 0 0 2px":"0 0 2px 0" }} />
+                                ))}
+                                <QRCodeSVG value={qrValue} size={160} level="H" includeMargin={false} fgColor="#0e2554" bgColor="#ffffff" />
+                            </div>
+                            <div style={{ textAlign: "center" }}>
+                                <div style={{ fontSize: 11, color: "#4a4a6a", fontWeight: 600 }}>Barangay East Tapinac, Olongapo City</div>
+                                <div style={{ fontSize: 10, color: "#9090aa", marginTop: 1 }}>City of Olongapo, Zambales</div>
                             </div>
                         </div>
+                        <div style={{ background: "#f8f6f1", borderTop: "1px solid #e4dfd4", padding: "8px 16px", display: "flex", alignItems: "center", gap: 5 }}>
+                            <AlertCircle size={10} color="#9090aa" />
+                            <span style={{ fontSize: 10, color: "#9090aa" }}>This QR is unique to this resident's account.</span>
+                        </div>
+                    </div>
+
+                    {/* Tip */}
+                    <div style={{ background: "#f5edce", border: "1px solid #e0d4a8", borderRadius: 6, padding: "10px 14px", display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <Scissors size={12} color="#9a7515" style={{ flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ fontSize: 11.5, color: "#7a6530", lineHeight: 1.6 }}>
+                            Clicking <strong>Print</strong> will print <strong>6 wallet-sized cards</strong> on one A4 sheet (CR80, 54 × 85.6 mm). Cut and laminate for the resident.
+                        </span>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div
-                    style={{
-                        padding: "14px 24px",
-                        borderTop: "1px solid #e4dfd4",
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        gap: 10,
-                        background: "#f8f6f1",
-                        alignItems: "center",
-                    }}
-                >
-                    <div style={{ fontSize: 11, color: "#9090aa", flex: 1 }}>
-                        💡 Tip: Print on card stock or thick paper for best
-                        results before laminating.
-                    </div>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            padding: "8px 18px",
-                            background: "#fff",
-                            border: "1.5px solid #e4dfd4",
-                            borderRadius: 4,
-                            fontSize: 12.5,
-                            cursor: "pointer",
-                            fontFamily: "'Source Serif 4',serif",
-                            color: "#4a4a6a",
-                        }}
-                    >
+                <div style={{ padding: "14px 24px", borderTop: "1px solid #e4dfd4", display: "flex", justifyContent: "flex-end", gap: 10, background: "#f8f6f1" }}>
+                    <button onClick={onClose} style={{ padding: "9px 18px", background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 4, fontSize: 12.5, cursor: "pointer", fontFamily: "'Source Serif 4',serif", color: "#4a4a6a" }}>
                         Cancel
                     </button>
-                    {/* TODO: implement actual print — window.print() targets the card only */}
                     <button
-                        style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "8px 22px",
-                            background: "#0e2554",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            fontSize: 12.5,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            fontFamily: "'Source Serif 4',serif",
-                        }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 22px", background: "linear-gradient(135deg,#163066,#091a3e)", color: "#fff", border: "none", borderRadius: 4, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "'Playfair Display',serif", letterSpacing: 1 }}
                         onClick={() => window.print()}
                     >
-                        <Printer size={13} /> Print Card
+                        <Printer size={13} /> Print 6 Cards
                     </button>
                 </div>
             </div>
         </div>
+
+        {/* ── Print sheet — hidden on screen, shown on @media print ── */}
+        <div id="rr-qr-print-sheet">
+            <div className="rr-ps-title">
+                CertiFast · Resident QR Wallet Card · {resident.name} · {resident.id}
+            </div>
+            <div className="rr-ps-hint">
+                ✂ Cut along the dashed borders · Laminate with a 54 × 86 mm pouch (credit card size)
+            </div>
+            <div className="rr-ps-grid">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <WalletCard key={i} name={resident.name} residentId={resident.id} qrValue={qrValue} />
+                ))}
+            </div>
+            <div className="rr-ps-cut">✂ Standard wallet / ID card size — 54 × 85.6 mm (CR80)</div>
+        </div>
+        </>
     );
 }
+
 
 // =============================================================
 // Resident Drawer
@@ -1193,102 +927,70 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR }) {
                         </>
                     )}
 
-                    {/* QR tab */}
+                    {/* QR tab — resident-side card design */}
                     {activeTab === "qr" && (
                         <>
-                            <div
-                                style={{
-                                    background: "#f8f6f1",
-                                    border: "1px solid #e4dfd4",
-                                    borderRadius: 6,
-                                    padding: 18,
-                                    display: "flex",
-                                    gap: 18,
-                                    alignItems: "center",
-                                    marginBottom: 16,
-                                }}
-                            >
-                                {/* QR placeholder */}
-                                <div
-                                    style={{
-                                        width: 96,
-                                        height: 96,
-                                        background: "#fff",
-                                        border: "1.5px solid #e4dfd4",
-                                        borderRadius: 4,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    {/* TODO: render actual QR code using qrcode npm package */}
-                                    {/* <img src={generateQRDataURL(resident.qr)} width={88} height={88} /> */}
-                                    <QrCodeSVG />
+                            {/* Card preview — matches resident's My QR page */}
+                            <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 10, overflow: "hidden", marginBottom: 14 }}>
+                                <div style={{ background: "linear-gradient(135deg, #0e2554, #163066)", padding: "12px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <div>
+                                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: "#fff" }}>CertiFast</div>
+                                        <div style={{ fontSize: 8, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", marginTop: 1 }}>Barangay East Tapinac</div>
+                                    </div>
+                                    <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden" }}>
+                                        <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    </div>
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <div
-                                        style={{
-                                            fontSize: 10,
-                                            fontWeight: 700,
-                                            color: "#9090aa",
-                                            letterSpacing: "1px",
-                                            textTransform: "uppercase",
-                                            marginBottom: 4,
-                                        }}
-                                    >
-                                        Resident QR Code
+                                <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)" }} />
+
+                                <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                                    {/* Name + ID */}
+                                    <div style={{ textAlign: "center" }}>
+                                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: "#0e2554" }}>{resident.name}</div>
+                                        <div style={{ fontSize: 11, color: "#9090aa", marginTop: 3 }}>
+                                            Resident ID: <span style={{ fontWeight: 600, color: "#4a4a6a", fontFamily: "'Courier New',monospace" }}>{resident.id}</span>
+                                        </div>
                                     </div>
-                                    <div
-                                        style={{
-                                            fontFamily:
-                                                "'Courier New',monospace",
-                                            fontSize: 12,
-                                            color: "#0e2554",
-                                            fontWeight: 700,
-                                            marginBottom: 8,
-                                        }}
-                                    >
-                                        {resident.qr}
+
+                                    {/* QR code with gold corner brackets */}
+                                    <div style={{ padding: 14, background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", position: "relative" }}>
+                                        {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
+                                            <div key={v+h} style={{ position: "absolute", [v]: 8, [h]: 8, width: 16, height: 16, [`border${v[0].toUpperCase()+v.slice(1)}`]: "2.5px solid #c9a227", [`border${h[0].toUpperCase()+h.slice(1)}`]: "2.5px solid #c9a227", borderRadius: v==="top"&&h==="left"?"3px 0 0 0":v==="top"&&h==="right"?"0 3px 0 0":v==="bottom"&&h==="left"?"0 0 0 3px":"0 0 3px 0" }} />
+                                        ))}
+                                        <QRCodeSVG
+                                            value={`certifast:resident:${resident.id}`}
+                                            size={180}
+                                            level="H"
+                                            includeMargin={false}
+                                            fgColor="#0e2554"
+                                            bgColor="#ffffff"
+                                        />
                                     </div>
-                                    <div
-                                        style={{
-                                            fontSize: 10.5,
-                                            color: "#9090aa",
-                                            lineHeight: 1.5,
-                                            marginBottom: 12,
-                                        }}
-                                    >
-                                        This QR code is permanent and uniquely
-                                        tied to this resident's account. It is
-                                        used to verify identity during
-                                        certificate pickup.
+
+                                    <div style={{ textAlign: "center" }}>
+                                        <div style={{ fontSize: 11.5, color: "#4a4a6a", fontWeight: 600 }}>Barangay East Tapinac, Olongapo City</div>
+                                        <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>City of Olongapo, Zambales</div>
                                     </div>
-                                    <button
-                                        className="rr-print-card-btn"
-                                        onClick={() => onPrintQR(resident)}
-                                    >
-                                        <Printer size={13} /> Print QR Card
-                                    </button>
+                                </div>
+
+                                <div style={{ background: "#f8f6f1", borderTop: "1px solid #e4dfd4", padding: "10px 18px", display: "flex", alignItems: "center", gap: 6 }}>
+                                    <AlertCircle size={11} color="#9090aa" />
+                                    <span style={{ fontSize: 11, color: "#9090aa" }}>This QR is permanent and uniquely tied to this resident's account.</span>
                                 </div>
                             </div>
-                            <div
-                                style={{
-                                    background: "#fff3e0",
-                                    border: "1px solid rgba(184,104,0,.25)",
-                                    borderRadius: 6,
-                                    padding: "12px 16px",
-                                    fontSize: 11.5,
-                                    color: "#b86800",
-                                    lineHeight: 1.6,
-                                }}
-                            >
-                                <strong>How to use:</strong> Print the QR card,
-                                cut along the dashed border, and give it to the
-                                resident to laminate. They present this card at
-                                the barangay office during certificate pickup —
-                                staff scans the QR to verify identity instantly.
+
+                            {/* How to use tip */}
+                            <div style={{ background: "#f5edce", border: "1px solid #e0d4a8", borderRadius: 6, padding: "12px 14px", marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                                <Scissors size={13} color="#9a7515" style={{ flexShrink: 0, marginTop: 1 }} />
+                                <span style={{ fontSize: 12, color: "#7a6530", lineHeight: 1.65 }}>
+                                    <strong>How to use:</strong> Click <em>Print 6 Cards</em> to print a sheet of 6 wallet-sized cards (CR80). Cut along the dashed borders and give to the resident to laminate. They show this card at the barangay office — staff scans it to pull up their latest request instantly.
+                                </span>
                             </div>
+
+                            {/* Print button */}
+                            <button className="rr-print-card-btn" style={{ width: "100%", justifyContent: "center" }} onClick={() => onPrintQR(resident)}>
+                                <Printer size={13} /> Print 6 Wallet Cards
+                            </button>
                         </>
                     )}
                 </div>
@@ -1297,35 +999,6 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR }) {
     );
 }
 
-// Simple decorative QR placeholder SVG (matches the HTML wireframe)
-function QrCodeSVG() {
-    return (
-        <svg width="70" height="70" viewBox="0 0 70 70" fill="none">
-            <rect x="2" y="2" width="28" height="28" rx="2" fill="#0e2554" />
-            <rect x="8" y="8" width="16" height="16" rx="1" fill="#fff" />
-            <rect x="11" y="11" width="10" height="10" fill="#0e2554" />
-            <rect x="40" y="2" width="28" height="28" rx="2" fill="#0e2554" />
-            <rect x="46" y="8" width="16" height="16" rx="1" fill="#fff" />
-            <rect x="49" y="11" width="10" height="10" fill="#0e2554" />
-            <rect x="2" y="40" width="28" height="28" rx="2" fill="#0e2554" />
-            <rect x="8" y="46" width="16" height="16" rx="1" fill="#fff" />
-            <rect x="11" y="49" width="10" height="10" fill="#0e2554" />
-            <rect x="40" y="40" width="4" height="4" fill="#0e2554" />
-            <rect x="46" y="40" width="4" height="4" fill="#0e2554" />
-            <rect x="52" y="40" width="4" height="4" fill="#0e2554" />
-            <rect x="58" y="40" width="10" height="4" fill="#0e2554" />
-            <rect x="40" y="46" width="10" height="4" fill="#0e2554" />
-            <rect x="54" y="46" width="4" height="4" fill="#0e2554" />
-            <rect x="40" y="52" width="4" height="4" fill="#0e2554" />
-            <rect x="46" y="52" width="10" height="4" fill="#0e2554" />
-            <rect x="58" y="52" width="10" height="4" fill="#0e2554" />
-            <rect x="40" y="58" width="4" height="4" fill="#0e2554" />
-            <rect x="48" y="58" width="4" height="4" fill="#0e2554" />
-            <rect x="56" y="58" width="4" height="4" fill="#0e2554" />
-            <rect x="62" y="58" width="6" height="4" fill="#0e2554" />
-        </svg>
-    );
-}
 
 // =============================================================
 // Main Component

@@ -814,16 +814,50 @@ function PrintPreviewModal({ cert, formData, docId, onClose, onConfirm }) {
     const dateStr = `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
 
     const buildBody = () => {
-        const name = formData.residentName;
+        const name    = formData.residentName;
         const address = formData.address;
         const purpose = formData.purpose;
-        let body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that <strong style="text-decoration:underline;text-transform:uppercase;">${name}</strong>, of legal age, Filipino citizen, and a bona fide resident of <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is personally known to this office to be a person of good standing in the community.`;
+        const dob     = formData.dateOfBirth
+            ? new Date(formData.dateOfBirth).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+            : "";
+        const age     = formData.dateOfBirth ? (() => {
+            const b = new Date(formData.dateOfBirth), t = new Date();
+            let a = t.getFullYear() - b.getFullYear();
+            if (t < new Date(t.getFullYear(), b.getMonth(), b.getDate())) a--;
+            return a;
+        })() : "";
+        const civil   = formData.civilStatus || "Single";
+        const nat     = formData.nationality || "Filipino";
+
+        const person = `<strong style="text-decoration:underline;text-transform:uppercase;">${name}</strong>, ${age}y/o, born on <strong>${dob}</strong>, ${civil}, ${nat} citizen`;
+
+        let body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, and presently residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is personally known to this office to be a person of good standing in the community.`;
+
         if (cert.name === "Certificate of Indigency") {
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that <strong style="text-decoration:underline;text-transform:uppercase;">${name}</strong>, of legal age, Filipino citizen, and a resident of <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, belongs to an indigent family within the jurisdiction of this barangay and is qualified to avail of government assistance programs.`;
-        } else if (cert.name === "Business Permit") {
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that <strong style="text-decoration:underline;text-transform:uppercase;">${name}</strong>, of legal age, Filipino citizen, and a resident of <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is hereby authorized to operate a business establishment within the jurisdiction of this barangay, for the purpose of <strong>${purpose}</strong>.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, belongs to an indigent family within the jurisdiction of this barangay and is qualified to avail of government assistance programs.`;
+        } else if (cert.name === "Certificate of Residency") {
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, with good moral character and a law-abiding citizen, is presently residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City.`;
+        } else if (cert.name === "Business Permit" || cert.name === "Barangay Business Clearance (Renewal)") {
+            const bname = formData.businessName ? ` known as <strong>${formData.businessName}</strong>` : "";
+            const btype = formData.businessType ? ` for <strong>${formData.businessType}</strong>` : "";
+            const barea = formData.businessArea ? ` covering an area of <strong>${formData.businessArea}</strong>` : "";
+            const baddr = formData.businessAddress ? ` located at <strong>${formData.businessAddress}</strong>` : "";
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is hereby authorized to operate a business establishment${bname}${btype}${baddr}${barea}.`;
+        } else if (cert.name === "Certificate of Cohabitation" && formData.partnerName) {
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, and <strong style="text-decoration:underline;text-transform:uppercase;">${formData.partnerName}</strong> are known to this office to be cohabiting as a couple within the jurisdiction of this barangay.`;
+        } else if (cert.name === "Certificate of Guardianship" && formData.wardName) {
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is the legal guardian of <strong style="text-decoration:underline;text-transform:uppercase;">${formData.wardName}</strong> as ${formData.relationship || "guardian"}.`;
+        } else if (cert.name === "Certificate of Live Birth (Endorsement)" && formData.childName) {
+            const childDOBStr = formData.childDOB
+                ? new Date(formData.childDOB).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                : "";
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is endorsing the late registration of the birth of <strong style="text-decoration:underline;text-transform:uppercase;">${formData.childName}</strong>${childDOBStr ? `, born on <strong>${childDOBStr}</strong>` : ""}${formData.fatherName ? `, father: <strong>${formData.fatherName}</strong>` : ""}${formData.motherName ? `, mother: <strong>${formData.motherName}</strong>` : ""}.`;
+        } else if (cert.name === "Good Moral Certificate") {
+            const inst = formData.requestingInstitution ? ` for submission to <strong>${formData.requestingInstitution}</strong>` : "";
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is a person of good moral character and is known to this office as a law-abiding citizen of the barangay${inst}.`;
         }
-        body += `<br/><br/>This certification is issued upon the request of the above-named individual for the purpose of <strong>${purpose}</strong> and for whatever legal purpose it may serve.`;
+
+        body += `<br/><br/>This certification is being issued upon the request of the above-named individual for <strong>${purpose}</strong> and for whatever legal purpose it may serve.`;
         return body;
     };
 
@@ -1169,7 +1203,15 @@ export default function WalkInIssuance({
 
     const handleSelectCert = (cert) => {
         setSelectedCert(cert);
-        setFormData({ residentName: "", address: "", purpose: "" });
+        setFormData({
+            residentName: "", dateOfBirth: "", civilStatus: "Single",
+            nationality: "Filipino", address: "", purpose: "",
+            // cert-specific extras
+            businessName: "", businessAddress: "", businessType: "", businessArea: "",
+            partnerName: "", wardName: "", relationship: "",
+            childName: "", childDOB: "", fatherName: "", motherName: "",
+            requestingInstitution: "",
+        });
         setFormError("");
     };
 
@@ -1179,21 +1221,26 @@ export default function WalkInIssuance({
     };
 
     const handleOpenPreview = () => {
-        if (!selectedCert) {
-            setFormError("Please select a certificate type.");
-            return;
+        if (!selectedCert) { setFormError("Please select a certificate type."); return; }
+        if (!formData.residentName.trim()) { setFormError("Please enter the resident's full name."); return; }
+        if (!formData.dateOfBirth) { setFormError("Please enter the resident's date of birth."); return; }
+        if (!formData.address.trim()) { setFormError("Please enter the resident's address."); return; }
+        if (!formData.purpose.trim()) { setFormError("Please enter the purpose."); return; }
+        // Cert-specific validation
+        if ((selectedCert.name === "Business Permit" || selectedCert.name === "Barangay Business Clearance (Renewal)") && !formData.businessName.trim()) {
+            setFormError("Please enter the business name."); return;
         }
-        if (!formData.residentName.trim()) {
-            setFormError("Please enter the resident's full name.");
-            return;
+        if (selectedCert.name === "Business Permit" && !formData.businessType.trim()) {
+            setFormError("Please enter the type of business."); return;
         }
-        if (!formData.address.trim()) {
-            setFormError("Please enter the resident's address.");
-            return;
+        if (selectedCert.name === "Certificate of Cohabitation" && !formData.partnerName.trim()) {
+            setFormError("Please enter the partner's full name."); return;
         }
-        if (!formData.purpose.trim()) {
-            setFormError("Please enter the purpose.");
-            return;
+        if (selectedCert.name === "Certificate of Guardianship" && !formData.wardName.trim()) {
+            setFormError("Please enter the ward's full name."); return;
+        }
+        if (selectedCert.name === "Certificate of Live Birth (Endorsement)" && !formData.childName.trim()) {
+            setFormError("Please enter the child's full name."); return;
         }
         setFormError("");
         setShowPreview(true);
@@ -1221,7 +1268,14 @@ export default function WalkInIssuance({
         );
         // Reset
         setSelectedCert(null);
-        setFormData({ residentName: "", address: "", purpose: "" });
+        setFormData({
+            residentName: "", dateOfBirth: "", civilStatus: "Single",
+            nationality: "Filipino", address: "", purpose: "",
+            businessName: "", businessAddress: "", businessType: "", businessArea: "",
+            partnerName: "", wardName: "", relationship: "",
+            childName: "", childDOB: "", fatherName: "", motherName: "",
+            requestingInstitution: "",
+        });
         setShowPreview(false);
         // TODO: trigger window.print() after logging
     };
@@ -1623,81 +1677,128 @@ export default function WalkInIssuance({
                                 )}
 
                                 {/* Form fields */}
-                                <div
-                                    style={{
-                                        display: "grid",
-                                        gridTemplateColumns: isMobile
-                                            ? "1fr"
-                                            : "1fr 1fr 1fr auto",
-                                        gap: 12,
-                                        alignItems: "flex-end",
-                                    }}
-                                >
-                                    <div>
-                                        <div style={f.label}>
-                                            Full Name{" "}
-                                            <span style={{ color: "#b02020" }}>
-                                                *
-                                            </span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+                                    {/* Row 1 — core identity */}
+                                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr", gap: 10 }}>
+                                        <div>
+                                            <div style={f.label}>Full Name <span style={{ color: "#b02020" }}>*</span></div>
+                                            <input className="wi-input" name="residentName" type="text" placeholder="e.g. Juan dela Cruz" value={formData.residentName} onChange={handleFormChange} />
                                         </div>
-                                        <input
-                                            className="wi-input"
-                                            name="residentName"
-                                            type="text"
-                                            placeholder="e.g. Juan dela Cruz"
-                                            value={formData.residentName}
-                                            onChange={handleFormChange}
-                                        />
-                                    </div>
-                                    <div>
-                                        <div style={f.label}>
-                                            Address{" "}
-                                            <span style={{ color: "#b02020" }}>
-                                                *
-                                            </span>
+                                        <div>
+                                            <div style={f.label}>Date of Birth <span style={{ color: "#b02020" }}>*</span></div>
+                                            <input className="wi-input" name="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={handleFormChange} max={new Date().toISOString().split("T")[0]} />
                                         </div>
-                                        <input
-                                            className="wi-input"
-                                            name="address"
-                                            type="text"
-                                            placeholder="Street, East Tapinac"
-                                            value={formData.address}
-                                            onChange={handleFormChange}
-                                        />
-                                    </div>
-                                    <div>
-                                        <div style={f.label}>
-                                            Purpose{" "}
-                                            <span style={{ color: "#b02020" }}>
-                                                *
-                                            </span>
+                                        <div>
+                                            <div style={f.label}>Age</div>
+                                            <input className="wi-input" readOnly value={formData.dateOfBirth ? (() => { const b = new Date(formData.dateOfBirth); const t = new Date(); let a = t.getFullYear() - b.getFullYear(); if (t < new Date(t.getFullYear(), b.getMonth(), b.getDate())) a--; return a + " y/o"; })() : ""} style={{ background: "#f8f6f1", color: "#9090aa" }} />
                                         </div>
-                                        <input
-                                            className="wi-input"
-                                            name="purpose"
-                                            type="text"
-                                            placeholder="e.g. Employment"
-                                            value={formData.purpose}
-                                            onChange={handleFormChange}
-                                        />
                                     </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "flex-end",
-                                        }}
-                                    >
-                                        <button
-                                            className="wi-preview-btn"
-                                            onClick={handleOpenPreview}
-                                            style={{
-                                                width: isMobile
-                                                    ? "100%"
-                                                    : "auto",
-                                            }}
-                                        >
-                                            <Eye size={13} /> Preview &amp;
-                                            Print
+
+                                    {/* Row 2 — civil status, nationality, address */}
+                                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 2fr", gap: 10 }}>
+                                        <div>
+                                            <div style={f.label}>Civil Status</div>
+                                            <select className="wi-input" name="civilStatus" value={formData.civilStatus} onChange={handleFormChange} style={{ cursor: "pointer" }}>
+                                                {["Single","Married","Widowed","Separated","Annulled"].map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <div style={f.label}>Nationality</div>
+                                            <input className="wi-input" name="nationality" type="text" value={formData.nationality} onChange={handleFormChange} />
+                                        </div>
+                                        <div>
+                                            <div style={f.label}>Address <span style={{ color: "#b02020" }}>*</span></div>
+                                            <input className="wi-input" name="address" type="text" placeholder="House No. + Street, East Tapinac" value={formData.address} onChange={handleFormChange} />
+                                        </div>
+                                    </div>
+
+                                    {/* Cert-specific extras */}
+                                    {(selectedCert.name === "Business Permit" || selectedCert.name === "Barangay Business Clearance (Renewal)") && (
+                                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, padding: "12px 14px", background: "#faf8ff", border: "1px solid #ede8ff", borderRadius: 6 }}>
+                                            <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: "#6a3db8", textTransform: "uppercase", letterSpacing: 1 }}>Business Details</div>
+                                            <div>
+                                                <div style={f.label}>Business / Trade Name <span style={{ color: "#b02020" }}>*</span></div>
+                                                <input className="wi-input" name="businessName" type="text" placeholder="e.g. Santos General Store" value={formData.businessName} onChange={handleFormChange} />
+                                            </div>
+                                            <div>
+                                                <div style={f.label}>Business Address <span style={{ color: "#b02020" }}>*</span></div>
+                                                <input className="wi-input" name="businessAddress" type="text" placeholder="Street, East Tapinac" value={formData.businessAddress} onChange={handleFormChange} />
+                                            </div>
+                                            {selectedCert.name === "Business Permit" && (
+                                                <>
+                                                    <div>
+                                                        <div style={f.label}>Type of Business <span style={{ color: "#b02020" }}>*</span></div>
+                                                        <input className="wi-input" name="businessType" type="text" placeholder="e.g. Sari-sari store, Wi-Fi installation" value={formData.businessType} onChange={handleFormChange} />
+                                                    </div>
+                                                    <div>
+                                                        <div style={f.label}>Coverage / Area (optional)</div>
+                                                        <input className="wi-input" name="businessArea" type="text" placeholder="e.g. 30 meters, 50 sqm" value={formData.businessArea} onChange={handleFormChange} />
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {selectedCert.name === "Certificate of Cohabitation" && (
+                                        <div style={{ padding: "12px 14px", background: "#faf8ff", border: "1px solid #ede8ff", borderRadius: 6 }}>
+                                            <div style={{ fontSize: 10, fontWeight: 700, color: "#6a3db8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Partner Details</div>
+                                            <div style={f.label}>Partner's Full Name <span style={{ color: "#b02020" }}>*</span></div>
+                                            <input className="wi-input" name="partnerName" type="text" placeholder="Full legal name of partner" value={formData.partnerName} onChange={handleFormChange} />
+                                        </div>
+                                    )}
+
+                                    {selectedCert.name === "Certificate of Guardianship" && (
+                                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, padding: "12px 14px", background: "#faf8ff", border: "1px solid #ede8ff", borderRadius: 6 }}>
+                                            <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: "#6a3db8", textTransform: "uppercase", letterSpacing: 1 }}>Ward Details</div>
+                                            <div>
+                                                <div style={f.label}>Ward's Full Name <span style={{ color: "#b02020" }}>*</span></div>
+                                                <input className="wi-input" name="wardName" type="text" placeholder="Full legal name of the ward" value={formData.wardName} onChange={handleFormChange} />
+                                            </div>
+                                            <div>
+                                                <div style={f.label}>Relationship to Ward <span style={{ color: "#b02020" }}>*</span></div>
+                                                <input className="wi-input" name="relationship" type="text" placeholder="e.g. Uncle, Grandparent" value={formData.relationship} onChange={handleFormChange} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedCert.name === "Certificate of Live Birth (Endorsement)" && (
+                                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, padding: "12px 14px", background: "#faf8ff", border: "1px solid #ede8ff", borderRadius: 6 }}>
+                                            <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: "#6a3db8", textTransform: "uppercase", letterSpacing: 1 }}>Child's Details</div>
+                                            <div>
+                                                <div style={f.label}>Child's Full Name <span style={{ color: "#b02020" }}>*</span></div>
+                                                <input className="wi-input" name="childName" type="text" placeholder="Full name of the child" value={formData.childName} onChange={handleFormChange} />
+                                            </div>
+                                            <div>
+                                                <div style={f.label}>Child's Date of Birth <span style={{ color: "#b02020" }}>*</span></div>
+                                                <input className="wi-input" name="childDOB" type="date" value={formData.childDOB} onChange={handleFormChange} />
+                                            </div>
+                                            <div>
+                                                <div style={f.label}>Father's Full Name (optional)</div>
+                                                <input className="wi-input" name="fatherName" type="text" placeholder="Leave blank if unknown" value={formData.fatherName} onChange={handleFormChange} />
+                                            </div>
+                                            <div>
+                                                <div style={f.label}>Mother's Full Name (optional)</div>
+                                                <input className="wi-input" name="motherName" type="text" placeholder="Full maiden name" value={formData.motherName} onChange={handleFormChange} />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedCert.name === "Good Moral Certificate" && (
+                                        <div style={{ padding: "12px 14px", background: "#faf8ff", border: "1px solid #ede8ff", borderRadius: 6 }}>
+                                            <div style={f.label}>Requesting School / Employer (optional)</div>
+                                            <input className="wi-input" name="requestingInstitution" type="text" placeholder="e.g. Olongapo City College" value={formData.requestingInstitution} onChange={handleFormChange} />
+                                        </div>
+                                    )}
+
+                                    {/* Row 3 — purpose + action */}
+                                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 10, alignItems: "flex-end" }}>
+                                        <div>
+                                            <div style={f.label}>Purpose <span style={{ color: "#b02020" }}>*</span></div>
+                                            <input className="wi-input" name="purpose" type="text" placeholder="e.g. Employment, School Requirement" value={formData.purpose} onChange={handleFormChange} />
+                                        </div>
+                                        <button className="wi-preview-btn" onClick={handleOpenPreview} style={{ width: isMobile ? "100%" : "auto" }}>
+                                            <Eye size={13} /> Preview &amp; Print
                                         </button>
                                     </div>
                                 </div>
