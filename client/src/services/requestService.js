@@ -11,6 +11,23 @@ const requestService = {
         });
         return res.data;
     },
+
+    // Alias used by resident pages for a consistent API.
+    getAllRequests: async () => {
+        const token = authService.getResidentToken();
+        const res = await axios.get(`${API}/resident/requests`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return res.data;
+    },
+
+    createRequest: async (payload) => {
+        const token = authService.getResidentToken();
+        const res = await axios.post(`${API}/resident/requests`, payload, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return res.data;
+    },
 };
 
 export default requestService;

@@ -2,6 +2,17 @@ import axios from "axios";
 
 const API = "http://localhost:5000/api";
 
+const getTokenFromAuthBlob = (storageKey) => {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed?.token || null;
+    } catch {
+        return null;
+    }
+};
+
 const authService = {
     // Resident Register
     residentRegister: async (formData) => {
@@ -33,8 +44,12 @@ const authService = {
     },
 
     // Get tokens for protected requests
-    getResidentToken: () => localStorage.getItem("certifast_resident_token"),
-    getAdminToken: () => localStorage.getItem("certifast_admin_token"),
+    getResidentToken: () =>
+        localStorage.getItem("certifast_resident_token") ||
+        getTokenFromAuthBlob("certifast_resident_auth"),
+    getAdminToken: () =>
+        localStorage.getItem("certifast_admin_token") ||
+        getTokenFromAuthBlob("certifast_admin_auth"),
 };
 
 export default authService;

@@ -14,6 +14,7 @@ import {
     QrCode, ChevronRight, LogOut, Bell, Menu, X,
     FileCheck, AlertCircle, Home, UserCircle,
 } from "lucide-react";
+import requestService from "../../services/requestService";
 
 // ─── Inject styles ────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-home]")) {
@@ -110,15 +111,6 @@ if (!document.head.querySelector("[data-resident-home]")) {
     document.head.appendChild(s);
 }
 
-// ─── Mock data ────────────────────────────────────────────────
-const MOCK_REQUESTS = [
-    { request_id: "REQ-0041", type: "Barangay Clearance", status: "released", requested_at: "2025-03-10", released_at: "2025-03-12" },
-    { request_id: "REQ-0038", type: "Certificate of Residency", status: "pending", requested_at: "2025-03-15", released_at: null },
-    { request_id: "REQ-0035", type: "Certificate of Indigency", status: "processing", requested_at: "2025-03-08", released_at: null },
-    { request_id: "REQ-0030", type: "Good Moral Certificate", status: "rejected", requested_at: "2025-03-01", released_at: null },
-    { request_id: "REQ-0028", type: "Barangay Clearance", status: "released", requested_at: "2025-02-20", released_at: "2025-02-22" },
-];
-
 function formatDate(str) {
     if (!str) return "—";
     return new Date(str).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -148,13 +140,55 @@ export default function ResidentHome({ resident, onLogout }) {
     const navigate = useNavigate();
     const [width, setWidth] = useState(window.innerWidth);
     const [showMenu, setShowMenu] = useState(false);
-    const [requests, setRequests] = useState(MOCK_REQUESTS);
+    const [requests, setRequests] = useState([]);
+    const [loadingRequests, setLoadingRequests] = useState(true);
+    const [requestsError, setRequestsError] = useState("");
+    const [expandedReasonId, setExpandedReasonId] = useState(null);
     const [activeNav, setActiveNav] = useState("home");
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
         window.addEventListener("resize", fn);
         return () => window.removeEventListener("resize", fn);
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadRequests() {
+            try {
+                const result = await requestService.getAllRequests();
+                const rawRows = Array.isArray(result?.data)
+                    ? result.data
+                    : Array.isArray(result)
+                        ? result
+                        : [];
+
+                const normalized = rawRows.map((row) => ({
+                    request_id: row.request_id || row.id || "N/A",
+                    type: row.type || row.cert_type || row.certType || "Certificate Request",
+                    status: String(row.status || "pending").toLowerCase(),
+                    rejection_reason: row.rejection_reason || null,
+                    requested_at: row.requested_at || row.created_at || null,
+                    released_at: row.released_at || null,
+                }));
+
+                if (mounted) {
+                    setRequests(normalized);
+                    setRequestsError("");
+                }
+            } catch (err) {
+                if (mounted) {
+                    setRequests([]);
+                    setRequestsError(err?.response?.data?.message || "Unable to load your requests right now.");
+                }
+            } finally {
+                if (mounted) setLoadingRequests(false);
+            }
+        }
+
+        loadRequests();
+        return () => { mounted = false; };
     }, []);
 
     const isMobile = width < 768;
@@ -169,7 +203,9 @@ export default function ResidentHome({ resident, onLogout }) {
         rejected:   requests.filter(r => r.status === "rejected").length,
     };
 
-    const recentRequests = requests.slice(0, 5);
+    const recentRequests = [...requests]
+        .sort((a, b) => new Date(b.requested_at || 0) - new Date(a.requested_at || 0))
+        .slice(0, 5);
 
     return (
         <div className="rh-root">
@@ -304,25 +340,67 @@ export default function ResidentHome({ resident, onLogout }) {
                             </button>
                         </div>
 
-                        {recentRequests.length === 0 ? (
+                        {requestsError && (
+                            <div style={{ margin: "12px 20px 0", background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", color: "#b02020", fontSize: 12, display: "flex", gap: 7, alignItems: "center" }}>
+                                <AlertCircle size={12} />
+                                {requestsError}
+                            </div>
+                        )}
+
+                        {loadingRequests && [1, 2, 3].map((i) => (
+                            <div key={i} className="rh-req-row">
+                                <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f0ece4", flexShrink: 0 }} />
+                                <div style={{ flex: 1 }}>
+                                    <div style={{ width: "55%", height: 12, background: "#f0ece4", borderRadius: 4, marginBottom: 6 }} />
+                                    <div style={{ width: "35%", height: 10, background: "#f5f2ee", borderRadius: 4 }} />
+                                </div>
+                                <div style={{ width: 64, height: 20, background: "#f0ece4", borderRadius: 20 }} />
+                            </div>
+                        ))}
+
+                        {!loadingRequests && recentRequests.length === 0 ? (
                             <div style={{ padding: "36px 20px", textAlign: "center", color: "#9090aa", fontSize: 13, fontStyle: "italic" }}>
                                 No requests yet. Submit your first one!
                             </div>
                         ) : (
-                            recentRequests.map((req) => (
-                                <div key={req.request_id} className="rh-req-row">
-                                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f8f6f1", border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                        <StatusIcon status={req.status} />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{req.type}</div>
-                                        <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
-                                            {req.request_id} · Submitted {formatDate(req.requested_at)}
+                            !loadingRequests && recentRequests.map((req) => {
+                                const isRejected = req.status === "rejected";
+                                const isExpanded = expandedReasonId === req.request_id;
+                                const rejectionReason = req.rejection_reason || "No rejection reason was provided by the admin.";
+
+                                return (
+                                    <div key={req.request_id}>
+                                        <div className="rh-req-row">
+                                            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f8f6f1", border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                <StatusIcon status={req.status} />
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{req.type}</div>
+                                                <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
+                                                    {req.request_id} · Submitted {formatDate(req.requested_at)}
+                                                </div>
+                                            </div>
+                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                                                <StatusBadge status={req.status} />
+                                                {isRejected && (
+                                                    <button
+                                                        onClick={() => setExpandedReasonId(isExpanded ? null : req.request_id)}
+                                                        style={{ background: "none", border: "none", color: "#b02020", fontSize: 10.5, fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontFamily: "'Source Serif 4', serif" }}
+                                                    >
+                                                        {isExpanded ? "Hide reason" : "View reason"}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
+
+                                        {isRejected && isExpanded && (
+                                            <div style={{ margin: "0 20px 12px 70px", background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", fontSize: 11.5, color: "#7a1f1f", lineHeight: 1.6 }}>
+                                                <strong style={{ color: "#b02020" }}>Rejection Reason:</strong> {rejectionReason}
+                                            </div>
+                                        )}
                                     </div>
-                                    <StatusBadge status={req.status} />
-                                </div>
-                            ))
+                                );
+                            })
                         )}
 
                         <div style={{ padding: "12px 20px", background: "#f8f6f1", borderTop: "1px solid #e4dfd4", fontSize: 11, color: "#9090aa", display: "flex", alignItems: "center", gap: 6 }}>

@@ -1,5 +1,13 @@
 const { Pool } = require("pg");
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+
+const dotEnvPath = path.join(__dirname, "..", ".env");
+const fallbackEnvPath = path.join(__dirname, "..", "env");
+dotenv.config({
+    path: fs.existsSync(dotEnvPath) ? dotEnvPath : fallbackEnvPath,
+});
 
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,

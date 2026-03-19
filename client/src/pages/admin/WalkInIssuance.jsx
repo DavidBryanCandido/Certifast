@@ -32,6 +32,7 @@ import {
     Plus,
     Menu,
 } from "lucide-react";
+import walkInService from "../../services/walkInService";
 import {
     AdminSidebar,
     AdminMobileSidebar,
@@ -573,7 +574,7 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
 // =============================================================
 // Cert Picker Modal
 // =============================================================
-function CertPickerModal({ onClose, onPick }) {
+function CertPickerModal({ onClose, onPick, certs }) {
     const [query, setQuery] = useState("");
     const inputRef = useRef(null);
 
@@ -590,7 +591,7 @@ function CertPickerModal({ onClose, onPick }) {
         };
     }, [onClose]);
 
-    const filtered = ALL_CERTS.filter(
+    const filtered = certs.filter(
         (c) => !query || c.name.toLowerCase().includes(query.toLowerCase()),
     );
 
@@ -1168,17 +1169,69 @@ export default function WalkInIssuance({
     const [showCertModal, setShowCertModal] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
     const [formError, setFormError] = useState("");
+    const [loadingData, setLoadingData] = useState(true);
+    const [loadError, setLoadError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+    const [certs, setCerts] = useState(ALL_CERTS);
 
     // Log state
-    const [log, setLog] = useState(MOCK_LOG);
+    const [log, setLog] = useState([]);
     const [logQuery, setLogQuery] = useState("");
-    const [wiCounter, setWiCounter] = useState(35);
 
     // Toast
     const [toast, setToast] = useState(null);
     const toastTimer = useRef(null);
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
+    const quickCerts = certs.slice(0, 6);
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadData() {
+            setLoadingData(true);
+            setLoadError("");
+            try {
+                const [templatesRes, todayRes] = await Promise.all([
+                    walkInService.getCertTemplates(),
+                    walkInService.getTodayLog(),
+                ]);
+
+                if (!mounted) return;
+
+                const templateRows = Array.isArray(templatesRes?.data)
+                    ? templatesRes.data
+                    : Array.isArray(templatesRes)
+                        ? templatesRes
+                        : [];
+
+                const todayRows = Array.isArray(todayRes?.data)
+                    ? todayRes.data
+                    : Array.isArray(todayRes)
+                        ? todayRes
+                        : [];
+
+                setCerts(templateRows.length > 0 ? templateRows : ALL_CERTS);
+                setLog(todayRows);
+            } catch (err) {
+                if (!mounted) return;
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    onLogout?.();
+                    return;
+                }
+                setLoadError(err?.response?.data?.message || "Failed to load walk-in data.");
+                setCerts(ALL_CERTS);
+                setLog(MOCK_LOG);
+            } finally {
+                if (mounted) setLoadingData(false);
+            }
+        }
+
+        loadData();
+        return () => {
+            mounted = false;
+        };
+    }, [onLogout]);
 
     const handleNavigate = (page) => {
         setActivePage(page);
@@ -1246,38 +1299,53 @@ export default function WalkInIssuance({
         setShowPreview(true);
     };
 
-    const handleConfirmPrint = () => {
-        // TODO: POST /api/walkin/issue with formData + selectedCert + admin info
-        const now = new Date();
-        const timeStr = now.toLocaleTimeString("en-PH", {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-        const newEntry = {
-            id: `#WI-0${wiCounter}`,
-            name: formData.residentName,
-            type: shortName(selectedCert.name),
-            purpose: formData.purpose,
-            issuedBy: admin?.name?.split(" ").slice(-1)[0] || "Staff",
-            time: timeStr,
-        };
-        setLog((prev) => [newEntry, ...prev]);
-        setWiCounter((prev) => prev + 1);
-        showToast(
-            `${newEntry.id} — ${shortName(selectedCert.name)} issued and logged.`,
-        );
-        // Reset
-        setSelectedCert(null);
-        setFormData({
-            residentName: "", dateOfBirth: "", civilStatus: "Single",
-            nationality: "Filipino", address: "", purpose: "",
-            businessName: "", businessAddress: "", businessType: "", businessArea: "",
-            partnerName: "", wardName: "", relationship: "",
-            childName: "", childDOB: "", fatherName: "", motherName: "",
-            requestingInstitution: "",
-        });
-        setShowPreview(false);
-        // TODO: trigger window.print() after logging
+    const handleConfirmPrint = async () => {
+        if (!selectedCert || submitting) return;
+        setSubmitting(true);
+        setFormError("");
+
+        try {
+            const result = await walkInService.issueWalkIn({
+                certType: selectedCert.name,
+                residentName: formData.residentName,
+                address: formData.address,
+                purpose: formData.purpose,
+            });
+
+            const latestEntry = result?.entry || null;
+            if (latestEntry) {
+                setLog((prev) => [
+                    {
+                        ...latestEntry,
+                        type: shortName(latestEntry.type),
+                    },
+                    ...prev,
+                ]);
+            }
+
+            showToast(
+                `${result?.id || "#WI"} — ${shortName(selectedCert.name)} issued and logged.`,
+            );
+
+            setSelectedCert(null);
+            setFormData({
+                residentName: "", dateOfBirth: "", civilStatus: "Single",
+                nationality: "Filipino", address: "", purpose: "",
+                businessName: "", businessAddress: "", businessType: "", businessArea: "",
+                partnerName: "", wardName: "", relationship: "",
+                childName: "", childDOB: "", fatherName: "", motherName: "",
+                requestingInstitution: "",
+            });
+            setShowPreview(false);
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setFormError(err?.response?.data?.message || "Failed to issue walk-in certificate.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const filteredLog = log.filter(
@@ -1289,7 +1357,7 @@ export default function WalkInIssuance({
                 .includes(logQuery.toLowerCase()),
     );
 
-    const nextDocId = `#WI-0${wiCounter}`;
+    const nextDocId = `#WI-PREVIEW-${Date.now().toString().slice(-5)}`;
 
     return (
         <div className="wi-root">
@@ -1330,6 +1398,7 @@ export default function WalkInIssuance({
                 <CertPickerModal
                     onClose={() => setShowCertModal(false)}
                     onPick={handleSelectCert}
+                    certs={certs}
                 />
             )}
 
@@ -1502,7 +1571,7 @@ export default function WalkInIssuance({
                                 borderBottom: "1px solid #e4dfd4",
                             }}
                         >
-                            {QUICK_CERTS.map((cert) => (
+                            {quickCerts.map((cert) => (
                                 <button
                                     key={cert.name}
                                     className={`wi-cert-btn${selectedCert?.name === cert.name ? " selected" : ""}`}
@@ -1808,6 +1877,12 @@ export default function WalkInIssuance({
 
                     {/* ── Today's Log ── */}
                     <div style={p.panel}>
+                        {loadError && (
+                            <div style={{ margin: "12px 22px 0", background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", color: "#b02020", fontSize: 12, display: "flex", alignItems: "center", gap: 7 }}>
+                                <X size={12} /> {loadError}
+                            </div>
+                        )}
+
                         {/* Log header */}
                         <div style={p.panelHeader}>
                             <div
@@ -1837,7 +1912,7 @@ export default function WalkInIssuance({
                                         borderRadius: 10,
                                     }}
                                 >
-                                    {log.length} issued
+                                    {loadingData ? "..." : `${log.length} issued`}
                                 </span>
                             </div>
                             <span style={{ fontSize: 11, color: "#9090aa" }}>

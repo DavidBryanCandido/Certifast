@@ -11,7 +11,7 @@
 //   - All endpoints require adminToken + superadmin role
 // =============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -34,6 +34,7 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import logsService from "../../services/logsService";
 
 // =============================================================
 // useWindowSize
@@ -386,8 +387,41 @@ const TYPE_CONFIG = {
     settings: { label: "Settings" },
 };
 
-const UNIQUE_ACTORS = [...new Set(MOCK_LOGS.map((l) => l.actor))];
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50];
+
+function mapLogRow(row) {
+    const createdAt = row?.created_at ? new Date(row.created_at) : null;
+    const date = createdAt
+        ? createdAt.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+          })
+        : "-";
+    const time = createdAt
+        ? createdAt.toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+          })
+        : "-";
+
+    return {
+        rawId: row.log_id,
+        id: `LOG-${String(row.log_id || "").padStart(4, "0")}`,
+        date,
+        time,
+        type: row.type || "request",
+        actor: row.actor_name || "System",
+        role: row.actor_role || "System",
+        desc: row.description || row.action_type || "System activity",
+        meta:
+            row.target_table && row.target_id
+                ? `${row.target_table} · #${row.target_id}`
+                : row.action_type || "-",
+        ip: row.ip_address || "-",
+    };
+}
 
 // =============================================================
 // Log Detail Drawer
@@ -620,6 +654,18 @@ export default function LogsAuditTrail({
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedLog, setSelectedLog] = useState(null);
+    const [logs, setLogs] = useState([]);
+    const [actors, setActors] = useState([]);
+    const [statsData, setStatsData] = useState({
+        total: 0,
+        today: 0,
+        activeSessions: 0,
+        settingsChanges: 0,
+    });
+    const [totalLogs, setTotalLogs] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
 
@@ -646,58 +692,126 @@ export default function LogsAuditTrail({
         setDateFilter("");
     };
 
-    const filtered = MOCK_LOGS.filter((l) => {
-        if (typeFilter && l.type !== typeFilter) return false;
-        if (actorFilter && l.actor !== actorFilter) return false;
-        if (search) {
-            const q = search.toLowerCase();
-            if (
-                ![l.actor, l.desc, l.meta, l.id]
-                    .join(" ")
-                    .toLowerCase()
-                    .includes(q)
-            )
-                return false;
-        }
-        return true;
-    });
-
-    const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-    const paginated = filtered.slice(
-        (currentPage - 1) * rowsPerPage,
-        currentPage * rowsPerPage,
-    );
-    const showStart = filtered.length
-        ? Math.min((currentPage - 1) * rowsPerPage + 1, filtered.length)
+    const showStart = totalLogs
+        ? Math.min((currentPage - 1) * rowsPerPage + 1, totalLogs)
         : 0;
-    const showEnd = Math.min(currentPage * rowsPerPage, filtered.length);
+    const showEnd = Math.min(currentPage * rowsPerPage, totalLogs);
 
     useEffect(() => {
         setCurrentPage(1);
     }, [search, typeFilter, actorFilter, dateFilter, rowsPerPage]);
 
+    const loadLogs = useCallback(async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const result = await logsService.getLogs({
+                search,
+                type: typeFilter,
+                actor: actorFilter,
+                date: dateFilter,
+                page: currentPage,
+                limit: rowsPerPage,
+            });
+
+            const rows = Array.isArray(result?.data) ? result.data : [];
+            setLogs(rows.map(mapLogRow));
+            setActors(Array.isArray(result?.actors) ? result.actors : []);
+            setTotalLogs(Number(result?.total || 0));
+            setTotalPages(Number(result?.totalPages || 1));
+        } catch (err) {
+            if (err?.response?.status === 401) {
+                onLogout?.();
+                return;
+            }
+            if (err?.response?.status === 403) {
+                setError(
+                    err?.response?.data?.message ||
+                        "Logs & Audit Trail is restricted to superadmin accounts.",
+                );
+                setLogs([]);
+                setActors([]);
+                setTotalLogs(0);
+                setTotalPages(1);
+                return;
+            }
+            setLogs([]);
+            setActors([]);
+            setTotalLogs(0);
+            setTotalPages(1);
+            setError(err?.response?.data?.message || "Failed to load audit logs.");
+        } finally {
+            setLoading(false);
+        }
+    }, [actorFilter, currentPage, dateFilter, onLogout, rowsPerPage, search, typeFilter]);
+
+    const loadStats = useCallback(async () => {
+        try {
+            const result = await logsService.getStats();
+            const s = result?.stats || {};
+            setStatsData({
+                total: Number(s.total || 0),
+                today: Number(s.today || 0),
+                activeSessions: Number(s.activeSessions || 0),
+                settingsChanges: Number(s.settingsChanges || 0),
+            });
+        } catch (err) {
+            if (err?.response?.status === 401) {
+                onLogout?.();
+                return;
+            }
+            if (err?.response?.status === 403) {
+                setError(
+                    err?.response?.data?.message ||
+                        "Logs & Audit Trail is restricted to superadmin accounts.",
+                );
+            }
+        }
+    }, [onLogout]);
+
+    useEffect(() => {
+        loadLogs();
+    }, [loadLogs]);
+
+    useEffect(() => {
+        loadStats();
+    }, [loadStats]);
+
+    const openLogDetail = useCallback(async (log) => {
+        setSelectedLog(log);
+        try {
+            const result = await logsService.getLogById(log.rawId);
+            if (result?.data) {
+                setSelectedLog(mapLogRow(result.data));
+            }
+        } catch {
+            // keep already loaded row detail as fallback
+        }
+    }, []);
+
     const stats = [
         {
             label: "Total Logs",
-            value: "2,841",
+            value: statsData.total.toLocaleString(),
             sub: "All time entries",
             color: "navy",
         },
         {
             label: "Today's Activity",
-            value: "47",
+            value: statsData.today.toLocaleString(),
             sub: formatDateShort(),
             color: "green",
         },
         {
             label: "Active Sessions",
-            value: "3",
+            value: statsData.activeSessions.toLocaleString(),
             sub: "Currently logged in",
             color: "amber",
         },
         {
             label: "Settings Changes",
-            value: "12",
+            value: statsData.settingsChanges.toLocaleString(),
             sub: "This month",
             color: "purple",
         },
@@ -864,6 +978,22 @@ export default function LogsAuditTrail({
                         flex: 1,
                     }}
                 >
+                    {error && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "10px 12px",
+                                color: "#b02020",
+                                fontSize: 12,
+                                marginBottom: 14,
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
+
                     {/* SA notice */}
                     <div
                         style={{
@@ -1059,7 +1189,7 @@ export default function LogsAuditTrail({
                             onChange={(e) => setActorFilter(e.target.value)}
                         >
                             <option value="">All Actors</option>
-                            {UNIQUE_ACTORS.map((a) => (
+                            {actors.map((a) => (
                                 <option key={a} value={a}>
                                     {a}
                                 </option>
@@ -1110,7 +1240,7 @@ export default function LogsAuditTrail({
                             <strong>
                                 {showStart}–{showEnd}
                             </strong>{" "}
-                            of <strong>{filtered.length}</strong> logs
+                            of <strong>{totalLogs}</strong> logs
                         </div>
                     </div>
 
@@ -1158,7 +1288,19 @@ export default function LogsAuditTrail({
                         )}
 
                         <div>
-                            {filtered.length === 0 ? (
+                            {loading ? (
+                                <div
+                                    style={{
+                                        textAlign: "center",
+                                        padding: 40,
+                                        color: "#9090aa",
+                                        fontSize: 13,
+                                        fontStyle: "italic",
+                                    }}
+                                >
+                                    Loading audit logs...
+                                </div>
+                            ) : logs.length === 0 ? (
                                 <div
                                     style={{
                                         textAlign: "center",
@@ -1171,7 +1313,7 @@ export default function LogsAuditTrail({
                                     No log entries match your filters.
                                 </div>
                             ) : (
-                                paginated.map((log) => {
+                                logs.map((log) => {
                                     const cfg =
                                         TYPE_CONFIG[log.type] ||
                                         TYPE_CONFIG.login;
@@ -1180,7 +1322,7 @@ export default function LogsAuditTrail({
                                         <div
                                             key={log.id}
                                             className="lg-log-row"
-                                            onClick={() => setSelectedLog(log)}
+                                            onClick={() => openLogDetail(log)}
                                         >
                                             <div
                                                 style={{
@@ -1290,7 +1432,7 @@ export default function LogsAuditTrail({
                                         <div
                                             key={log.id}
                                             className="lg-mob-row"
-                                            onClick={() => setSelectedLog(log)}
+                                            onClick={() => openLogDetail(log)}
                                         >
                                             <div
                                                 style={{
@@ -1365,7 +1507,7 @@ export default function LogsAuditTrail({
                         </div>
 
                         {/* Pagination */}
-                        {filtered.length > 0 && (
+                        {totalLogs > 0 && (
                             <div
                                 style={{
                                     display: "flex",

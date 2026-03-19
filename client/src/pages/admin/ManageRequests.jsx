@@ -13,7 +13,7 @@
 //   - Status values: pending | approved | ready | released | rejected
 // =============================================================
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -40,6 +40,7 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import adminRequestService from "../../services/adminRequestService";
 
 // TODO: import { useAdminAuth } from "../../context/AdminAuthContext";
 // TODO: import { getRequests, approveRequest, rejectRequest, markReady, releaseRequest } from "../../services/requestService";
@@ -491,13 +492,16 @@ function formatDate() {
 // =============================================================
 // Request Drawer
 // =============================================================
-function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
+function RequestDrawer({ request, onClose, isMobile, onActionComplete, onLogout }) {
     const [step, setStep] = useState("default"); // default | reject | release
     const [rejectReason, setRejectReason] = useState("");
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionError, setActionError] = useState("");
 
     useEffect(() => {
         setStep("default");
         setRejectReason("");
+        setActionError("");
         document.body.style.overflow = "hidden";
         const fn = (e) => {
             if (e.key === "Escape") onClose();
@@ -519,6 +523,25 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
     );
 
     const renderFooter = () => {
+        const runAction = async (action, reason) => {
+            if (actionLoading) return;
+            setActionLoading(true);
+            setActionError("");
+
+            try {
+                await onActionComplete(action, request, reason);
+                onClose();
+            } catch (err) {
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    onLogout?.();
+                    return;
+                }
+                setActionError(err?.response?.data?.message || err?.message || "Action failed.");
+            } finally {
+                setActionLoading(false);
+            }
+        };
+
         if (step === "reject")
             return (
                 <>
@@ -542,11 +565,15 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
                             color: "#fff",
                         }}
                         onClick={() => {
-                            onActionComplete("rejected", request.id);
-                            onClose();
+                            if (!rejectReason.trim()) {
+                                setActionError("Please provide a rejection reason.");
+                                return;
+                            }
+                            runAction("reject", rejectReason.trim());
                         }}
+                        disabled={actionLoading}
                     >
-                        <X size={13} /> Confirm Rejection
+                        <X size={13} /> {actionLoading ? "Saving..." : "Confirm Rejection"}
                     </button>
                 </>
             );
@@ -572,12 +599,10 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
                             background: "#1a7a4a",
                             color: "#fff",
                         }}
-                        onClick={() => {
-                            onActionComplete("released", request.id);
-                            onClose();
-                        }}
+                        onClick={() => runAction("release")}
+                        disabled={actionLoading}
                     >
-                        <Check size={13} /> Confirm Release
+                        <Check size={13} /> {actionLoading ? "Saving..." : "Confirm Release"}
                     </button>
                 </>
             );
@@ -603,12 +628,10 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
                             background: "#1a7a4a",
                             color: "#fff",
                         }}
-                        onClick={() => {
-                            onActionComplete("approved", request.id);
-                            onClose();
-                        }}
+                        onClick={() => runAction("approve")}
+                        disabled={actionLoading}
                     >
-                        <Check size={11} /> Approve Request
+                        <Check size={11} /> {actionLoading ? "Saving..." : "Approve Request"}
                     </button>
                 </>
             );
@@ -637,13 +660,12 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
                         className="mr-drawer-btn"
                         style={{
                             background: "#d4edda",
-                            color: "#8aaa8a",
-                            cursor: "not-allowed",
+                            color: "#1a7a4a",
                         }}
-                        disabled
-                        title="Print first"
+                        onClick={() => runAction("mark-ready")}
+                        disabled={actionLoading}
                     >
-                        Mark Ready
+                        {actionLoading ? "Saving..." : "Mark Ready"}
                     </button>
                 </>
             );
@@ -996,9 +1018,8 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
                                     lineHeight: 1.6,
                                 }}
                             >
-                                Incomplete supporting documents submitted.
-                                Resident must re-submit with a valid
-                                government-issued ID and proof of residency.
+                                {request.rejection_reason ||
+                                    "No rejection reason was provided."}
                             </div>
                         </div>
                     )}
@@ -1015,6 +1036,22 @@ function RequestDrawer({ request, onClose, isMobile, onActionComplete }) {
                                     setRejectReason(e.target.value)
                                 }
                             />
+                        </div>
+                    )}
+
+                    {actionError && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "9px 11px",
+                                color: "#b02020",
+                                fontSize: 11.5,
+                                marginBottom: 12,
+                            }}
+                        >
+                            {actionError}
                         </div>
                     )}
 
@@ -1144,13 +1181,79 @@ export default function ManageRequests({
     const [sortFilter, setSortFilter] = useState("newest");
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Requests state — in prod this comes from API
-    const [requests, setRequests] = useState(MOCK_REQUESTS);
+    const [requests, setRequests] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     // Drawer
     const [selectedRequest, setSelectedRequest] = useState(null);
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
+
+    const mapRequestRow = useCallback((row) => {
+        const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
+        const address = [row.resident_address_house, row.resident_address_street]
+            .filter((v) => String(v || "").trim())
+            .join(" ");
+
+        return {
+            rawId: row.request_id,
+            id: `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
+            name: row.resident_name || "Unknown Resident",
+            certType: row.cert_type || "Certificate Request",
+            purpose: row.purpose || "—",
+            date: requestedAt
+                ? requestedAt.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                  })
+                : "—",
+            time: requestedAt
+                ? requestedAt.toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                  })
+                : "—",
+            status: String(row.status || "pending").toLowerCase(),
+            hasFee: Boolean(row.has_fee),
+            address: address || "N/A",
+            contact: row.resident_contact || "N/A",
+            email: row.resident_email || "N/A",
+            civil: row.resident_civil || "N/A",
+            nationality: "Filipino",
+            rejection_reason: row.rejection_reason || "",
+            requestedAtMs: requestedAt ? requestedAt.getTime() : 0,
+        };
+    }, []);
+
+    const loadRequests = useCallback(async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const result = await adminRequestService.getRequests();
+            const rows = Array.isArray(result?.data)
+                ? result.data
+                : Array.isArray(result)
+                    ? result
+                    : [];
+            setRequests(rows.map(mapRequestRow));
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setError(err?.response?.data?.message || "Failed to load requests.");
+            setRequests([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [mapRequestRow, onLogout]);
+
+    useEffect(() => {
+        loadRequests();
+    }, [loadRequests]);
 
     const handleNavigate = (page) => {
         setActivePage(page);
@@ -1167,6 +1270,23 @@ export default function ManageRequests({
         .filter((r) => {
             if (activeTab !== "all" && r.status !== activeTab) return false;
             if (certFilter !== "all" && r.certType !== certFilter) return false;
+            if (dateFilter !== "all") {
+                const now = new Date();
+                const reqDate = new Date(r.requestedAtMs || 0);
+                if (dateFilter === "today") {
+                    const isToday = reqDate.toDateString() === now.toDateString();
+                    if (!isToday) return false;
+                }
+                if (dateFilter === "week") {
+                    const start = new Date(now);
+                    start.setDate(now.getDate() - 7);
+                    if (reqDate < start) return false;
+                }
+                if (dateFilter === "month") {
+                    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+                    if (reqDate < start) return false;
+                }
+            }
             if (search) {
                 const q = search.toLowerCase();
                 if (
@@ -1180,8 +1300,8 @@ export default function ManageRequests({
             return true;
         })
         .sort((a, b) => {
-            if (sortFilter === "newest") return b.id.localeCompare(a.id);
-            if (sortFilter === "oldest") return a.id.localeCompare(b.id);
+            if (sortFilter === "newest") return b.requestedAtMs - a.requestedAtMs;
+            if (sortFilter === "oldest") return a.requestedAtMs - b.requestedAtMs;
             if (sortFilter === "name") return a.name.localeCompare(b.name);
             return 0;
         });
@@ -1202,12 +1322,20 @@ export default function ManageRequests({
     const countByStatus = (status) =>
         requests.filter((r) => status === "all" || r.status === status).length;
 
-    // Action complete callback (status update in local state)
-    const handleActionComplete = (newStatus, reqId) => {
-        // TODO: refetch from API instead
-        setRequests((prev) =>
-            prev.map((r) => (r.id === reqId ? { ...r, status: newStatus } : r)),
-        );
+    const handleActionComplete = async (action, request, reason) => {
+        if (!request?.rawId) throw new Error("Missing request ID");
+
+        if (action === "approve") {
+            await adminRequestService.approveRequest(request.rawId);
+        } else if (action === "reject") {
+            await adminRequestService.rejectRequest(request.rawId, reason || "Rejected by admin");
+        } else if (action === "mark-ready") {
+            await adminRequestService.markReady(request.rawId);
+        } else if (action === "release") {
+            await adminRequestService.releaseRequest(request.rawId);
+        }
+
+        await loadRequests();
     };
 
     // Unique cert types for filter
@@ -1251,6 +1379,7 @@ export default function ManageRequests({
                     onClose={() => setSelectedRequest(null)}
                     isMobile={isMobile}
                     onActionComplete={handleActionComplete}
+                    onLogout={onLogout}
                 />
             )}
 
@@ -1349,6 +1478,12 @@ export default function ManageRequests({
                     }}
                 >
                     {/* Page header */}
+                    {error && (
+                        <div style={{ background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", color: "#b02020", fontSize: 12, marginBottom: 14 }}>
+                            {error}
+                        </div>
+                    )}
+
                     <div
                         style={{
                             display: "flex",
@@ -1571,7 +1706,13 @@ export default function ManageRequests({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {paginated.length === 0 ? (
+                                        {loading ? (
+                                            <tr>
+                                                <td colSpan={7} style={{ textAlign: "center", color: "#9090aa", fontSize: 12, padding: 32 }}>
+                                                    Loading requests...
+                                                </td>
+                                            </tr>
+                                        ) : paginated.length === 0 ? (
                                             <tr>
                                                 <td
                                                     colSpan={7}
@@ -1804,7 +1945,18 @@ export default function ManageRequests({
                         ) : (
                             /* Mobile cards */
                             <div>
-                                {paginated.length === 0 ? (
+                                {loading ? (
+                                    <div
+                                        style={{
+                                            textAlign: "center",
+                                            color: "#9090aa",
+                                            fontSize: 12,
+                                            padding: 28,
+                                        }}
+                                    >
+                                        Loading requests...
+                                    </div>
+                                ) : paginated.length === 0 ? (
                                     <div
                                         style={{
                                             textAlign: "center",

@@ -10,7 +10,7 @@
 //   - All endpoints require adminToken in Authorization header
 // =============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -32,6 +32,7 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import reportsService from "../../services/reportsService";
 import {
     BarChart,
     Bar,
@@ -314,8 +315,29 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
     const [activePeriod, setActivePeriod] = useState("month");
     const [certFilter, setCertFilter] = useState("all");
     const [toast, setToast] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [reportStats, setReportStats] = useState({
+        issuedThisPeriod: 0,
+        totalAllTime: 0,
+        feesThisPeriod: 0,
+        pending: 0,
+    });
+    const [certData, setCertData] = useState([]);
+    const [statusData, setStatusData] = useState([]);
+    const [monthlyData, setMonthlyData] = useState([]);
+    const [dailyData, setDailyData] = useState([]);
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
+
+        const periodLabel =
+                activePeriod === "week"
+                        ? "This Week"
+                        : activePeriod === "year"
+                            ? "This Year"
+                            : activePeriod === "all"
+                                ? "All Time"
+                                : "This Month";
 
     const formatDate = () => {
         return new Date().toLocaleDateString("en-US", {
@@ -348,8 +370,103 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
         setTimeout(() => setToast(false), 3000);
     };
 
+    const loadReports = useCallback(async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+            const result = await reportsService.getOverview(activePeriod);
+            const data = result?.data || {};
+            const s = data?.stats || {};
+            const byCertType = Array.isArray(data?.byCertType)
+                ? data.byCertType
+                : [];
+            const st = data?.statusBreakdown || {};
+
+            setReportStats({
+                issuedThisPeriod: Number(s.issuedThisPeriod || 0),
+                totalAllTime: Number(s.totalAllTime || 0),
+                feesThisPeriod: Number(s.feesThisPeriod || 0),
+                pending: Number(s.pending || 0),
+            });
+            setCertData(byCertType);
+            setStatusData([
+                {
+                    name: "Released",
+                    value: Number(st.released || 0),
+                    color: "#1a7a4a",
+                },
+                {
+                    name: "Pending",
+                    value: Number(st.pending || 0),
+                    color: "#b86800",
+                },
+                {
+                    name: "Rejected",
+                    value: Number(st.rejected || 0),
+                    color: "#b02020",
+                },
+            ]);
+            setMonthlyData(Array.isArray(data?.monthlyTrend) ? data.monthlyTrend : []);
+            setDailyData(Array.isArray(data?.daily) ? data.daily : []);
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setError(err?.response?.data?.message || "Failed to load reports.");
+            setReportStats({
+                issuedThisPeriod: 0,
+                totalAllTime: 0,
+                feesThisPeriod: 0,
+                pending: 0,
+            });
+            setCertData([]);
+            setStatusData([]);
+            setMonthlyData([]);
+            setDailyData([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [activePeriod, onLogout]);
+
+    useEffect(() => {
+        loadReports();
+    }, [loadReports]);
+
     // Sorted cert data for top table
-    const sortedCerts = [...CERT_DATA].sort((a, b) => b.count - a.count);
+    const chartCertData = certFilter === "all"
+        ? certData
+        : certData.filter((c) => c.label === certFilter);
+    const certTotal = chartCertData.reduce((a, b) => a + Number(b.count || 0), 0);
+    const sortedCerts = [...chartCertData].sort((a, b) => b.count - a.count);
+
+    const statsCards = [
+        {
+            label: activePeriod === "all" ? "Issued (All Time)" : `Issued ${periodLabel}`,
+            value: reportStats.issuedThisPeriod.toLocaleString(),
+            sub: periodLabel,
+            delta: "Live from database",
+            up: true,
+            color: "navy",
+        },
+        {
+            label: "Total Issued (All Time)",
+            value: reportStats.totalAllTime.toLocaleString(),
+            sub: "Since system launch",
+            delta: `${reportStats.feesThisPeriod.toLocaleString()} fee-based releases ${periodLabel.toLowerCase()}`,
+            up: true,
+            color: "green",
+        },
+        {
+            label: "Pending Requests",
+            value: reportStats.pending.toLocaleString(),
+            sub: "Awaiting processing",
+            delta: "Needs admin action",
+            up: false,
+            color: "amber",
+        },
+    ];
 
     return (
         <div className="rep-root">
@@ -485,6 +602,22 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                         flex: 1,
                     }}
                 >
+                    {error && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "10px 12px",
+                                color: "#b02020",
+                                fontSize: 12,
+                                marginBottom: 14,
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
+
                     {/* ── Stat strip ── */}
                     <div
                         style={{
@@ -496,7 +629,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                             marginBottom: isMobile ? 16 : 22,
                         }}
                     >
-                        {STATS.map((stat) => (
+                        {statsCards.map((stat) => (
                             <div
                                 key={stat.label}
                                 style={{
@@ -656,7 +789,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                             onChange={(e) => setCertFilter(e.target.value)}
                         >
                             <option value="all">All Types</option>
-                            {CERT_DATA.map((c) => (
+                            {certData.map((c) => (
                                 <option key={c.label} value={c.label}>
                                     {c.label}
                                 </option>
@@ -684,7 +817,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                         >
                             <ResponsiveContainer width="100%" height={240}>
                                 <BarChart
-                                    data={CERT_DATA}
+                                    data={chartCertData}
                                     margin={{
                                         top: 4,
                                         right: 8,
@@ -726,7 +859,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                         name="Requests"
                                         radius={[4, 4, 0, 0]}
                                     >
-                                        {CERT_DATA.map((entry, i) => (
+                                        {chartCertData.map((entry, i) => (
                                             <Cell
                                                 key={i}
                                                 fill={entry.color + "cc"}
@@ -747,7 +880,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                             <ResponsiveContainer width="100%" height={200}>
                                 <PieChart>
                                     <Pie
-                                        data={STATUS_DATA}
+                                        data={statusData}
                                         cx="50%"
                                         cy="50%"
                                         innerRadius="62%"
@@ -755,7 +888,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                         paddingAngle={2}
                                         dataKey="value"
                                     >
-                                        {STATUS_DATA.map((entry, i) => (
+                                        {statusData.map((entry, i) => (
                                             <Cell
                                                 key={i}
                                                 fill={entry.color}
@@ -768,7 +901,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                         content={({ active, payload }) => {
                                             if (!active || !payload?.length)
                                                 return null;
-                                            const total = STATUS_DATA.reduce(
+                                            const total = statusData.reduce(
                                                 (a, b) => a + b.value,
                                                 0,
                                             );
@@ -814,7 +947,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                     marginTop: 12,
                                 }}
                             >
-                                {STATUS_DATA.map((item) => (
+                                {statusData.map((item) => (
                                     <div
                                         key={item.name}
                                         style={{
@@ -880,13 +1013,13 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                         whiteSpace: "nowrap",
                                     }}
                                 >
-                                    Apr 2025 – Mar 2026
+                                    Last 12 months
                                 </div>
                             }
                         >
                             <ResponsiveContainer width="100%" height={220}>
                                 <LineChart
-                                    data={MONTHLY_DATA}
+                                    data={monthlyData}
                                     margin={{
                                         top: 8,
                                         right: 8,
@@ -963,7 +1096,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                         {/* Top Requested */}
                         <ChartCard
                             title="Top Requested This Month"
-                            sub="Ranked by volume — March 2026"
+                            sub={`Ranked by volume — ${periodLabel}`}
                             noPad
                         >
                             <table className="rep-summary-table">
@@ -978,7 +1111,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                 <tbody>
                                     {sortedCerts.map((cert, i) => {
                                         const pct = Math.round(
-                                            (cert.count / CERT_TOTAL) * 100,
+                                            certTotal > 0 ? (cert.count / certTotal) * 100 : 0,
                                         );
                                         return (
                                             <tr key={cert.label}>
@@ -1066,7 +1199,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {DAILY_DATA.map((day, i) => (
+                                    {dailyData.map((day, i) => (
                                         <tr key={i}>
                                             <td
                                                 style={{
@@ -1121,6 +1254,12 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                             </table>
                         </ChartCard>
                     </div>
+
+                    {loading && (
+                        <div style={{ fontSize: 12, color: "#9090aa", marginTop: 12 }}>
+                            Loading latest report data...
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,0 +1,7 @@
+# server/.env
+
+DATABASE_URL=postgresql://postgres.fyihciqyaugzhqeezxci:tado-29-david@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres
+JWT_SECRET=8260c754-f9b1-4484-a7f3-146b8fa31991
+JWT_RESIDENT_EXPIRES=7d
+JWT_ADMIN_EXPIRES=8h
+CLIENT_URL=http://localhost:5173

@@ -1,8 +1,18 @@
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+
+const dotEnvPath = path.join(__dirname, ".env");
+const fallbackEnvPath = path.join(__dirname, "env");
+dotenv.config({
+    path: fs.existsSync(dotEnvPath) ? dotEnvPath : fallbackEnvPath,
+});
 const express = require("express");
 const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
+const residentRoutes = require("./routes/resident");
+const adminRoutes = require("./routes/admin");
 
 const app = express();
 
@@ -16,6 +26,8 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/resident", residentRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Health check
 app.get("/", (req, res) => res.json({ message: "CertiFast API is running" }));

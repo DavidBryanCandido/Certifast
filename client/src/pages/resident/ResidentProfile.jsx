@@ -13,9 +13,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Home, Plus, FileText, QrCode, LogOut,
-    User, Phone, MapPin, Calendar, Edit3,
-    Check, X, AlertCircle, Mail, Shield,
+    User, Edit3,
+    Check, X, AlertCircle,
 } from "lucide-react";
+import residentProfileService from "../../services/residentProfileService";
 
 // ─── Reuse shared styles ──────────────────────────────────────
 if (!document.head.querySelector("[data-resident-home]")) {
@@ -36,21 +37,6 @@ if (!document.head.querySelector("[data-resident-home]")) {
     `;
     document.head.appendChild(s);
 }
-
-// ─── Mock profile (replace with GET /api/resident/profile) ───
-const MOCK_PROFILE = {
-    full_name:      "Maria Reyes Santos",
-    email:          "maria.santos@email.com",
-    resident_id:    "RES-0042",
-    date_of_birth:  "1985-06-14",
-    civil_status:   "Married",
-    nationality:    "Filipino",
-    contact_number: "09171234567",
-    address_house:  "12",
-    address_street: "Rizal Street",
-    registered_at:  "2025-01-05",
-    status:         "Active",
-};
 
 const CIVIL_STATUSES = ["Single", "Married", "Widowed", "Separated", "Annulled"];
 
@@ -93,20 +79,55 @@ export default function ResidentProfile({ resident, onLogout }) {
         return () => window.removeEventListener("resize", fn);
     }, []);
 
-    // Load profile
+    // Load profile and keep it refreshed while this page is open.
     useEffect(() => {
-        // TODO: replace with GET /api/resident/profile
-        setTimeout(() => {
-            setProfile(MOCK_PROFILE);
+        let mounted = true;
+
+        const applyProfile = (nextProfile) => {
+            if (!mounted || !nextProfile) return;
+            setProfile(nextProfile);
             setForm({
-                date_of_birth:  MOCK_PROFILE.date_of_birth,
-                civil_status:   MOCK_PROFILE.civil_status,
-                contact_number: MOCK_PROFILE.contact_number,
-                address_house:  MOCK_PROFILE.address_house,
-                address_street: MOCK_PROFILE.address_street,
+                date_of_birth: nextProfile.date_of_birth || "",
+                civil_status: nextProfile.civil_status || CIVIL_STATUSES[0],
+                contact_number: nextProfile.contact_number || "",
+                address_house: nextProfile.address_house || "",
+                address_street: nextProfile.address_street || "",
             });
-        }, 300);
-    }, []);
+        };
+
+        const loadProfile = async ({ silent = false } = {}) => {
+            if (!silent) setError("");
+            try {
+                const data = await residentProfileService.getProfile();
+                applyProfile(data?.profile || data);
+            } catch (err) {
+                if (!mounted) return;
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    onLogout?.();
+                    return;
+                }
+                if (!silent) {
+                    setError(
+                        err?.response?.data?.message ||
+                            "Failed to load profile. Please refresh and try again.",
+                    );
+                }
+            }
+        };
+
+        loadProfile();
+
+        const intervalId = setInterval(() => {
+            if (!document.hidden && !editing && !saving) {
+                loadProfile({ silent: true });
+            }
+        }, 10000);
+
+        return () => {
+            mounted = false;
+            clearInterval(intervalId);
+        };
+    }, [editing, onLogout, saving]);
 
     async function handleSave() {
         if (!form.contact_number.trim()) { setError("Contact number is required."); return; }
@@ -114,14 +135,32 @@ export default function ResidentProfile({ resident, onLogout }) {
         setSaving(true);
         setError("");
         try {
-            // TODO: PUT /api/resident/profile  body: form
-            await new Promise((r) => setTimeout(r, 700));
-            setProfile((p) => ({ ...p, ...form }));
+            const payload = {
+                date_of_birth: form.date_of_birth || null,
+                civil_status: form.civil_status || null,
+                contact_number: form.contact_number,
+                address_house: form.address_house || null,
+                address_street: form.address_street,
+            };
+
+            const data = await residentProfileService.updateProfile(payload);
+            const updatedProfile = data?.profile || data;
+            setProfile(updatedProfile);
+            setForm({
+                date_of_birth: updatedProfile.date_of_birth || "",
+                civil_status: updatedProfile.civil_status || CIVIL_STATUSES[0],
+                contact_number: updatedProfile.contact_number || "",
+                address_house: updatedProfile.address_house || "",
+                address_street: updatedProfile.address_street || "",
+            });
             setEditing(false);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
-        } catch {
-            setError("Failed to save. Please try again.");
+        } catch (err) {
+            setError(
+                err?.response?.data?.message ||
+                    "Failed to save. Please try again.",
+            );
         } finally {
             setSaving(false);
         }
@@ -143,7 +182,6 @@ export default function ResidentProfile({ resident, onLogout }) {
 
     const isMobile  = width < 768;
     const name      = profile?.full_name || resident?.full_name || resident?.name || "Resident";
-    const firstName = name.split(" ")[0];
     const initials  = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
     const fullAddress = profile
         ? `${profile.address_house} ${profile.address_street}, Barangay East Tapinac, Olongapo City`

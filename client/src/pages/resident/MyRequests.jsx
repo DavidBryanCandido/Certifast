@@ -76,6 +76,7 @@ export default function MyRequests({ resident, onLogout }) {
     const [rows, setRows]       = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError]     = useState("");
+    const [expandedReasonId, setExpandedReasonId] = useState(null);
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -204,22 +205,46 @@ export default function MyRequests({ resident, onLogout }) {
                     )}
 
                     {/* Rows — same markup as ResidentHome "Recent Requests" */}
-                    {!loading && rows.map((row) => (
-                        <div key={row.request_id} className="rh-req-row">
-                            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f8f6f1", border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                <StatusIcon status={row.status} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    {row.type || row.cert_type || "Certificate Request"}
+                    {!loading && rows.map((row) => {
+                        const isRejected = String(row.status || "").toLowerCase() === "rejected";
+                        const isExpanded = expandedReasonId === row.request_id;
+                        const rejectionReason = row.rejection_reason || "No rejection reason was provided by the admin.";
+
+                        return (
+                            <div key={row.request_id}>
+                                <div className="rh-req-row">
+                                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f8f6f1", border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <StatusIcon status={row.status} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                            {row.type || row.cert_type || "Certificate Request"}
+                                        </div>
+                                        <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
+                                            {row.request_id} · Submitted {formatDate(row.requested_at)}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                                        <StatusBadge status={row.status} />
+                                        {isRejected && (
+                                            <button
+                                                onClick={() => setExpandedReasonId(isExpanded ? null : row.request_id)}
+                                                style={{ background: "none", border: "none", color: "#b02020", fontSize: 10.5, fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontFamily: "'Source Serif 4', serif" }}
+                                            >
+                                                {isExpanded ? "Hide reason" : "View reason"}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
-                                    {row.request_id} · Submitted {formatDate(row.requested_at)}
-                                </div>
+
+                                {isRejected && isExpanded && (
+                                    <div style={{ margin: "0 20px 12px 70px", background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", fontSize: 11.5, color: "#7a1f1f", lineHeight: 1.6 }}>
+                                        <strong style={{ color: "#b02020" }}>Rejection Reason:</strong> {rejectionReason}
+                                    </div>
+                                )}
                             </div>
-                            <StatusBadge status={row.status} />
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {/* Footer note */}
                     {!loading && rows.length > 0 && (

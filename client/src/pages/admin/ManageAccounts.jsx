@@ -10,7 +10,7 @@
 //   - All endpoints require adminToken in Authorization header
 // =============================================================
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     UserCog, UserPlus, Search, MoreVertical, X, Eye, EyeOff,
@@ -232,14 +232,6 @@ function avatarColor(name = "") {
     const idx = name.charCodeAt(0) % AVATAR_COLORS.length;
     return AVATAR_COLORS[idx];
 }
-
-// ─── Mock data (replace with API) ────────────────────────────
-const MOCK_ACCOUNTS = [
-    { admin_id: 1, full_name: "Admin Superuser", username: "admin", role: "admin", status: "active", created_at: "2024-01-15", last_login: "2025-03-17" },
-    { admin_id: 2, full_name: "Maria Santos", username: "m.santos", role: "staff", status: "active", created_at: "2024-02-01", last_login: "2025-03-16" },
-    { admin_id: 3, full_name: "Juan Dela Cruz", username: "j.delacruz", role: "staff", status: "active", created_at: "2024-02-10", last_login: "2025-03-15" },
-    { admin_id: 4, full_name: "Rosa Reyes", username: "r.reyes", role: "staff", status: "inactive", created_at: "2024-03-05", last_login: "2024-12-20" },
-];
 
 // ─── Stat Card ────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, accent }) {
@@ -492,7 +484,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     const handleNavigate = (key) => { setActivePage(key); if (onNavigate) onNavigate(key); };
 
     // Data
-    const [rows, setRows] = useState(MOCK_ACCOUNTS);
+    const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -511,24 +503,28 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
         setTimeout(() => setToast(null), 3000);
     };
 
+    const loadAccounts = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const result = await accountService.getAccounts();
+            setRows(Array.isArray(result?.data) ? result.data : []);
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setRows([]);
+            setError(err?.response?.data?.message || "Failed to load accounts.");
+        } finally {
+            setLoading(false);
+        }
+    }, [onLogout]);
+
     // Load accounts
     useEffect(() => {
-        let mounted = true;
-        setLoading(true);
-        async function load() {
-            try {
-                const token = localStorage.getItem("certifast_admin_token") || "";
-                const result = await accountService.getAccounts(token);
-                if (mounted) setRows(result.data || []);
-            } catch {
-                // fallback to mock data — backend not yet connected
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        }
-        load();
-        return () => { mounted = false; };
-    }, []);
+        loadAccounts();
+    }, [loadAccounts]);
 
     // Filtered rows
     const filtered = rows.filter((r) => {
@@ -546,30 +542,72 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     const staffCount = rows.filter((r) => r.role === "staff").length;
 
     // Handlers
-    const handleSave = (form) => {
-        if (modal.mode === "create") {
-            const newRow = { admin_id: Date.now(), full_name: form.full_name, username: form.username, role: form.role, status: "active", created_at: new Date().toISOString(), last_login: null };
-            setRows((p) => [newRow, ...p]);
-            showToast(`Account for ${form.full_name} created successfully.`);
-        } else if (modal.mode === "edit") {
-            setRows((p) => p.map((r) => r.admin_id === modal.account.admin_id ? { ...r, full_name: form.full_name, username: form.username, role: form.role } : r));
-            showToast(`Account updated successfully.`);
-        } else if (modal.mode === "password") {
-            showToast(`Password reset for ${modal.account.full_name}.`);
+    const handleSave = async (form) => {
+        try {
+            if (modal.mode === "create") {
+                await accountService.createAccount({
+                    full_name: form.full_name,
+                    username: form.username,
+                    role: form.role,
+                    password: form.password,
+                });
+                showToast(`Account for ${form.full_name} created successfully.`);
+            } else if (modal.mode === "edit") {
+                await accountService.updateAccount(modal.account.admin_id, {
+                    full_name: form.full_name,
+                    username: form.username,
+                    role: form.role,
+                    status: modal.account.status,
+                });
+                showToast("Account updated successfully.");
+            } else if (modal.mode === "password") {
+                await accountService.resetPassword(
+                    modal.account.admin_id,
+                    form.password,
+                );
+                showToast(`Password reset for ${modal.account.full_name}.`);
+            }
+            setModal(null);
+            await loadAccounts();
+        } catch (err) {
+            showToast(
+                err?.response?.data?.message || "Action failed.",
+                "error",
+            );
         }
-        setModal(null);
     };
 
-    const handleToggleStatus = (account) => {
+    const handleToggleStatus = async (account) => {
         const next = account.status === "active" ? "inactive" : "active";
-        setRows((p) => p.map((r) => r.admin_id === account.admin_id ? { ...r, status: next } : r));
-        showToast(`${account.full_name} is now ${next}.`);
+        try {
+            await accountService.updateAccount(account.admin_id, {
+                full_name: account.full_name,
+                username: account.username,
+                role: account.role,
+                status: next,
+            });
+            showToast(`${account.full_name} is now ${next}.`);
+            await loadAccounts();
+        } catch (err) {
+            showToast(
+                err?.response?.data?.message || "Failed to update account.",
+                "error",
+            );
+        }
     };
 
-    const handleDelete = () => {
-        setRows((p) => p.filter((r) => r.admin_id !== modal.account.admin_id));
-        showToast(`Account removed.`, "success");
-        setModal(null);
+    const handleDelete = async () => {
+        try {
+            await accountService.deactivateAccount(modal.account.admin_id);
+            showToast("Account deactivated.", "success");
+            setModal(null);
+            await loadAccounts();
+        } catch (err) {
+            showToast(
+                err?.response?.data?.message || "Failed to deactivate account.",
+                "error",
+            );
+        }
     };
 
     return (
@@ -594,6 +632,21 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
 
                 {/* Content */}
                 <div style={{ padding: isMobile ? "16px" : "28px 32px", flex: 1 }}>
+                    {error && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "10px 12px",
+                                color: "#b02020",
+                                fontSize: 12,
+                                marginBottom: 14,
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
 
                     {/* Stats */}
                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>

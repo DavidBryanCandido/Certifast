@@ -10,7 +10,7 @@
 //   - All endpoints require adminToken in Authorization header
 // =============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -37,6 +37,7 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import residentRecordsService from "../../services/residentRecordsService";
 
 // TODO: import { useAdminAuth } from "../../context/AdminAuthContext";
 // TODO: import { getResidents, getResidentById } from "../../services/residentService";
@@ -418,7 +419,15 @@ function formatDateShort() {
 }
 function calcAge(dob) {
     try {
-        return 2026 - parseInt(dob.split(", ")[1]);
+        const birth = new Date(dob);
+        if (Number.isNaN(birth.getTime())) return "—";
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+            age -= 1;
+        }
+        return age;
     } catch {
         return "—";
     }
@@ -575,7 +584,7 @@ function QRCardModal({ resident, onClose }) {
 // =============================================================
 // Resident Drawer
 // =============================================================
-function ResidentDrawer({ resident, onClose, isMobile, onPrintQR }) {
+function ResidentDrawer({ resident, onClose, isMobile, onPrintQR, history, historyLoading }) {
     const [activeTab, setActiveTab] = useState("profile");
 
     useEffect(() => {
@@ -880,10 +889,9 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR }) {
                                         color: "#0e2554",
                                     }}
                                 >
-                                    {MOCK_HISTORY.length} requests
+                                    {history.length} requests
                                 </div>
                             </div>
-                            {/* TODO: replace MOCK_HISTORY with GET /api/residents/:id/requests */}
                             <table className="rr-hist-table">
                                 <thead>
                                     <tr>
@@ -893,12 +901,24 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR }) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {MOCK_HISTORY.map((h, i) => {
+                                    {historyLoading ? (
+                                        <tr>
+                                            <td colSpan={3} style={{ color: "#9090aa", fontStyle: "italic" }}>
+                                                Loading request history...
+                                            </td>
+                                        </tr>
+                                    ) : history.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} style={{ color: "#9090aa", fontStyle: "italic" }}>
+                                                No request history found.
+                                            </td>
+                                        </tr>
+                                    ) : history.map((h, i) => {
                                         const b =
                                             HIST_BADGE[h.status] ||
                                             HIST_BADGE.pending;
                                         return (
-                                            <tr key={i}>
+                                            <tr key={`${h.cert}-${h.date}-${i}`}>
                                                 <td>{h.cert}</td>
                                                 <td>{h.date}</td>
                                                 <td>
@@ -1022,9 +1042,22 @@ export default function ResidentRecords({
     const [sortFilter, setSortFilter] = useState("name");
     const [rowsPerPage, setRowsPerPage] = useState(5);
     const [currentPage, setCurrentPage] = useState(1);
+    const [residents, setResidents] = useState([]);
+    const [listLoading, setListLoading] = useState(true);
+    const [listError, setListError] = useState("");
+    const [totalResidents, setTotalResidents] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [statsData, setStatsData] = useState({
+        total: 0,
+        active: 0,
+        newThisMonth: 0,
+        totalRequests: 0,
+    });
 
     // Drawer + modal state
     const [selectedResident, setSelectedResident] = useState(null);
+    const [selectedHistory, setSelectedHistory] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [printResident, setPrintResident] = useState(null);
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
@@ -1038,55 +1071,173 @@ export default function ResidentRecords({
         if (onLogout) onLogout();
     };
 
-    // Filter + sort
-    const filtered = MOCK_RESIDENTS.filter((r) => {
-        if (statusFilter && r.status !== statusFilter) return false;
-        if (search) {
-            const q = search.toLowerCase();
-            if (![r.name, r.addr, r.id].join(" ").toLowerCase().includes(q))
-                return false;
-        }
-        return true;
-    }).sort((a, b) => {
-        if (sortFilter === "name") return a.name.localeCompare(b.name);
-        if (sortFilter === "date") return new Date(b.date) - new Date(a.date);
-        if (sortFilter === "requests") return b.requests - a.requests;
-        return 0;
-    });
+    const mapResidentRow = useCallback((row) => {
+        const status = String(row.status || "active").toLowerCase();
+        const registeredAt = row.created_at ? new Date(row.created_at) : null;
+        const dob = row.date_of_birth ? new Date(row.date_of_birth) : null;
 
-    const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-    const paginated = filtered.slice(
-        (currentPage - 1) * rowsPerPage,
-        currentPage * rowsPerPage,
-    );
+        return {
+            rawId: row.resident_id,
+            id: `#RES-${String(row.resident_id || "").padStart(4, "0")}`,
+            name: row.full_name || "Unknown Resident",
+            addr: [row.address_house, row.address_street]
+                .filter((v) => String(v || "").trim())
+                .join(" ") || "N/A",
+            contact: row.contact_number || "N/A",
+            date: registeredAt
+                ? registeredAt.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                  })
+                : "—",
+            requests: Number(row.request_count || 0),
+            status: status === "inactive" ? "Inactive" : "Active",
+            dob: dob
+                ? dob.toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                  })
+                : "—",
+            civil: row.civil_status || "N/A",
+            nationality: "Filipino",
+            email: row.email || "N/A",
+            qr: `QR-ET-${new Date().getFullYear()}-${String(row.resident_id || "").padStart(4, "0")}`,
+        };
+    }, []);
+
+    const mapHistoryRow = useCallback((row) => {
+        const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
+        return {
+            cert: row.cert_type || "Certificate Request",
+            date: requestedAt
+                ? requestedAt.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                  })
+                : "—",
+            status: String(row.status || "pending").toLowerCase(),
+        };
+    }, []);
+
+    const loadResidents = useCallback(async () => {
+        setListLoading(true);
+        setListError("");
+
+        try {
+            const result = await residentRecordsService.getResidents({
+                search,
+                status: statusFilter ? statusFilter.toLowerCase() : "",
+                sort: sortFilter,
+                page: currentPage,
+                limit: rowsPerPage,
+            });
+
+            const rows = Array.isArray(result?.data)
+                ? result.data
+                : [];
+
+            setResidents(rows.map(mapResidentRow));
+            setTotalResidents(Number(result?.total || 0));
+            setTotalPages(Number(result?.totalPages || 1));
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setResidents([]);
+            setTotalResidents(0);
+            setTotalPages(1);
+            setListError(err?.response?.data?.message || "Failed to load residents.");
+        } finally {
+            setListLoading(false);
+        }
+    }, [currentPage, mapResidentRow, onLogout, rowsPerPage, search, sortFilter, statusFilter]);
+
+    const loadResidentStats = useCallback(async () => {
+        try {
+            const result = await residentRecordsService.getResidentStats();
+            const s = result?.stats || {};
+            setStatsData({
+                total: Number(s.total || 0),
+                active: Number(s.active || 0),
+                newThisMonth: Number(s.newThisMonth || 0),
+                totalRequests: Number(s.totalRequests || 0),
+            });
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+            }
+        }
+    }, [onLogout]);
+
+    const openResident = useCallback(async (resident) => {
+        setSelectedResident(resident);
+        setSelectedHistory([]);
+        setHistoryLoading(true);
+
+        try {
+            const [detailResult, historyResult] = await Promise.all([
+                residentRecordsService.getResidentById(resident.rawId),
+                residentRecordsService.getResidentRequests(resident.rawId),
+            ]);
+
+            if (detailResult?.data) {
+                setSelectedResident(mapResidentRow(detailResult.data));
+            }
+
+            const rows = Array.isArray(historyResult?.data)
+                ? historyResult.data
+                : [];
+            setSelectedHistory(rows.map(mapHistoryRow));
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setSelectedHistory([]);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, [mapHistoryRow, mapResidentRow, onLogout]);
 
     useEffect(() => {
         setCurrentPage(1);
     }, [search, statusFilter, sortFilter, rowsPerPage]);
 
+    useEffect(() => {
+        loadResidents();
+    }, [loadResidents]);
+
+    useEffect(() => {
+        loadResidentStats();
+    }, [loadResidentStats]);
+
     // Stat strip values
     const stats = [
         {
             label: "Total Residents",
-            value: "1,284",
+            value: statsData.total.toLocaleString(),
             sub: "All registered accounts",
             color: "navy",
         },
         {
             label: "Active",
-            value: "1,241",
+            value: statsData.active.toLocaleString(),
             sub: "With valid QR cards",
             color: "green",
         },
         {
             label: "New This Month",
-            value: "38",
-            sub: "Registered in March 2026",
+            value: statsData.newThisMonth.toLocaleString(),
+            sub: "Recently registered residents",
             color: "gold",
         },
         {
             label: "Total Requests",
-            value: "3,910",
+            value: statsData.totalRequests.toLocaleString(),
             sub: "Across all residents",
             color: "blue",
         },
@@ -1133,6 +1284,8 @@ export default function ResidentRecords({
                     resident={selectedResident}
                     onClose={() => setSelectedResident(null)}
                     isMobile={isMobile}
+                    history={selectedHistory}
+                    historyLoading={historyLoading}
                     onPrintQR={(r) => {
                         setPrintResident(r);
                     }}
@@ -1239,6 +1392,22 @@ export default function ResidentRecords({
                         flex: 1,
                     }}
                 >
+                    {listError && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "10px 12px",
+                                color: "#b02020",
+                                fontSize: 12,
+                                marginBottom: 14,
+                            }}
+                        >
+                            {listError}
+                        </div>
+                    )}
+
                     {/* Stat strip */}
                     <div
                         style={{
@@ -1400,15 +1569,15 @@ export default function ResidentRecords({
                             <strong>
                                 {Math.min(
                                     (currentPage - 1) * rowsPerPage + 1,
-                                    filtered.length,
+                                    totalResidents,
                                 )}
                                 –
                                 {Math.min(
                                     currentPage * rowsPerPage,
-                                    filtered.length,
+                                    totalResidents,
                                 )}
                             </strong>{" "}
-                            of <strong>{filtered.length}</strong> residents
+                            of <strong>{totalResidents}</strong> residents
                         </div>
                     </div>
 
@@ -1460,7 +1629,19 @@ export default function ResidentRecords({
 
                         {/* Rows */}
                         <div id="rr-table-body">
-                            {filtered.length === 0 ? (
+                            {listLoading ? (
+                                <div
+                                    style={{
+                                        textAlign: "center",
+                                        padding: 40,
+                                        color: "#9090aa",
+                                        fontSize: 13,
+                                        fontStyle: "italic",
+                                    }}
+                                >
+                                    Loading residents...
+                                </div>
+                            ) : residents.length === 0 ? (
                                 <div
                                     style={{
                                         textAlign: "center",
@@ -1473,7 +1654,7 @@ export default function ResidentRecords({
                                     No residents found matching your search.
                                 </div>
                             ) : (
-                                paginated.map((r) => {
+                                residents.map((r) => {
                                     const isActive = r.status === "Active";
                                     return !isMobile ? (
                                         // Desktop row
@@ -1484,9 +1665,7 @@ export default function ResidentRecords({
                                                 gridTemplateColumns:
                                                     "1.4fr 1.4fr 1fr 1.1fr 0.7fr 0.9fr 0.6fr",
                                             }}
-                                            onClick={() =>
-                                                setSelectedResident(r)
-                                            }
+                                            onClick={() => openResident(r)}
                                         >
                                             <div>
                                                 <div
@@ -1575,7 +1754,7 @@ export default function ResidentRecords({
                                                     className="rr-view-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setSelectedResident(r);
+                                                        openResident(r);
                                                     }}
                                                 >
                                                     View
@@ -1587,9 +1766,7 @@ export default function ResidentRecords({
                                         <div
                                             key={r.id}
                                             className="rr-mob-card"
-                                            onClick={() =>
-                                                setSelectedResident(r)
-                                            }
+                                            onClick={() => openResident(r)}
                                         >
                                             <div
                                                 style={{
@@ -1674,7 +1851,7 @@ export default function ResidentRecords({
                         </div>
 
                         {/* Pagination */}
-                        {filtered.length > 0 && (
+                        {totalResidents > 0 && (
                             <div
                                 style={{
                                     display: "flex",

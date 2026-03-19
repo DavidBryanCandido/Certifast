@@ -11,7 +11,7 @@
 //   - All endpoints require adminToken in Authorization header
 // =============================================================
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -34,6 +34,7 @@ import {
     FileOutput,
     Menu,
 } from "lucide-react";
+import adminDashboardService from "../../services/adminDashboardService";
 
 import {
     AdminSidebar,
@@ -340,6 +341,7 @@ const BADGE = {
     approved: { bg: "#e8f5ee", color: "#1a7a4a", label: "Approved" },
     ready: { bg: "#e8eef8", color: "#1a4a8a", label: "Ready" },
     released: { bg: "#f0f0f0", color: "#666", label: "Released" },
+    rejected: { bg: "#fdecea", color: "#b02020", label: "Rejected" },
 };
 
 const DOT_COLORS = {
@@ -563,19 +565,24 @@ function formatDateShort() {
 // =============================================================
 // Request Drawer
 // =============================================================
-function RequestDrawer({ drawerKey, onClose, isMobile }) {
-    const { key: dk, hasFee: reqHasFee } =
+function RequestDrawer({ drawerKey, onClose, isMobile, onRequestUpdated, onLogout }) {
+    const { key: dk, hasFee: reqHasFee, requestId } =
         typeof drawerKey === "object"
             ? drawerKey
-            : { key: drawerKey, hasFee: false };
+            : { key: drawerKey, hasFee: false, requestId: null };
     const data = {
         ...DRAWER_STATES[dk],
         hasFee: reqHasFee ?? DRAWER_STATES[dk]?.hasFee,
     };
     const [step, setStep] = useState("default");
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionError, setActionError] = useState("");
+    const [rejectReason, setRejectReason] = useState("");
 
     useEffect(() => {
         setStep("default");
+        setActionError("");
+        setRejectReason("");
         document.body.style.overflow = "hidden";
         const fn = (e) => {
             if (e.key === "Escape") onClose();
@@ -593,6 +600,51 @@ function RequestDrawer({ drawerKey, onClose, isMobile }) {
     const SectionTitle = ({ children }) => (
         <div className="cf-drawer-section-title">{children}</div>
     );
+
+    async function handleApprove() {
+        if (!requestId || actionLoading) return;
+        setActionLoading(true);
+        setActionError("");
+
+        try {
+            await adminDashboardService.approveRequest(requestId);
+            await onRequestUpdated?.();
+            onClose();
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setActionError(err?.response?.data?.message || "Failed to approve request.");
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
+    async function handleReject() {
+        if (!requestId || actionLoading) return;
+        if (!rejectReason.trim()) {
+            setActionError("Please provide a rejection reason.");
+            return;
+        }
+
+        setActionLoading(true);
+        setActionError("");
+
+        try {
+            await adminDashboardService.rejectRequest(requestId, rejectReason.trim());
+            await onRequestUpdated?.();
+            onClose();
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            setActionError(err?.response?.data?.message || "Failed to reject request.");
+        } finally {
+            setActionLoading(false);
+        }
+    }
 
     const renderFooter = () => {
         if (step === "reject")
@@ -617,8 +669,11 @@ function RequestDrawer({ drawerKey, onClose, isMobile }) {
                             background: "#b02020",
                             color: "#fff",
                         }}
+                        onClick={handleReject}
+                        disabled={actionLoading}
                     >
-                        <X size={13} /> Confirm Rejection
+                        <X size={13} />
+                        {actionLoading ? "Saving..." : "Confirm Rejection"}
                     </button>
                 </>
             );
@@ -671,8 +726,11 @@ function RequestDrawer({ drawerKey, onClose, isMobile }) {
                             background: "#1a7a4a",
                             color: "#fff",
                         }}
+                        onClick={handleApprove}
+                        disabled={actionLoading || !requestId}
                     >
-                        <Check size={11} /> Approve
+                        <Check size={11} />
+                        {actionLoading ? "Saving..." : "Approve"}
                     </button>
                 </>
             );
@@ -1023,7 +1081,32 @@ function RequestDrawer({ drawerKey, onClose, isMobile }) {
                             <textarea
                                 className="cf-reject-textarea"
                                 placeholder="Enter reason for rejection — this will be visible to the resident…"
+                                value={rejectReason}
+                                onChange={(e) => {
+                                    setRejectReason(e.target.value);
+                                    if (actionError) setActionError("");
+                                }}
                             />
+                        </div>
+                    )}
+
+                    {actionError && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "9px 11px",
+                                color: "#b02020",
+                                fontSize: 11.5,
+                                marginBottom: 12,
+                                display: "flex",
+                                gap: 7,
+                                alignItems: "center",
+                            }}
+                        >
+                            <AlertCircle size={12} />
+                            {actionError}
                         </div>
                     )}
 
@@ -1265,6 +1348,140 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const [showQR, setShowQR] = useState(false);
     const [drawerKey, setDrawerKey] = useState(null);
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+    const [statsData, setStatsData] = useState({
+        totalRequests: 0,
+        pending: 0,
+        released: 0,
+        residents: 0,
+        walkIn: 0,
+    });
+    const [recentRequests, setRecentRequests] = useState([]);
+    const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [dashboardError, setDashboardError] = useState("");
+
+    const loadDashboardData = useCallback(async () => {
+        let mounted = true;
+
+        async function load() {
+            setDashboardLoading(true);
+            setDashboardError("");
+
+            try {
+                const [statsRes, recentRes] = await Promise.all([
+                    adminDashboardService.getStats(),
+                    adminDashboardService.getRecentRequests(5),
+                ]);
+
+                if (!mounted) return;
+
+                const nextStats = statsRes?.stats || statsRes || {};
+                const nextRecent = Array.isArray(recentRes?.data)
+                    ? recentRes.data
+                    : Array.isArray(recentRes)
+                        ? recentRes
+                        : [];
+
+                setStatsData({
+                    totalRequests: nextStats.totalRequests || 0,
+                    pending: nextStats.pending || 0,
+                    released: nextStats.released || 0,
+                    residents: nextStats.residents || 0,
+                    walkIn: nextStats.walkIn || 0,
+                });
+
+                setRecentRequests(
+                    nextRecent.map((row) => ({
+                        rawId: row.request_id,
+                        id: `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
+                        name: row.resident_name || "Unknown Resident",
+                        type: row.cert_type || "Certificate Request",
+                        date: row.requested_at
+                            ? new Date(row.requested_at).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                              })
+                            : "—",
+                        status: String(row.status || "pending").toLowerCase(),
+                        hasFee: Boolean(row.has_fee),
+                    })),
+                );
+            } catch (err) {
+                if (!mounted) return;
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    onLogout?.();
+                    return;
+                }
+                setDashboardError(
+                    err?.response?.data?.message ||
+                        "Failed to load dashboard data.",
+                );
+            } finally {
+                if (mounted) setDashboardLoading(false);
+            }
+        }
+
+        await load();
+        return () => {
+            mounted = false;
+        };
+    }, [onLogout]);
+
+    useEffect(() => {
+        let mounted = true;
+        loadDashboardData();
+        return () => {
+            mounted = false;
+        };
+    }, [loadDashboardData]);
+
+    const dynamicStats = [
+        {
+            label: "Total Requests",
+            value: statsData.totalRequests,
+            color: "navy",
+            iconColor: "#0e2554",
+            iconBg: "#e8eef8",
+            change: "Live data",
+            changeType: "up",
+        },
+        {
+            label: "Pending",
+            value: statsData.pending,
+            color: "amber",
+            iconColor: "#b86800",
+            iconBg: "#fff3e0",
+            change: "Needs attention",
+            changeType: "warn",
+        },
+        {
+            label: "Released",
+            value: statsData.released,
+            color: "green",
+            iconColor: "#1a7a4a",
+            iconBg: "#e8f5ee",
+            change: "Completed requests",
+            changeType: "up",
+        },
+        {
+            label: "Residents",
+            value: statsData.residents,
+            color: "gold",
+            iconColor: "#9a7515",
+            iconBg: "#f5edce",
+            change: "Active residents",
+            changeType: "up",
+        },
+        {
+            label: "Walk-in Issued",
+            value: statsData.walkIn,
+            color: "purple",
+            iconColor: "#6a3db8",
+            iconBg: "#f3eeff",
+            change: "Walk-in certificates",
+            changeType: "up",
+        },
+    ];
 
     // TODO: Replace mock data with API calls
     // useEffect(() => { fetchDashboardStats().then(setStats); }, []);
@@ -1329,6 +1546,8 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                     drawerKey={drawerKey}
                     onClose={() => setDrawerKey(null)}
                     isMobile={isMobile}
+                    onRequestUpdated={loadDashboardData}
+                    onLogout={onLogout}
                 />
             )}
 
@@ -1411,6 +1630,26 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         </p>
                     )}
 
+                    {dashboardError && (
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "10px 12px",
+                                color: "#b02020",
+                                fontSize: 12,
+                                marginBottom: 14,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 7,
+                            }}
+                        >
+                            <AlertCircle size={13} />
+                            {dashboardError}
+                        </div>
+                    )}
+
                     {/* ── Stat cards ── */}
                     <div
                         style={{
@@ -1424,7 +1663,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             marginBottom: isMobile ? 20 : 24,
                         }}
                     >
-                        {MOCK_STATS.map((stat, i) => (
+                        {dynamicStats.map((stat, i) => (
                             <StatCard key={i} {...stat} compact={isMobile} />
                         ))}
                     </div>
@@ -1476,8 +1715,18 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {MOCK_REQUESTS.map((req) => {
-                                                const b = BADGE[req.status];
+                                            {!dashboardLoading && recentRequests.length === 0 && (
+                                                <tr>
+                                                    <td style={d.td} colSpan={6}>
+                                                        <div style={{ textAlign: "center", color: "#9090aa", fontStyle: "italic", padding: "16px 0" }}>
+                                                            No recent requests found.
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+
+                                            {recentRequests.map((req) => {
+                                                const b = BADGE[req.status] || BADGE.pending;
                                                 const sm =
                                                     STATUS_MAP[req.status];
                                                 return (
@@ -1579,6 +1828,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                             {
                                                                                 key: sm.drawerKey,
                                                                                 hasFee: req.hasFee,
+                                                                                requestId: req.rawId,
                                                                             },
                                                                         )
                                                                     }
@@ -1598,8 +1848,14 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             ) : (
                                 /* Mobile: card list */
                                 <div>
-                                    {MOCK_REQUESTS.map((req) => {
-                                        const b = BADGE[req.status];
+                                    {!dashboardLoading && recentRequests.length === 0 && (
+                                        <div style={{ padding: "20px 16px", textAlign: "center", color: "#9090aa", fontStyle: "italic", fontSize: 12.5 }}>
+                                            No recent requests found.
+                                        </div>
+                                    )}
+
+                                    {recentRequests.map((req) => {
+                                        const b = BADGE[req.status] || BADGE.pending;
                                         const sm = STATUS_MAP[req.status];
                                         return (
                                             <div
@@ -1610,6 +1866,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                     setDrawerKey({
                                                         key: sm.drawerKey,
                                                         hasFee: req.hasFee,
+                                                        requestId: req.rawId,
                                                     })
                                                 }
                                             >

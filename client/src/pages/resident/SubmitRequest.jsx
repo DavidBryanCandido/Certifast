@@ -2,7 +2,6 @@
 // FILE: client/src/pages/resident/SubmitRequest.jsx
 // =============================================================
 // TODO (Backend Dev):
-//   - GET /api/resident/profile → pre-fill resident info
 //   - GET /api/certificates/templates → ALL_CERTS list
 //   - POST /api/resident/requests
 //     body: { certType, purpose, extraFields, notes, source: 'resident', status: 'pending' }
@@ -19,6 +18,8 @@ import {
     Heart, Baby, Building2, Shield,
     ClipboardList, FileCheck, UserCircle,
 } from "lucide-react";
+import residentProfileService from "../../services/residentProfileService";
+import requestService from "../../services/requestService";
 
 // ─── Styles ───────────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-sr]")) {
@@ -162,8 +163,10 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [width, setWidth]   = useState(window.innerWidth);
     const [activeNav]         = useState("request");
 
-    // Profile (pre-filled from account)
+    // Profile (pre-filled from resident profile API)
     const [profile, setProfile] = useState(null);
+    const [profileLoading, setProfileLoading] = useState(true);
+    const [profileError, setProfileError] = useState("");
 
     // Wizard state
     const [step, setStep]                     = useState(1);
@@ -186,18 +189,43 @@ export default function SubmitRequest({ resident, onLogout }) {
 
     // Load resident profile to pre-fill
     useEffect(() => {
-        // TODO: replace with GET /api/resident/profile
-        setTimeout(() => {
-            setProfile({
-                full_name:      resident?.full_name || resident?.name || "Resident",
-                date_of_birth:  "1985-06-14",
-                civil_status:   "Married",
-                contact_number: "09171234567",
-                address_house:  "12",
-                address_street: "Rizal Street",
-            });
-        }, 200);
-    }, [resident]);
+        let mounted = true;
+
+        async function loadProfile() {
+            setProfileLoading(true);
+            setProfileError("");
+
+            try {
+                const data = await residentProfileService.getProfile();
+                const profileData = data?.profile || data;
+
+                if (mounted) {
+                    setProfile(profileData || null);
+                }
+            } catch (err) {
+                if (!mounted) return;
+
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    onLogout?.();
+                    return;
+                }
+
+                setProfile(null);
+                setProfileError(
+                    err?.response?.data?.message ||
+                    "Unable to load your profile right now. You can still continue, but please check your profile details first.",
+                );
+            } finally {
+                if (mounted) setProfileLoading(false);
+            }
+        }
+
+        loadProfile();
+
+        return () => {
+            mounted = false;
+        };
+    }, [onLogout]);
 
     const isMobile     = width < 768;
     const name         = profile?.full_name || resident?.full_name || resident?.name || "Resident";
@@ -205,7 +233,9 @@ export default function SubmitRequest({ resident, onLogout }) {
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra    = selectedCert ? (CERT_EXTRA_FIELDS[selectedCert.name] || []) : [];
     const fullAddress  = profile
-        ? `${profile.address_house} ${profile.address_street}, Barangay East Tapinac, Olongapo City`
+        ? [profile.address_house, profile.address_street, "Barangay East Tapinac", "Olongapo City"]
+            .filter((part) => String(part || "").trim())
+            .join(", ")
         : "—";
 
     function setExtra(key, val) {
@@ -237,18 +267,21 @@ export default function SubmitRequest({ resident, onLogout }) {
         setSubmitting(true);
         setError("");
         try {
-            // TODO: replace with real API
-            // await requestService.createRequest({
-            //     certType: selectedCert.name,
-            //     purpose: finalPurpose,
-            //     extraFields,
-            //     notes,
-            //     source: 'resident',
-            //     status: 'pending',
-            // });
-            await new Promise((r) => setTimeout(r, 900));
-            setSuccess({ request_id: "REQ-" + String(Math.floor(1000 + Math.random() * 9000)) });
+            const data = await requestService.createRequest({
+                certType: selectedCert.name,
+                purpose: finalPurpose,
+                extraFields,
+                notes,
+                source: "resident",
+            });
+
+            const created = data?.request || data;
+            setSuccess({ request_id: created?.request_id || "—" });
         } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
             setError(err?.response?.data?.message || "Failed to submit. Please try again.");
         } finally {
             setSubmitting(false);
@@ -394,6 +427,21 @@ export default function SubmitRequest({ resident, onLogout }) {
             </div>
 
             {/* ── Pre-filled profile info ── */}
+            {profileLoading && (
+                <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 8, padding: "14px 16px", marginBottom: 22 }}>
+                    <div style={{ width: "40%", height: 12, background: "#f0ece4", borderRadius: 4, marginBottom: 10 }} />
+                    <div style={{ width: "65%", height: 10, background: "#f5f2ee", borderRadius: 4, marginBottom: 7 }} />
+                    <div style={{ width: "58%", height: 10, background: "#f5f2ee", borderRadius: 4, marginBottom: 7 }} />
+                    <div style={{ width: "72%", height: 10, background: "#f5f2ee", borderRadius: 4 }} />
+                </div>
+            )}
+
+            {profileError && (
+                <div style={{ background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "11px 14px", color: "#b02020", fontSize: 12.5, marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
+                    <AlertCircle size={13} /> {profileError}
+                </div>
+            )}
+
             {profile && (
                 <div style={{ background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 8, padding: "14px 16px", marginBottom: 22 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
@@ -408,7 +456,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                             { label: "Full Name",   value: profile.full_name },
                             { label: "Date of Birth", value: fmtDate(profile.date_of_birth) },
                             { label: "Address",      value: fullAddress, wide: true },
-                            { label: "Contact",      value: profile.contact_number },
+                            { label: "Contact",      value: profile.contact_number || "—" },
                         ].map(({ label, value, wide }) => (
                             <div key={label} style={{ gridColumn: wide && !isMobile ? "1 / -1" : "auto" }}>
                                 <div style={{ fontSize: 9.5, color: "#9090aa", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 }}>{label}</div>
