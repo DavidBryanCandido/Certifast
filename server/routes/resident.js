@@ -1,18 +1,18 @@
 const express = require("express");
 const router = express.Router();
-
-const { residentAuth } = require("../middleware/authMiddleware");
+const { residentChangePassword } = require("../controllers/authController");
 const {
-    getResidentProfile,
-    updateResidentProfile,
-    getResidentRequests,
-    createResidentRequest,
+    getProfile,
+    updateProfile,
+    createRequest,
+    getMyRequests,
 } = require("../controllers/residentController");
+const { residentAuth } = require("../middleware/authMiddleware");
 
-router.get("/requests", residentAuth, getResidentRequests);
-router.post("/requests", residentAuth, createResidentRequest);
-
-router.get("/profile", residentAuth, getResidentProfile);
-router.put("/profile", residentAuth, updateResidentProfile);
+router.get("/profile", residentAuth, getProfile);
+router.put("/profile", residentAuth, updateProfile);
+router.get("/requests", residentAuth, getMyRequests);
+router.post("/requests", residentAuth, createRequest);
+router.put("/change-password", residentAuth, residentChangePassword);
 
 module.exports = router;

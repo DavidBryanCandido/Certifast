@@ -173,26 +173,41 @@ if (!document.head.querySelector("[data-cf-rr]")) {
     /* ── Admin-side QR print sheet (hidden on screen, shown on print) ── */
     #rr-qr-print-sheet { display: none; }
     @media print {
-        .rr-root { display: none !important; }
-        #rr-qr-print-sheet { display: block !important; }
-        @page { size: A4 portrait; margin: 10mm; }
-        #rr-qr-print-sheet { font-family: 'Source Serif 4', Georgia, serif; }
-        .rr-ps-title  { font-size:9pt; color:#666; text-align:center; margin-bottom:4mm; }
-        .rr-ps-hint   { font-size:7.5pt; color:#999; text-align:center; margin-bottom:6mm; }
-        .rr-ps-grid   { display:grid; grid-template-columns:repeat(3,54mm); grid-template-rows:repeat(2,85.6mm); gap:5mm; justify-content:center; }
-        .rr-wc        { width:54mm; height:85.6mm; border:1px dashed #bbb; border-radius:3mm; overflow:hidden; display:flex; flex-direction:column; background:#fff; page-break-inside:avoid; }
-        .rr-wc-head   { background:#0e2554; padding:2mm 3mm; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-        .rr-wc-brand  { font-size:7pt; font-weight:700; color:#fff; font-family:Georgia,serif; line-height:1.2; }
-        .rr-wc-sub    { font-size:5pt; color:rgba(201,162,39,0.9); letter-spacing:.4px; text-transform:uppercase; margin-top:.3mm; }
-        .rr-wc-gold   { height:1.2mm; background:linear-gradient(90deg,#c9a227,#f0d060,#c9a227); flex-shrink:0; }
-        .rr-wc-body   { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.5mm 2.5mm 1.5mm; gap:1.8mm; }
-        .rr-wc-name   { font-size:7.5pt; font-weight:700; color:#0e2554; text-align:center; line-height:1.2; font-family:Georgia,serif; }
-        .rr-wc-id     { font-size:5.5pt; color:#888; text-align:center; }
-        .rr-wc-qr     { padding:1.5mm; border:.5px solid #ddd; border-radius:1mm; background:#fff; }
-        .rr-wc-addr   { font-size:5pt; color:#888; text-align:center; line-height:1.3; }
-        .rr-wc-foot   { background:#f8f6f1; border-top:.5px solid #e4dfd4; padding:1.2mm 2.5mm; font-size:4.8pt; color:#aaa; text-align:center; line-height:1.4; flex-shrink:0; }
-        .rr-ps-cut    { font-size:7pt; color:#bbb; text-align:center; margin-top:5mm; padding-top:3mm; border-top:1px dashed #ddd; }
+    @page { size: A4 portrait; margin: 10mm; }
+
+    /* Hide EVERYTHING first */
+    body * { visibility: hidden; }
+
+    /* Then show ONLY the print sheet and its children */
+    #rr-qr-print-sheet,
+    #rr-qr-print-sheet * { visibility: visible; }
+
+    /* Position the print sheet at top of page */
+    #rr-qr-print-sheet {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        display: block !important;
+        font-family: 'Source Serif 4', Georgia, serif;
     }
+
+    .rr-ps-title  { font-size:9pt; color:#666; text-align:center; margin-bottom:4mm; }
+    .rr-ps-hint   { font-size:7.5pt; color:#999; text-align:center; margin-bottom:6mm; }
+    .rr-ps-grid   { display:grid; grid-template-columns:repeat(3,54mm); grid-template-rows:repeat(2,85.6mm); gap:5mm; justify-content:center; }
+    .rr-wc        { width:54mm; height:85.6mm; border:1px dashed #bbb; border-radius:3mm; overflow:hidden; display:flex; flex-direction:column; background:#fff; page-break-inside:avoid; }
+    .rr-wc-head   { background:#0e2554; padding:2mm 3mm; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    .rr-wc-brand  { font-size:7pt; font-weight:700; color:#fff; font-family:Georgia,serif; line-height:1.2; }
+    .rr-wc-sub    { font-size:5pt; color:rgba(201,162,39,0.9); letter-spacing:.4px; text-transform:uppercase; margin-top:.3mm; }
+    .rr-wc-gold   { height:1.2mm; background:linear-gradient(90deg,#c9a227,#f0d060,#c9a227); flex-shrink:0; }
+    .rr-wc-body   { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.5mm 2.5mm 1.5mm; gap:1.8mm; }
+    .rr-wc-name   { font-size:7.5pt; font-weight:700; color:#0e2554; text-align:center; line-height:1.2; font-family:Georgia,serif; }
+    .rr-wc-id     { font-size:5.5pt; color:#888; text-align:center; }
+    .rr-wc-qr     { padding:1.5mm; border:.5px solid #ddd; border-radius:1mm; background:#fff; }
+    .rr-wc-addr   { font-size:5pt; color:#888; text-align:center; line-height:1.3; }
+    .rr-wc-foot   { background:#f8f6f1; border-top:.5px solid #e4dfd4; padding:1.2mm 2.5mm; font-size:4.8pt; color:#aaa; text-align:center; line-height:1.4; flex-shrink:0; }
+    .rr-ps-cut    { font-size:7pt; color:#bbb; text-align:center; margin-top:5mm; padding-top:3mm; border-top:1px dashed #ddd; }
+}
     /* QR Card wallet */
     .rr-wallet-card {
       width:420px; height:265px; border-radius:10px; overflow:hidden;
@@ -444,18 +459,37 @@ function WalletCard({ name, residentId, qrValue }) {
                     <div className="rr-wc-brand">CertiFast</div>
                     <div className="rr-wc-sub">Brgy. East Tapinac</div>
                 </div>
-                <img src="/logo.png" alt="" style={{ width: "6mm", height: "6mm", borderRadius: "50%", objectFit: "cover", opacity: 0.9 }} />
+                <img
+                    src="/logo.png"
+                    alt=""
+                    style={{
+                        width: "6mm",
+                        height: "6mm",
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        opacity: 0.9,
+                    }}
+                />
             </div>
             <div className="rr-wc-gold" />
             <div className="rr-wc-body">
                 <div className="rr-wc-name">{name}</div>
                 <div className="rr-wc-id">ID: {residentId}</div>
                 <div className="rr-wc-qr">
-                    <QRCodeSVG value={qrValue} size={108} level="H" includeMargin={false} fgColor="#0e2554" bgColor="#ffffff" />
+                    <QRCodeSVG
+                        value={qrValue}
+                        size={108}
+                        level="H"
+                        includeMargin={false}
+                        fgColor="#0e2554"
+                        bgColor="#ffffff"
+                    />
                 </div>
                 <div className="rr-wc-addr">Olongapo City, Zambales</div>
             </div>
-            <div className="rr-wc-foot">Show to staff when claiming certificate.</div>
+            <div className="rr-wc-foot">
+                Show to staff when claiming certificate.
+            </div>
         </div>
     );
 }
@@ -467,7 +501,9 @@ function WalletCard({ name, residentId, qrValue }) {
 function QRCardModal({ resident, onClose }) {
     useEffect(() => {
         document.body.style.overflow = "hidden";
-        const fn = (e) => { if (e.key === "Escape") onClose(); };
+        const fn = (e) => {
+            if (e.key === "Escape") onClose();
+        };
         window.addEventListener("keydown", fn);
         return () => {
             document.body.style.overflow = "";
@@ -479,112 +515,417 @@ function QRCardModal({ resident, onClose }) {
 
     return (
         <>
-        {/* ── Modal ── */}
-        <div
-            style={{ position: "fixed", inset: 0, background: "rgba(9,26,62,.6)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
-            onClick={(e) => e.target === e.currentTarget && onClose()}
-        >
-            <div style={{ background: "#fff", borderRadius: 8, width: "100%", maxWidth: 480, overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,.22)", animation: "modalFadeIn .2s ease both" }}>
-
-                {/* Header */}
-                <div style={{ padding: "18px 24px", borderBottom: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "space-between", background: "linear-gradient(135deg, #0e2554, #163066)" }}>
-                    <div>
-                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: "#fff" }}>Resident QR Card</div>
-                        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>{resident.name} · {resident.id}</div>
-                    </div>
-                    <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, display: "flex" }}>
-                        <X size={18} />
-                    </button>
-                </div>
-                <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)" }} />
-
-                {/* Card preview — same design as resident's My QR page */}
-                <div style={{ padding: "24px 24px 16px" }}>
-                    <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 10, overflow: "hidden", marginBottom: 14, maxWidth: 340, margin: "0 auto 14px" }}>
-                        {/* Card header */}
-                        <div style={{ background: "linear-gradient(135deg, #0e2554, #163066)", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <div>
-                                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: "#fff" }}>CertiFast</div>
-                                <div style={{ fontSize: 8, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", marginTop: 1 }}>Barangay East Tapinac</div>
-                            </div>
-                            <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden" }}>
-                                <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            </div>
-                        </div>
-                        <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)" }} />
-
-                        {/* QR + name */}
-                        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-                            <div style={{ textAlign: "center" }}>
-                                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, fontWeight: 700, color: "#0e2554" }}>{resident.name}</div>
-                                <div style={{ fontSize: 10, color: "#9090aa", marginTop: 2 }}>ID: <span style={{ fontWeight: 600, color: "#4a4a6a" }}>{resident.id}</span></div>
-                            </div>
-                            {/* QR with gold corner brackets */}
-                            <div style={{ padding: 12, background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.06)", position: "relative" }}>
-                                {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
-                                    <div key={v+h} style={{ position: "absolute", [v]: 6, [h]: 6, width: 14, height: 14, [`border${v[0].toUpperCase()+v.slice(1)}`]: "2px solid #c9a227", [`border${h[0].toUpperCase()+h.slice(1)}`]: "2px solid #c9a227", borderRadius: v==="top"&&h==="left"?"2px 0 0 0":v==="top"&&h==="right"?"0 2px 0 0":v==="bottom"&&h==="left"?"0 0 0 2px":"0 0 2px 0" }} />
-                                ))}
-                                <QRCodeSVG value={qrValue} size={160} level="H" includeMargin={false} fgColor="#0e2554" bgColor="#ffffff" />
-                            </div>
-                            <div style={{ textAlign: "center" }}>
-                                <div style={{ fontSize: 11, color: "#4a4a6a", fontWeight: 600 }}>Barangay East Tapinac, Olongapo City</div>
-                                <div style={{ fontSize: 10, color: "#9090aa", marginTop: 1 }}>City of Olongapo, Zambales</div>
-                            </div>
-                        </div>
-                        <div style={{ background: "#f8f6f1", borderTop: "1px solid #e4dfd4", padding: "8px 16px", display: "flex", alignItems: "center", gap: 5 }}>
-                            <AlertCircle size={10} color="#9090aa" />
-                            <span style={{ fontSize: 10, color: "#9090aa" }}>This QR is unique to this resident's account.</span>
-                        </div>
-                    </div>
-
-                    {/* Tip */}
-                    <div style={{ background: "#f5edce", border: "1px solid #e0d4a8", borderRadius: 6, padding: "10px 14px", display: "flex", gap: 8, alignItems: "flex-start" }}>
-                        <Scissors size={12} color="#9a7515" style={{ flexShrink: 0, marginTop: 1 }} />
-                        <span style={{ fontSize: 11.5, color: "#7a6530", lineHeight: 1.6 }}>
-                            Clicking <strong>Print</strong> will print <strong>6 wallet-sized cards</strong> on one A4 sheet (CR80, 54 × 85.6 mm). Cut and laminate for the resident.
-                        </span>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div style={{ padding: "14px 24px", borderTop: "1px solid #e4dfd4", display: "flex", justifyContent: "flex-end", gap: 10, background: "#f8f6f1" }}>
-                    <button onClick={onClose} style={{ padding: "9px 18px", background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 4, fontSize: 12.5, cursor: "pointer", fontFamily: "'Source Serif 4',serif", color: "#4a4a6a" }}>
-                        Cancel
-                    </button>
-                    <button
-                        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 22px", background: "linear-gradient(135deg,#163066,#091a3e)", color: "#fff", border: "none", borderRadius: 4, fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "'Playfair Display',serif", letterSpacing: 1 }}
-                        onClick={() => window.print()}
+            {/* ── Modal ── */}
+            <div
+                style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "rgba(9,26,62,.6)",
+                    zIndex: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 16,
+                }}
+                onClick={(e) => e.target === e.currentTarget && onClose()}
+            >
+                <div
+                    style={{
+                        background: "#fff",
+                        borderRadius: 8,
+                        width: "100%",
+                        maxWidth: 480,
+                        overflow: "hidden",
+                        boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+                        animation: "modalFadeIn .2s ease both",
+                    }}
+                >
+                    {/* Header */}
+                    <div
+                        style={{
+                            padding: "18px 24px",
+                            borderBottom: "1px solid #e4dfd4",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            background:
+                                "linear-gradient(135deg, #0e2554, #163066)",
+                        }}
                     >
-                        <Printer size={13} /> Print 6 Cards
-                    </button>
+                        <div>
+                            <div
+                                style={{
+                                    fontFamily: "'Playfair Display',serif",
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    color: "#fff",
+                                }}
+                            >
+                                Resident QR Card
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: 11,
+                                    color: "rgba(255,255,255,0.6)",
+                                    marginTop: 2,
+                                }}
+                            >
+                                {resident.name} · {resident.id}
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                color: "rgba(255,255,255,0.7)",
+                                padding: 4,
+                                display: "flex",
+                            }}
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
+                    <div
+                        style={{
+                            height: 3,
+                            background:
+                                "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+                        }}
+                    />
+
+                    {/* Card preview — same design as resident's My QR page */}
+                    <div style={{ padding: "24px 24px 16px" }}>
+                        <div
+                            style={{
+                                background: "#fff",
+                                border: "1px solid #e4dfd4",
+                                borderRadius: 10,
+                                overflow: "hidden",
+                                marginBottom: 14,
+                                maxWidth: 340,
+                                margin: "0 auto 14px",
+                            }}
+                        >
+                            {/* Card header */}
+                            <div
+                                style={{
+                                    background:
+                                        "linear-gradient(135deg, #0e2554, #163066)",
+                                    padding: "12px 16px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                }}
+                            >
+                                <div>
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: "#fff",
+                                        }}
+                                    >
+                                        CertiFast
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 8,
+                                            color: "rgba(201,162,39,0.8)",
+                                            letterSpacing: "1.5px",
+                                            textTransform: "uppercase",
+                                            marginTop: 1,
+                                        }}
+                                    >
+                                        Barangay East Tapinac
+                                    </div>
+                                </div>
+                                <div
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: "50%",
+                                        border: "1.5px solid rgba(201,162,39,0.5)",
+                                        overflow: "hidden",
+                                    }}
+                                >
+                                    <img
+                                        src="/logo.png"
+                                        alt="Seal"
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div
+                                style={{
+                                    height: 3,
+                                    background:
+                                        "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+                                }}
+                            />
+
+                            {/* QR + name */}
+                            <div
+                                style={{
+                                    padding: "20px 24px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    gap: 14,
+                                }}
+                            >
+                                <div style={{ textAlign: "center" }}>
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                        }}
+                                    >
+                                        {resident.name}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 10,
+                                            color: "#9090aa",
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        ID:{" "}
+                                        <span
+                                            style={{
+                                                fontWeight: 600,
+                                                color: "#4a4a6a",
+                                            }}
+                                        >
+                                            {resident.id}
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* QR with gold corner brackets */}
+                                <div
+                                    style={{
+                                        padding: 12,
+                                        background: "#fff",
+                                        border: "1.5px solid #e4dfd4",
+                                        borderRadius: 8,
+                                        boxShadow:
+                                            "0 4px 16px rgba(0,0,0,0.06)",
+                                        position: "relative",
+                                    }}
+                                >
+                                    {[
+                                        ["top", "left"],
+                                        ["top", "right"],
+                                        ["bottom", "left"],
+                                        ["bottom", "right"],
+                                    ].map(([v, h]) => (
+                                        <div
+                                            key={v + h}
+                                            style={{
+                                                position: "absolute",
+                                                [v]: 6,
+                                                [h]: 6,
+                                                width: 14,
+                                                height: 14,
+                                                [`border${v[0].toUpperCase() + v.slice(1)}`]:
+                                                    "2px solid #c9a227",
+                                                [`border${h[0].toUpperCase() + h.slice(1)}`]:
+                                                    "2px solid #c9a227",
+                                                borderRadius:
+                                                    v === "top" && h === "left"
+                                                        ? "2px 0 0 0"
+                                                        : v === "top" &&
+                                                            h === "right"
+                                                          ? "0 2px 0 0"
+                                                          : v === "bottom" &&
+                                                              h === "left"
+                                                            ? "0 0 0 2px"
+                                                            : "0 0 2px 0",
+                                            }}
+                                        />
+                                    ))}
+                                    <QRCodeSVG
+                                        value={qrValue}
+                                        size={160}
+                                        level="H"
+                                        includeMargin={false}
+                                        fgColor="#0e2554"
+                                        bgColor="#ffffff"
+                                    />
+                                </div>
+                                <div style={{ textAlign: "center" }}>
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            color: "#4a4a6a",
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        Barangay East Tapinac, Olongapo City
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 10,
+                                            color: "#9090aa",
+                                            marginTop: 1,
+                                        }}
+                                    >
+                                        City of Olongapo, Zambales
+                                    </div>
+                                </div>
+                            </div>
+                            <div
+                                style={{
+                                    background: "#f8f6f1",
+                                    borderTop: "1px solid #e4dfd4",
+                                    padding: "8px 16px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 5,
+                                }}
+                            >
+                                <AlertCircle size={10} color="#9090aa" />
+                                <span
+                                    style={{ fontSize: 10, color: "#9090aa" }}
+                                >
+                                    This QR is unique to this resident's
+                                    account.
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Tip */}
+                        <div
+                            style={{
+                                background: "#f5edce",
+                                border: "1px solid #e0d4a8",
+                                borderRadius: 6,
+                                padding: "10px 14px",
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "flex-start",
+                            }}
+                        >
+                            <Scissors
+                                size={12}
+                                color="#9a7515"
+                                style={{ flexShrink: 0, marginTop: 1 }}
+                            />
+                            <span
+                                style={{
+                                    fontSize: 11.5,
+                                    color: "#7a6530",
+                                    lineHeight: 1.6,
+                                }}
+                            >
+                                Clicking <strong>Print</strong> will print{" "}
+                                <strong>6 wallet-sized cards</strong> on one A4
+                                sheet (CR80, 54 × 85.6 mm). Cut and laminate for
+                                the resident.
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div
+                        style={{
+                            padding: "14px 24px",
+                            borderTop: "1px solid #e4dfd4",
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: 10,
+                            background: "#f8f6f1",
+                        }}
+                    >
+                        <button
+                            onClick={onClose}
+                            style={{
+                                padding: "9px 18px",
+                                background: "#fff",
+                                border: "1.5px solid #e4dfd4",
+                                borderRadius: 4,
+                                fontSize: 12.5,
+                                cursor: "pointer",
+                                fontFamily: "'Source Serif 4',serif",
+                                color: "#4a4a6a",
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "9px 22px",
+                                background:
+                                    "linear-gradient(135deg,#163066,#091a3e)",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 4,
+                                fontSize: 12.5,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                fontFamily: "'Playfair Display',serif",
+                                letterSpacing: 1,
+                            }}
+                            onClick={() => window.print()}
+                        >
+                            <Printer size={13} /> Print 6 Cards
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        {/* ── Print sheet — hidden on screen, shown on @media print ── */}
-        <div id="rr-qr-print-sheet">
-            <div className="rr-ps-title">
-                CertiFast · Resident QR Wallet Card · {resident.name} · {resident.id}
+            {/* ── Print sheet — hidden on screen, shown on @media print ── */}
+            <div id="rr-qr-print-sheet">
+                <div className="rr-ps-title">
+                    CertiFast · Resident QR Wallet Card · {resident.name} ·{" "}
+                    {resident.id}
+                </div>
+                <div className="rr-ps-hint">
+                    ✂ Cut along the dashed borders · Laminate with a 54 × 86 mm
+                    pouch (credit card size)
+                </div>
+                <div className="rr-ps-grid">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <WalletCard
+                            key={i}
+                            name={resident.name}
+                            residentId={resident.id}
+                            qrValue={qrValue}
+                        />
+                    ))}
+                </div>
+                <div className="rr-ps-cut">
+                    ✂ Standard wallet / ID card size — 54 × 85.6 mm (CR80)
+                </div>
             </div>
-            <div className="rr-ps-hint">
-                ✂ Cut along the dashed borders · Laminate with a 54 × 86 mm pouch (credit card size)
-            </div>
-            <div className="rr-ps-grid">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <WalletCard key={i} name={resident.name} residentId={resident.id} qrValue={qrValue} />
-                ))}
-            </div>
-            <div className="rr-ps-cut">✂ Standard wallet / ID card size — 54 × 85.6 mm (CR80)</div>
-        </div>
         </>
     );
 }
 
-
 // =============================================================
 // Resident Drawer
 // =============================================================
-function ResidentDrawer({ resident, onClose, isMobile, onPrintQR, history, historyLoading }) {
+function ResidentDrawer({
+    resident,
+    onClose,
+    isMobile,
+    onPrintQR,
+    history,
+    historyLoading,
+}) {
     const [activeTab, setActiveTab] = useState("profile");
 
     useEffect(() => {
@@ -903,45 +1244,63 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR, history, histo
                                 <tbody>
                                     {historyLoading ? (
                                         <tr>
-                                            <td colSpan={3} style={{ color: "#9090aa", fontStyle: "italic" }}>
+                                            <td
+                                                colSpan={3}
+                                                style={{
+                                                    color: "#9090aa",
+                                                    fontStyle: "italic",
+                                                }}
+                                            >
                                                 Loading request history...
                                             </td>
                                         </tr>
                                     ) : history.length === 0 ? (
                                         <tr>
-                                            <td colSpan={3} style={{ color: "#9090aa", fontStyle: "italic" }}>
+                                            <td
+                                                colSpan={3}
+                                                style={{
+                                                    color: "#9090aa",
+                                                    fontStyle: "italic",
+                                                }}
+                                            >
                                                 No request history found.
                                             </td>
                                         </tr>
-                                    ) : history.map((h, i) => {
-                                        const b =
-                                            HIST_BADGE[h.status] ||
-                                            HIST_BADGE.pending;
-                                        return (
-                                            <tr key={`${h.cert}-${h.date}-${i}`}>
-                                                <td>{h.cert}</td>
-                                                <td>{h.date}</td>
-                                                <td>
-                                                    <span
-                                                        style={{
-                                                            display:
-                                                                "inline-block",
-                                                            fontSize: 9,
-                                                            fontWeight: 600,
-                                                            padding: "2px 8px",
-                                                            borderRadius: 20,
-                                                            background: b.bg,
-                                                            color: b.color,
-                                                            textTransform:
-                                                                "uppercase",
-                                                        }}
-                                                    >
-                                                        {b.label}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                    ) : (
+                                        history.map((h, i) => {
+                                            const b =
+                                                HIST_BADGE[h.status] ||
+                                                HIST_BADGE.pending;
+                                            return (
+                                                <tr
+                                                    key={`${h.cert}-${h.date}-${i}`}
+                                                >
+                                                    <td>{h.cert}</td>
+                                                    <td>{h.date}</td>
+                                                    <td>
+                                                        <span
+                                                            style={{
+                                                                display:
+                                                                    "inline-block",
+                                                                fontSize: 9,
+                                                                fontWeight: 600,
+                                                                padding:
+                                                                    "2px 8px",
+                                                                borderRadius: 20,
+                                                                background:
+                                                                    b.bg,
+                                                                color: b.color,
+                                                                textTransform:
+                                                                    "uppercase",
+                                                            }}
+                                                        >
+                                                            {b.label}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </>
@@ -951,31 +1310,164 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR, history, histo
                     {activeTab === "qr" && (
                         <>
                             {/* Card preview — matches resident's My QR page */}
-                            <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 10, overflow: "hidden", marginBottom: 14 }}>
-                                <div style={{ background: "linear-gradient(135deg, #0e2554, #163066)", padding: "12px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div
+                                style={{
+                                    background: "#fff",
+                                    border: "1px solid #e4dfd4",
+                                    borderRadius: 10,
+                                    overflow: "hidden",
+                                    marginBottom: 14,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        background:
+                                            "linear-gradient(135deg, #0e2554, #163066)",
+                                        padding: "12px 18px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                    }}
+                                >
                                     <div>
-                                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, color: "#fff" }}>CertiFast</div>
-                                        <div style={{ fontSize: 8, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", marginTop: 1 }}>Barangay East Tapinac</div>
+                                        <div
+                                            style={{
+                                                fontFamily:
+                                                    "'Playfair Display',serif",
+                                                fontSize: 12,
+                                                fontWeight: 700,
+                                                color: "#fff",
+                                            }}
+                                        >
+                                            CertiFast
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: 8,
+                                                color: "rgba(201,162,39,0.8)",
+                                                letterSpacing: "1.5px",
+                                                textTransform: "uppercase",
+                                                marginTop: 1,
+                                            }}
+                                        >
+                                            Barangay East Tapinac
+                                        </div>
                                     </div>
-                                    <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden" }}>
-                                        <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    <div
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: "50%",
+                                            border: "1.5px solid rgba(201,162,39,0.5)",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        <img
+                                            src="/logo.png"
+                                            alt="Seal"
+                                            style={{
+                                                width: "100%",
+                                                height: "100%",
+                                                objectFit: "cover",
+                                            }}
+                                        />
                                     </div>
                                 </div>
-                                <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)" }} />
+                                <div
+                                    style={{
+                                        height: 3,
+                                        background:
+                                            "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+                                    }}
+                                />
 
-                                <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                                <div
+                                    style={{
+                                        padding: "22px 24px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        gap: 16,
+                                    }}
+                                >
                                     {/* Name + ID */}
                                     <div style={{ textAlign: "center" }}>
-                                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 17, fontWeight: 700, color: "#0e2554" }}>{resident.name}</div>
-                                        <div style={{ fontSize: 11, color: "#9090aa", marginTop: 3 }}>
-                                            Resident ID: <span style={{ fontWeight: 600, color: "#4a4a6a", fontFamily: "'Courier New',monospace" }}>{resident.id}</span>
+                                        <div
+                                            style={{
+                                                fontFamily:
+                                                    "'Playfair Display',serif",
+                                                fontSize: 17,
+                                                fontWeight: 700,
+                                                color: "#0e2554",
+                                            }}
+                                        >
+                                            {resident.name}
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: 11,
+                                                color: "#9090aa",
+                                                marginTop: 3,
+                                            }}
+                                        >
+                                            Resident ID:{" "}
+                                            <span
+                                                style={{
+                                                    fontWeight: 600,
+                                                    color: "#4a4a6a",
+                                                    fontFamily:
+                                                        "'Courier New',monospace",
+                                                }}
+                                            >
+                                                {resident.id}
+                                            </span>
                                         </div>
                                     </div>
 
                                     {/* QR code with gold corner brackets */}
-                                    <div style={{ padding: 14, background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.06)", position: "relative" }}>
-                                        {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v,h]) => (
-                                            <div key={v+h} style={{ position: "absolute", [v]: 8, [h]: 8, width: 16, height: 16, [`border${v[0].toUpperCase()+v.slice(1)}`]: "2.5px solid #c9a227", [`border${h[0].toUpperCase()+h.slice(1)}`]: "2.5px solid #c9a227", borderRadius: v==="top"&&h==="left"?"3px 0 0 0":v==="top"&&h==="right"?"0 3px 0 0":v==="bottom"&&h==="left"?"0 0 0 3px":"0 0 3px 0" }} />
+                                    <div
+                                        style={{
+                                            padding: 14,
+                                            background: "#fff",
+                                            border: "1.5px solid #e4dfd4",
+                                            borderRadius: 10,
+                                            boxShadow:
+                                                "0 4px 20px rgba(0,0,0,0.06)",
+                                            position: "relative",
+                                        }}
+                                    >
+                                        {[
+                                            ["top", "left"],
+                                            ["top", "right"],
+                                            ["bottom", "left"],
+                                            ["bottom", "right"],
+                                        ].map(([v, h]) => (
+                                            <div
+                                                key={v + h}
+                                                style={{
+                                                    position: "absolute",
+                                                    [v]: 8,
+                                                    [h]: 8,
+                                                    width: 16,
+                                                    height: 16,
+                                                    [`border${v[0].toUpperCase() + v.slice(1)}`]:
+                                                        "2.5px solid #c9a227",
+                                                    [`border${h[0].toUpperCase() + h.slice(1)}`]:
+                                                        "2.5px solid #c9a227",
+                                                    borderRadius:
+                                                        v === "top" &&
+                                                        h === "left"
+                                                            ? "3px 0 0 0"
+                                                            : v === "top" &&
+                                                                h === "right"
+                                                              ? "0 3px 0 0"
+                                                              : v ===
+                                                                      "bottom" &&
+                                                                  h === "left"
+                                                                ? "0 0 0 3px"
+                                                                : "0 0 3px 0",
+                                                }}
+                                            />
                                         ))}
                                         <QRCodeSVG
                                             value={`certifast:resident:${resident.id}`}
@@ -988,27 +1480,94 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR, history, histo
                                     </div>
 
                                     <div style={{ textAlign: "center" }}>
-                                        <div style={{ fontSize: 11.5, color: "#4a4a6a", fontWeight: 600 }}>Barangay East Tapinac, Olongapo City</div>
-                                        <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>City of Olongapo, Zambales</div>
+                                        <div
+                                            style={{
+                                                fontSize: 11.5,
+                                                color: "#4a4a6a",
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            Barangay East Tapinac, Olongapo City
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: 10.5,
+                                                color: "#9090aa",
+                                                marginTop: 2,
+                                            }}
+                                        >
+                                            City of Olongapo, Zambales
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div style={{ background: "#f8f6f1", borderTop: "1px solid #e4dfd4", padding: "10px 18px", display: "flex", alignItems: "center", gap: 6 }}>
+                                <div
+                                    style={{
+                                        background: "#f8f6f1",
+                                        borderTop: "1px solid #e4dfd4",
+                                        padding: "10px 18px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                    }}
+                                >
                                     <AlertCircle size={11} color="#9090aa" />
-                                    <span style={{ fontSize: 11, color: "#9090aa" }}>This QR is permanent and uniquely tied to this resident's account.</span>
+                                    <span
+                                        style={{
+                                            fontSize: 11,
+                                            color: "#9090aa",
+                                        }}
+                                    >
+                                        This QR is permanent and uniquely tied
+                                        to this resident's account.
+                                    </span>
                                 </div>
                             </div>
 
                             {/* How to use tip */}
-                            <div style={{ background: "#f5edce", border: "1px solid #e0d4a8", borderRadius: 6, padding: "12px 14px", marginBottom: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                                <Scissors size={13} color="#9a7515" style={{ flexShrink: 0, marginTop: 1 }} />
-                                <span style={{ fontSize: 12, color: "#7a6530", lineHeight: 1.65 }}>
-                                    <strong>How to use:</strong> Click <em>Print 6 Cards</em> to print a sheet of 6 wallet-sized cards (CR80). Cut along the dashed borders and give to the resident to laminate. They show this card at the barangay office — staff scans it to pull up their latest request instantly.
+                            <div
+                                style={{
+                                    background: "#f5edce",
+                                    border: "1px solid #e0d4a8",
+                                    borderRadius: 6,
+                                    padding: "12px 14px",
+                                    marginBottom: 14,
+                                    display: "flex",
+                                    gap: 10,
+                                    alignItems: "flex-start",
+                                }}
+                            >
+                                <Scissors
+                                    size={13}
+                                    color="#9a7515"
+                                    style={{ flexShrink: 0, marginTop: 1 }}
+                                />
+                                <span
+                                    style={{
+                                        fontSize: 12,
+                                        color: "#7a6530",
+                                        lineHeight: 1.65,
+                                    }}
+                                >
+                                    <strong>How to use:</strong> Click{" "}
+                                    <em>Print 6 Cards</em> to print a sheet of 6
+                                    wallet-sized cards (CR80). Cut along the
+                                    dashed borders and give to the resident to
+                                    laminate. They show this card at the
+                                    barangay office — staff scans it to pull up
+                                    their latest request instantly.
                                 </span>
                             </div>
 
                             {/* Print button */}
-                            <button className="rr-print-card-btn" style={{ width: "100%", justifyContent: "center" }} onClick={() => onPrintQR(resident)}>
+                            <button
+                                className="rr-print-card-btn"
+                                style={{
+                                    width: "100%",
+                                    justifyContent: "center",
+                                }}
+                                onClick={() => onPrintQR(resident)}
+                            >
                                 <Printer size={13} /> Print 6 Wallet Cards
                             </button>
                         </>
@@ -1018,7 +1577,6 @@ function ResidentDrawer({ resident, onClose, isMobile, onPrintQR, history, histo
         </>
     );
 }
-
 
 // =============================================================
 // Main Component
@@ -1080,9 +1638,10 @@ export default function ResidentRecords({
             rawId: row.resident_id,
             id: `#RES-${String(row.resident_id || "").padStart(4, "0")}`,
             name: row.full_name || "Unknown Resident",
-            addr: [row.address_house, row.address_street]
-                .filter((v) => String(v || "").trim())
-                .join(" ") || "N/A",
+            addr:
+                [row.address_house, row.address_street]
+                    .filter((v) => String(v || "").trim())
+                    .join(" ") || "N/A",
             contact: row.contact_number || "N/A",
             date: registeredAt
                 ? registeredAt.toLocaleDateString("en-US", {
@@ -1108,7 +1667,9 @@ export default function ResidentRecords({
     }, []);
 
     const mapHistoryRow = useCallback((row) => {
-        const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
+        const requestedAt = row.requested_at
+            ? new Date(row.requested_at)
+            : null;
         return {
             cert: row.cert_type || "Certificate Request",
             date: requestedAt
@@ -1135,26 +1696,37 @@ export default function ResidentRecords({
                 limit: rowsPerPage,
             });
 
-            const rows = Array.isArray(result?.data)
-                ? result.data
-                : [];
+            const rows = Array.isArray(result?.data) ? result.data : [];
 
             setResidents(rows.map(mapResidentRow));
             setTotalResidents(Number(result?.total || 0));
             setTotalPages(Number(result?.totalPages || 1));
         } catch (err) {
-            if (err?.response?.status === 401 || err?.response?.status === 403) {
+            if (
+                err?.response?.status === 401 ||
+                err?.response?.status === 403
+            ) {
                 onLogout?.();
                 return;
             }
             setResidents([]);
             setTotalResidents(0);
             setTotalPages(1);
-            setListError(err?.response?.data?.message || "Failed to load residents.");
+            setListError(
+                err?.response?.data?.message || "Failed to load residents.",
+            );
         } finally {
             setListLoading(false);
         }
-    }, [currentPage, mapResidentRow, onLogout, rowsPerPage, search, sortFilter, statusFilter]);
+    }, [
+        currentPage,
+        mapResidentRow,
+        onLogout,
+        rowsPerPage,
+        search,
+        sortFilter,
+        statusFilter,
+    ]);
 
     const loadResidentStats = useCallback(async () => {
         try {
@@ -1167,41 +1739,50 @@ export default function ResidentRecords({
                 totalRequests: Number(s.totalRequests || 0),
             });
         } catch (err) {
-            if (err?.response?.status === 401 || err?.response?.status === 403) {
+            if (
+                err?.response?.status === 401 ||
+                err?.response?.status === 403
+            ) {
                 onLogout?.();
             }
         }
     }, [onLogout]);
 
-    const openResident = useCallback(async (resident) => {
-        setSelectedResident(resident);
-        setSelectedHistory([]);
-        setHistoryLoading(true);
-
-        try {
-            const [detailResult, historyResult] = await Promise.all([
-                residentRecordsService.getResidentById(resident.rawId),
-                residentRecordsService.getResidentRequests(resident.rawId),
-            ]);
-
-            if (detailResult?.data) {
-                setSelectedResident(mapResidentRow(detailResult.data));
-            }
-
-            const rows = Array.isArray(historyResult?.data)
-                ? historyResult.data
-                : [];
-            setSelectedHistory(rows.map(mapHistoryRow));
-        } catch (err) {
-            if (err?.response?.status === 401 || err?.response?.status === 403) {
-                onLogout?.();
-                return;
-            }
+    const openResident = useCallback(
+        async (resident) => {
+            setSelectedResident(resident);
             setSelectedHistory([]);
-        } finally {
-            setHistoryLoading(false);
-        }
-    }, [mapHistoryRow, mapResidentRow, onLogout]);
+            setHistoryLoading(true);
+
+            try {
+                const [detailResult, historyResult] = await Promise.all([
+                    residentRecordsService.getResidentById(resident.rawId),
+                    residentRecordsService.getResidentRequests(resident.rawId),
+                ]);
+
+                if (detailResult?.data) {
+                    setSelectedResident(mapResidentRow(detailResult.data));
+                }
+
+                const rows = Array.isArray(historyResult?.data)
+                    ? historyResult.data
+                    : [];
+                setSelectedHistory(rows.map(mapHistoryRow));
+            } catch (err) {
+                if (
+                    err?.response?.status === 401 ||
+                    err?.response?.status === 403
+                ) {
+                    onLogout?.();
+                    return;
+                }
+                setSelectedHistory([]);
+            } finally {
+                setHistoryLoading(false);
+            }
+        },
+        [mapHistoryRow, mapResidentRow, onLogout],
+    );
 
     useEffect(() => {
         setCurrentPage(1);

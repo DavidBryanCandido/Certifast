@@ -100,6 +100,59 @@ async function residentLogin(req, res) {
     }
 }
 
+// PUT /api/resident/change-password
+// body: { current_password, new_password }
+async function residentChangePassword(req, res) {
+    const resident_id = req.resident.id;
+    const { current_password, new_password } = req.body;
+
+    if (!current_password || !new_password) {
+        return res
+            .status(400)
+            .json({
+                message: "Current password and new password are required",
+            });
+    }
+    if (new_password.length < 8) {
+        return res
+            .status(400)
+            .json({ message: "New password must be at least 8 characters" });
+    }
+
+    try {
+        const result = await pool.query(
+            "SELECT password_hash FROM residents WHERE resident_id = $1",
+            [resident_id],
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Resident not found" });
+        }
+
+        const resident = result.rows[0];
+        const match = await bcrypt.compare(
+            current_password,
+            resident.password_hash,
+        );
+        if (!match) {
+            return res
+                .status(401)
+                .json({ message: "Current password is incorrect" });
+        }
+
+        const newHash = await bcrypt.hash(new_password, 10);
+        await pool.query(
+            "UPDATE residents SET password_hash = $1 WHERE resident_id = $2",
+            [newHash, resident_id],
+        );
+
+        return res.json({ message: "Password updated successfully" });
+    } catch (err) {
+        console.error("residentChangePassword error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 // POST /api/auth/admin/login
 // body: { username, password }
 async function adminLogin(req, res) {
@@ -159,4 +212,9 @@ async function adminLogin(req, res) {
     }
 }
 
-module.exports = { residentRegister, residentLogin, adminLogin };
+module.exports = {
+    residentRegister,
+    residentLogin,
+    residentChangePassword,
+    adminLogin,
+};

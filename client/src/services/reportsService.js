@@ -1,23 +1,17 @@
 import axios from "axios";
-import authService from "./authService";
 
 const API = "http://localhost:5000/api";
 
-function getAdminHeaders() {
-    const token = authService.getAdminToken();
-    return {
-        headers: {
-            Authorization: `Bearer ${token}`,
-        },
-    };
-}
+const getToken = () => localStorage.getItem("certifast_admin_token");
 
 const reportsService = {
     getOverview: async (period = "month") => {
-        const res = await axios.get(`${API}/admin/reports/overview`, {
-            ...getAdminHeaders(),
-            params: { period },
-        });
+        const res = await axios.get(
+            `${API}/reports/overview?period=${period}`,
+            {
+                headers: { Authorization: `Bearer ${getToken()}` },
+            },
+        );
         return res.data;
     },
 };

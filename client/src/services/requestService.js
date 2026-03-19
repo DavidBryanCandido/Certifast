@@ -4,15 +4,7 @@ import authService from "./authService";
 const API = "http://localhost:5000/api";
 
 const requestService = {
-    getMyRequests: async () => {
-        const token = authService.getResidentToken();
-        const res = await axios.get(`${API}/resident/requests`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        return res.data;
-    },
-
-    // Alias used by resident pages for a consistent API.
+    // GET all requests for logged-in resident
     getAllRequests: async () => {
         const token = authService.getResidentToken();
         const res = await axios.get(`${API}/resident/requests`, {
@@ -21,9 +13,10 @@ const requestService = {
         return res.data;
     },
 
-    createRequest: async (payload) => {
+    // POST create a new request
+    createRequest: async (formData) => {
         const token = authService.getResidentToken();
-        const res = await axios.post(`${API}/resident/requests`, payload, {
+        const res = await axios.post(`${API}/resident/requests`, formData, {
             headers: { Authorization: `Bearer ${token}` },
         });
         return res.data;
