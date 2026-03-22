@@ -180,7 +180,7 @@ export default function ResidentLogin({ onLogin }) {
                 <div
                     style={{
                         background:
-                            "linear-gradient(180deg, #f8f6f1 0%, #fff 100%)",
+                            "linear-gradient(180deg, rgb(14, 37, 84) 0%, rgb(22, 48, 102) 100%)",
                         padding: "28px 44px 20px",
                         textAlign: "center",
                         borderBottom: "1px solid #ede8df",
@@ -216,7 +216,7 @@ export default function ResidentLogin({ onLogin }) {
                             fontSize: 9.5,
                             letterSpacing: "2.5px",
                             textTransform: "uppercase",
-                            color: "#9090aa",
+                            color: "rgba(201,162,39,0.7)",
                             fontFamily: "'Source Serif 4', serif",
                             margin: "0 0 4px",
                         }}
@@ -227,7 +227,7 @@ export default function ResidentLogin({ onLogin }) {
                         style={{
                             fontSize: 18,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "#fff",
                             fontFamily: "'Playfair Display', serif",
                             margin: "0 0 3px",
                         }}
@@ -237,7 +237,7 @@ export default function ResidentLogin({ onLogin }) {
                     <p
                         style={{
                             fontSize: 11,
-                            color: "#7a7a9a",
+                            color: "rgba(255,255,255,0.55)",
                             fontFamily: "'Source Serif 4', serif",
                             margin: 0,
                         }}
@@ -252,6 +252,7 @@ export default function ResidentLogin({ onLogin }) {
                         padding: isMobile ? "24px 24px 28px" : "30px 44px 34px",
                     }}
                 >
+                    <div style={{ display:"flex", justifyContent:"center", marginBottom:18 }}>
                     <div
                         style={{
                             display: "inline-flex",
@@ -261,7 +262,6 @@ export default function ResidentLogin({ onLogin }) {
                             border: "1px solid rgba(201,162,39,0.25)",
                             borderRadius: 20,
                             padding: "4px 14px",
-                            marginBottom: 18,
                         }}
                     >
                         <span
@@ -276,6 +276,7 @@ export default function ResidentLogin({ onLogin }) {
                         >
                             CertiFast &nbsp;·&nbsp; Resident Portal
                         </span>
+                    </div>
                     </div>
 
                     <p
@@ -545,47 +546,44 @@ export default function ResidentLogin({ onLogin }) {
                     </div>
                 </div>
 
-                {/* Card footer */}
+                {/* Card footer — high contrast */}
                 <div
                     style={{
-                        background: "#f9f7f2",
-                        borderTop: "1px solid #ddd8cc",
-                        padding: "13px 44px",
-                        textAlign: "center",
+                        background: "#0e2554",
+                        borderTop: "1px solid rgba(201,162,39,0.2)",
+                        padding: isMobile ? "12px 20px" : "14px 44px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 8,
+                        gap: isMobile ? 8 : 14,
+                        flexWrap: "wrap",
                     }}
                 >
-                    <p
+                    <span
                         style={{
-                            fontSize: 10,
-                            color: "#9090aa",
-                            letterSpacing: ".5px",
+                            fontSize: isMobile ? 11.5 : 13.5,
+                            color: "rgba(255,255,255,0.7)",
                             fontFamily: "'Source Serif 4', serif",
-                            margin: 0,
                         }}
                     >
                         Don't have an account?
-                    </p>
+                    </span>
                     <button
                         type="button"
                         onClick={() => navigate("/resident/register")}
                         style={{
-                            background: "none",
-                            border: "none",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#0e2554",
+                            background: "rgba(201,162,39,0.18)",
+                            border: "1.5px solid rgba(201,162,39,0.55)",
+                            borderRadius: 5,
+                            padding: isMobile ? "5px 12px" : "7px 18px",
+                            fontSize: isMobile ? 11.5 : 13.5,
+                            fontWeight: 700,
+                            color: "#f0d060",
                             cursor: "pointer",
                             fontFamily: "'Source Serif 4', serif",
-                            textDecoration: "underline",
-                            textUnderlineOffset: 2,
-                            padding: 0,
                         }}
                     >
-                        Register here
+                        Register here →
                     </button>
                 </div>
             </div>

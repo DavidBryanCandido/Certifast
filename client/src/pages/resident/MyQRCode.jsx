@@ -14,6 +14,8 @@ import {
     Home, Plus, FileText, QrCode,
     LogOut, AlertCircle, Printer, Scissors,
 } from "lucide-react";
+import ResidentBottomNav from "../../components/ResidentBottomNav";
+import ResidentSidebar from "../../components/ResidentSidebar";
 
 // ─── Screen styles ────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-home]")) {
@@ -23,12 +25,7 @@ if (!document.head.querySelector("[data-resident-home]")) {
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:wght@300;400;600&display=swap');
     .rh-root { min-height:100vh; background:#f4f2ed; font-family:'Source Serif 4',serif; }
     .rh-topbar { background:linear-gradient(135deg,#0e2554 0%,#163066 100%); border-bottom:1px solid rgba(201,162,39,0.2); position:sticky; top:0; z-index:100; }
-    .rh-topbar-inner { max-width:1000px; margin:0 auto; padding:0 24px; height:60px; display:flex; align-items:center; gap:12px; }
-    .rh-bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #e4dfd4; display:flex; z-index:100; box-shadow:0 -2px 12px rgba(0,0,0,0.08); }
-    .rh-nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 6px; background:none; border:none; cursor:pointer; font-family:'Source Serif 4',serif; font-size:9.5px; color:#9090aa; transition:color 0.15s; }
-    .rh-nav-btn.active { color:#0e2554; }
-    .rh-nav-btn svg { opacity:0.5; }
-    .rh-nav-btn.active svg { opacity:1; }
+    .rh-topbar-inner { padding:0 24px; height:60px; display:flex; align-items:center; gap:12px; }
     @keyframes rhFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .rh-fadein { animation:rhFadeUp 0.35s ease both; }
     `;
@@ -163,7 +160,6 @@ function WalletCard({ name, residentId, qrValue }) {
 export default function MyQRCode({ resident, onLogout }) {
     const navigate              = useNavigate();
     const [width, setWidth]     = useState(window.innerWidth);
-    const [activeNav]           = useState("qr");
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -180,48 +176,46 @@ export default function MyQRCode({ resident, onLogout }) {
 
     return (
         <>
-        <div className="rh-root">
+        <div className="rh-root" style={{ display: "flex", minHeight: "100vh" }}>
+            {/* ── DESKTOP SIDEBAR ── */}
+            {!isMobile && (
+                <ResidentSidebar active="qr" resident={resident} onLogout={onLogout} />
+            )}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
 
             {/* ── TOPBAR ── */}
             <div className="rh-topbar">
                 <div className="rh-topbar-inner">
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-                        <div style={{ width: 34, height: 34, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden", flexShrink: 0 }}>
-                            <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    {isMobile && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
+                            <div style={{ width: 34, height: 34, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden", flexShrink: 0 }}>
+                                <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            </div>
+                            <div>
+                                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>CertiFast</div>
+                                <div style={{ fontSize: 9, color: "rgba(201,162,39,0.7)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Resident Portal</div>
+                            </div>
                         </div>
-                        <div>
-                            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>CertiFast</div>
-                            <div style={{ fontSize: 9, color: "rgba(201,162,39,0.7)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Resident Portal</div>
-                        </div>
-                    </div>
-
+                    )}
                     {!isMobile && (
-                        <button onClick={() => navigate("/resident/home")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.7)", fontFamily: "'Source Serif 4', serif", fontSize: 12, cursor: "pointer" }}>
-                            <Home size={13} /> Home
+                        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: "#fff" }}>
+                            My QR Code
+                        </div>
+                    )}
+                    {/* Logout — mobile only (desktop uses sidebar) */}
+                    {isMobile && (
+                        <button onClick={onLogout} title="Log out"
+                            style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontFamily: "'Source Serif 4', serif", fontWeight: 600 }}>
+                            <LogOut size={14} strokeWidth={2} />
+                            Log Out
                         </button>
                     )}
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(201,162,39,0.15)", border: "1.5px solid rgba(201,162,39,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#c9a227", flexShrink: 0 }}>
-                            {firstName[0]?.toUpperCase()}
-                        </div>
-                        {!isMobile && (
-                            <div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{name}</div>
-                                <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 1 }}>Resident</div>
-                            </div>
-                        )}
-                        <button onClick={onLogout} title="Log out" style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 11, fontFamily: "'Source Serif 4', serif" }}>
-                            <LogOut size={13} />
-                            {!isMobile && "Logout"}
-                        </button>
-                    </div>
                 </div>
                 <div style={{ height: 2, background: "linear-gradient(90deg, #c9a227, #f0d060, #c9a227)" }} />
             </div>
 
             {/* ── CONTENT ── */}
-            <div style={{ maxWidth: 900, margin: "0 auto", padding: isMobile ? "28px 16px 80px" : "32px 24px" }}>
+            <div style={{ width: "100%", boxSizing: "border-box", padding: isMobile ? "28px 16px 80px" : "32px 24px" }}>
 
                 <div className="rh-fadein" style={{ textAlign: "center", marginBottom: 24 }}>
                     <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: isMobile ? 20 : 22, fontWeight: 700, color: "#0e2554", margin: "0 0 6px" }}>My QR Code</h1>
@@ -355,21 +349,8 @@ export default function MyQRCode({ resident, onLogout }) {
             </div>
 
             {/* Mobile bottom nav */}
-            {isMobile && (
-                <div className="rh-bottom-nav">
-                    {[
-                        { key: "home",    icon: Home,     label: "Home",    path: "/resident/home"           },
-                        { key: "request", icon: Plus,     label: "Request", path: "/resident/submit-request" },
-                        { key: "history", icon: FileText, label: "History", path: "/resident/my-requests"    },
-                        { key: "qr",      icon: QrCode,   label: "My QR",   path: "/resident/my-qr"          },
-                    ].map(({ key, icon: Icon, label, path }) => (
-                        <button key={key} className={`rh-nav-btn${activeNav === key ? " active" : ""}`} onClick={() => navigate(path)}>
-                            <Icon size={20} strokeWidth={1.8} />
-                            {label}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {isMobile && <ResidentBottomNav active="qr" />}
+            </div>{/* end inner flex */}
         </div>
 
         {/* ══════════════════════════════════════════════════════

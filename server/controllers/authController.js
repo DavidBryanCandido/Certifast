@@ -1,16 +1,37 @@
 const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { createClient } = require("@supabase/supabase-js");
+
+// Supabase client — uses service role key so it can write to storage
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 // POST /api/auth/resident/register
-// body: { full_name, email, password, address, contact_number }
+// body: { first_name, middle_name, last_name, full_name, email, password,
+//         contact_number, date_of_birth, house_number, purok_id, street_id,
+//         street_other, address_house, address_street, id_type }
 async function residentRegister(req, res) {
-    const { full_name, email, password, address, contact_number } = req.body;
+    const {
+        first_name, middle_name, last_name,
+        email, password, contact_number, date_of_birth,
+        house_number, purok_id, street_id, street_other,
+        address_house, address_street,
+        id_type, civil_status, nationality,
+    } = req.body;
 
-    if (!full_name || !email || !password) {
+    // Compose full_name from parts
+    const full_name = [first_name, middle_name, last_name]
+        .map(s => (s || "").trim())
+        .filter(Boolean)
+        .join(" ") || req.body.full_name;
+
+    if (!first_name || !last_name || !email || !password) {
         return res
             .status(400)
-            .json({ message: "full_name, email and password are required" });
+            .json({ message: "first_name, last_name, email and password are required" });
     }
 
     try {
@@ -20,22 +41,68 @@ async function residentRegister(req, res) {
             [email],
         );
         if (existing.rows.length > 0) {
-            return res
-                .status(409)
-                .json({ message: "Email already registered" });
+            return res.status(409).json({ message: "Email already registered" });
         }
 
         const password_hash = await bcrypt.hash(password, 10);
 
+        // ── Upload ID image to Supabase Storage if provided ──
+        let id_image_url = null;
+        if (req.file) {
+            const ext      = req.file.mimetype === "image/png" ? "png"
+                           : req.file.mimetype === "image/webp" ? "webp"
+                           : "jpg";
+            const filename = `resident-ids/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from("certifast-uploads")
+                .upload(filename, req.file.buffer, {
+                    contentType: req.file.mimetype,
+                    upsert: false,
+                });
+
+            if (uploadError) {
+                console.error("Supabase upload error:", uploadError.message);
+                // Don't fail registration — just proceed without the image URL
+            } else {
+                const { data: urlData } = supabase.storage
+                    .from("certifast-uploads")
+                    .getPublicUrl(filename);
+                id_image_url = urlData.publicUrl;
+            }
+        }
+
         const result = await pool.query(
-            `INSERT INTO residents (full_name, email, password_hash, address_street, contact_number)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING resident_id, full_name, email`,
-            [full_name, email, password_hash, address, contact_number],
+            `INSERT INTO residents (
+                full_name, first_name, middle_name, last_name,
+                email, password_hash, contact_number, date_of_birth,
+                house_number, purok_id, street_id, street_other,
+                address_house, address_street,
+                id_type, id_image_url, civil_status, nationality, status
+            ) VALUES (
+                $1,  $2,  $3,  $4,
+                $5,  $6,  $7,  $8,
+                $9,  $10, $11, $12,
+                $13, $14,
+                $15, $16, $17, $18, 'pending_verification'
+            )
+            RETURNING resident_id, full_name, first_name, last_name, email, status`,
+            [
+                full_name, first_name, middle_name || null, last_name,
+                email, password_hash, contact_number || null, date_of_birth || null,
+                house_number || null,
+                (purok_id && Number(purok_id) > 0) ? Number(purok_id) : null,
+                (street_id && Number(street_id) > 0) ? Number(street_id) : null,
+                street_other || null,
+                address_house || null, address_street || null,
+                id_type || null, id_image_url,
+                civil_status || null,
+                nationality || 'Filipino',
+            ],
         );
 
         return res.status(201).json({
-            message: "Account created successfully",
+            message: "Account created successfully. Your registration is under review. Please come back in 1–3 business days.",
             resident: result.rows[0],
         });
     } catch (err) {
@@ -56,9 +123,10 @@ async function residentLogin(req, res) {
     }
 
     try {
+        // Check if account exists at all (any status)
         const result = await pool.query(
-            "SELECT * FROM residents WHERE email = $1 AND status = $2",
-            [email, "active"],
+            "SELECT * FROM residents WHERE email = $1",
+            [email],
         );
 
         if (result.rows.length === 0) {
@@ -68,6 +136,27 @@ async function residentLogin(req, res) {
         }
 
         const resident = result.rows[0];
+
+        // Block pending_verification accounts with a clear message
+        if (resident.status === "pending_verification") {
+            return res
+                .status(403)
+                .json({ message: "Your account is still under review. Please come back in 1–3 business days once the barangay has verified your ID." });
+        }
+
+        // Block inactive accounts
+        if (resident.status === "inactive") {
+            return res
+                .status(403)
+                .json({ message: "Your account has been deactivated. Please contact the barangay office." });
+        }
+
+        if (resident.status !== "active") {
+            return res
+                .status(403)
+                .json({ message: "Your account is not active. Please contact the barangay office." });
+        }
+
         const match = await bcrypt.compare(password, resident.password_hash);
 
         if (!match) {

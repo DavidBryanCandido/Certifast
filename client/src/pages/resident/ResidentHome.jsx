@@ -10,11 +10,23 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    FileText, Clock, CheckCircle, XCircle, Plus,
-    QrCode, ChevronRight, LogOut, Bell, Menu, X,
-    FileCheck, AlertCircle, Home, UserCircle,
+    FileText,
+    Clock,
+    CheckCircle,
+    XCircle,
+    Plus,
+    QrCode,
+    ChevronRight,
+    LogOut,
+    Bell,
+    FileCheck,
+    AlertCircle,
+    Home,
+    UserCircle,
 } from "lucide-react";
 import requestService from "../../services/requestService";
+import ResidentBottomNav from "../../components/ResidentBottomNav";
+import ResidentSidebar from "../../components/ResidentSidebar";
 
 // ─── Inject styles ────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-home]")) {
@@ -35,27 +47,10 @@ if (!document.head.querySelector("[data-resident-home]")) {
         position: sticky; top: 0; z-index: 100;
     }
     .rh-topbar-inner {
-        max-width: 1000px; margin: 0 auto;
+        max-width: 1000px;
         padding: 0 24px; height: 60px;
         display: flex; align-items: center; gap: 12px;
     }
-    /* BOTTOM NAV (mobile) */
-    .rh-bottom-nav {
-        position: fixed; bottom: 0; left: 0; right: 0;
-        background: #fff; border-top: 1px solid #e4dfd4;
-        display: flex; z-index: 100;
-        box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
-    }
-    .rh-nav-btn {
-        flex: 1; display: flex; flex-direction: column;
-        align-items: center; gap: 3px; padding: 10px 6px;
-        background: none; border: none; cursor: pointer;
-        font-family: 'Source Serif 4', serif; font-size: 9.5px;
-        color: #9090aa; transition: color 0.15s;
-    }
-    .rh-nav-btn.active { color: #0e2554; }
-    .rh-nav-btn.active svg { opacity: 1; }
-    .rh-nav-btn svg { opacity: 0.5; }
     /* CARDS */
     .rh-stat-card {
         background: #fff; border: 1px solid #e4dfd4;
@@ -113,25 +108,34 @@ if (!document.head.querySelector("[data-resident-home]")) {
 
 function formatDate(str) {
     if (!str) return "—";
-    return new Date(str).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(str).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
 }
 
 function StatusBadge({ status }) {
     const map = {
-        pending:    { cls: "rh-badge-pending",    label: "Pending" },
+        pending: { cls: "rh-badge-pending", label: "Pending" },
         processing: { cls: "rh-badge-processing", label: "Processing" },
-        released:   { cls: "rh-badge-released",   label: "Released" },
-        rejected:   { cls: "rh-badge-rejected",   label: "Rejected" },
+        released: { cls: "rh-badge-released", label: "Released" },
+        rejected: { cls: "rh-badge-rejected", label: "Rejected" },
     };
-    const { cls, label } = map[status] || { cls: "rh-badge-pending", label: status };
+    const { cls, label } = map[status] || {
+        cls: "rh-badge-pending",
+        label: status,
+    };
     return <span className={cls}>{label}</span>;
 }
 
 function StatusIcon({ status }) {
     const props = { size: 16, strokeWidth: 2 };
-    if (status === "released")   return <CheckCircle {...props} color="#1a7a4a" />;
-    if (status === "rejected")   return <XCircle {...props} color="#b02020" />;
-    if (status === "processing") return <FileCheck {...props} color="#3730a3" />;
+    if (status === "released")
+        return <CheckCircle {...props} color="#1a7a4a" />;
+    if (status === "rejected") return <XCircle {...props} color="#b02020" />;
+    if (status === "processing")
+        return <FileCheck {...props} color="#3730a3" />;
     return <Clock {...props} color="#b86800" />;
 }
 
@@ -139,12 +143,10 @@ function StatusIcon({ status }) {
 export default function ResidentHome({ resident, onLogout }) {
     const navigate = useNavigate();
     const [width, setWidth] = useState(window.innerWidth);
-    const [showMenu, setShowMenu] = useState(false);
     const [requests, setRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [requestsError, setRequestsError] = useState("");
     const [expandedReasonId, setExpandedReasonId] = useState(null);
-    const [activeNav, setActiveNav] = useState("home");
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -161,12 +163,16 @@ export default function ResidentHome({ resident, onLogout }) {
                 const rawRows = Array.isArray(result?.data)
                     ? result.data
                     : Array.isArray(result)
-                        ? result
-                        : [];
+                      ? result
+                      : [];
 
                 const normalized = rawRows.map((row) => ({
                     request_id: row.request_id || row.id || "N/A",
-                    type: row.type || row.cert_type || row.certType || "Certificate Request",
+                    type:
+                        row.type ||
+                        row.cert_type ||
+                        row.certType ||
+                        "Certificate Request",
                     status: String(row.status || "pending").toLowerCase(),
                     rejection_reason: row.rejection_reason || null,
                     requested_at: row.requested_at || row.created_at || null,
@@ -180,7 +186,10 @@ export default function ResidentHome({ resident, onLogout }) {
             } catch (err) {
                 if (mounted) {
                     setRequests([]);
-                    setRequestsError(err?.response?.data?.message || "Unable to load your requests right now.");
+                    setRequestsError(
+                        err?.response?.data?.message ||
+                            "Unable to load your requests right now.",
+                    );
                 }
             } finally {
                 if (mounted) setLoadingRequests(false);
@@ -188,7 +197,9 @@ export default function ResidentHome({ resident, onLogout }) {
         }
 
         loadRequests();
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const isMobile = width < 768;
@@ -197,271 +208,799 @@ export default function ResidentHome({ resident, onLogout }) {
 
     // Stats
     const stats = {
-        total:      requests.length,
-        pending:    requests.filter(r => r.status === "pending" || r.status === "processing").length,
-        released:   requests.filter(r => r.status === "released").length,
-        rejected:   requests.filter(r => r.status === "rejected").length,
+        total: requests.length,
+        pending: requests.filter(
+            (r) => r.status === "pending" || r.status === "processing",
+        ).length,
+        released: requests.filter((r) => r.status === "released").length,
+        rejected: requests.filter((r) => r.status === "rejected").length,
     };
 
     const recentRequests = [...requests]
-        .sort((a, b) => new Date(b.requested_at || 0) - new Date(a.requested_at || 0))
+        .sort(
+            (a, b) =>
+                new Date(b.requested_at || 0) - new Date(a.requested_at || 0),
+        )
         .slice(0, 5);
 
     return (
-        <div className="rh-root">
-            {/* ── TOPBAR ── */}
-            <div className="rh-topbar">
-                <div className="rh-topbar-inner">
-                    {/* Logo + Brand */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1 }}>
-                        <div style={{ width: 34, height: 34, borderRadius: "50%", border: "1.5px solid rgba(201,162,39,0.5)", overflow: "hidden", flexShrink: 0 }}>
-                            <img src="/logo.png" alt="Seal" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        </div>
-                        <div>
-                            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>CertiFast</div>
-                            <div style={{ fontSize: 9, color: "rgba(201,162,39,0.7)", letterSpacing: "1.5px", textTransform: "uppercase" }}>Resident Portal</div>
-                        </div>
-                    </div>
-
-                    {/* Desktop nav */}
-                    {!isMobile && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <button onClick={() => navigate("/resident/my-qr")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.7)", fontFamily: "'Source Serif 4', serif", fontSize: 12, cursor: "pointer" }}>
-                                <QrCode size={13} /> My QR
-                            </button>
-                            <button onClick={() => navigate("/resident/profile")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.7)", fontFamily: "'Source Serif 4', serif", fontSize: 12, cursor: "pointer" }}>
-                                <UserCircle size={13} /> My Profile
-                            </button>
-                        </div>
-                    )}
-
-                    {/* User + logout */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: 10 }}>
-                        {/* Avatar — clickable on both desktop and mobile */}
-                        <button
-                            onClick={() => navigate("/resident/profile")}
-                            title="My Profile"
-                            style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(201,162,39,0.15)", border: "1.5px solid rgba(201,162,39,0.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#c9a227", flexShrink: 0, cursor: "pointer", transition: "background 0.15s" }}
-                        >
-                            {firstName[0]?.toUpperCase()}
-                        </button>
-                        {!isMobile && (
-                            <button
-                                onClick={() => navigate("/resident/profile")}
-                                style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: 0 }}
+        <div
+            className="rh-root"
+            style={{ display: "flex", minHeight: "100vh" }}
+        >
+            {/* ── DESKTOP SIDEBAR ── */}
+            {!isMobile && (
+                <ResidentSidebar
+                    active="home"
+                    resident={resident}
+                    onLogout={onLogout}
+                />
+            )}
+            <div
+                style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    minWidth: 0,
+                }}
+            >
+                {/* ── TOPBAR ── */}
+                <div className="rh-topbar">
+                    <div className="rh-topbar-inner">
+                        {isMobile && (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    flex: 1,
+                                }}
                             >
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>{name}</div>
-                                <div style={{ fontSize: 9.5, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 1 }}>Resident · View Profile</div>
-                            </button>
-                        )}
-                        <button onClick={onLogout} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 11, fontFamily: "'Source Serif 4', serif", transition: "all 0.15s" }}
-                            title="Log out">
-                            <LogOut size={13} />
-                            {!isMobile && "Logout"}
-                        </button>
-                    </div>
-                </div>
-                {/* Gold accent line */}
-                <div style={{ height: 2, background: "linear-gradient(90deg, #c9a227, #f0d060, #c9a227)" }} />
-            </div>
-
-            {/* ── CONTENT ── */}
-            <div style={{ maxWidth: 1000, margin: "0 auto", padding: isMobile ? "20px 16px 80px" : "28px 24px 40px" }}>
-
-                {/* Welcome banner — with office hours on the right */}
-                <div className="rh-fadein" style={{ background: "linear-gradient(135deg, #0e2554 0%, #163066 60%, #1a3a7a 100%)", borderRadius: 10, padding: isMobile ? "22px 20px" : "26px 32px", marginBottom: 22, position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", top: -20, right: -20, width: 120, height: 120, borderRadius: "50%", background: "rgba(201,162,39,0.06)", border: "1px solid rgba(201,162,39,0.1)" }} />
-                    <div style={{ position: "relative", display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: 20, flexDirection: isMobile ? "column" : "row" }}>
-
-                        {/* Left — greeting */}
-                        <div>
-                            <p style={{ fontSize: 11, color: "rgba(201,162,39,0.8)", letterSpacing: "1.5px", textTransform: "uppercase", fontFamily: "'Source Serif 4', serif", margin: "0 0 6px" }}>
-                                Good day,
-                            </p>
-                            <p style={{ fontFamily: "'Playfair Display', serif", fontSize: isMobile ? 20 : 24, fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>
-                                {name}
-                            </p>
-                            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.55)", fontFamily: "'Source Serif 4', serif", margin: "0 0 18px" }}>
-                                Barangay East Tapinac · City of Olongapo
-                            </p>
-                            <button onClick={() => navigate("/resident/submit-request")} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 22px", background: "linear-gradient(135deg, #c9a227, #9a7515)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}>
-                                <Plus size={14} /> Request a Certificate
-                            </button>
-                        </div>
-
-                        {/* Right — office hours */}
-                        <div style={{ flexShrink: 0, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(201,162,39,0.2)", borderRadius: 8, padding: "14px 18px", minWidth: isMobile ? "100%" : 210 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 10 }}>
-                                <Bell size={12} color="#c9a227" />
-                                <span style={{ fontSize: 10, fontWeight: 700, color: "#c9a227", letterSpacing: "1.2px", textTransform: "uppercase" }}>Office Hours</span>
-                            </div>
-                            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", lineHeight: 1.9, fontFamily: "'Source Serif 4', serif" }}>
-                                <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, display: "inline-block", width: 72 }}>Mon – Fri</span>8:00 AM – 5:00 PM</div>
-                                <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, display: "inline-block", width: 72 }}>Saturday</span>8:00 AM – 12:00 PM</div>
-                                <div><span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, display: "inline-block", width: 72 }}>Sun & Hol.</span>Closed</div>
-                            </div>
-                            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(201,162,39,0.15)", fontSize: 10.5, color: "rgba(255,255,255,0.38)", lineHeight: 1.5 }}>
-                                54 - 14th St. cor. Gallagher St., Olongapo City
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stats row */}
-                <div className="rh-fadein" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 22 }}>
-                    {[
-                        { icon: FileText,    label: "Total Requests", value: stats.total,    accent: "#0e2554", bg: "rgba(14,37,84,0.08)"   },
-                        { icon: Clock,       label: "In Progress",    value: stats.pending,  accent: "#b86800", bg: "rgba(184,104,0,0.08)"  },
-                        { icon: CheckCircle, label: "Released",       value: stats.released, accent: "#1a7a4a", bg: "rgba(26,122,74,0.08)"  },
-                        { icon: XCircle,     label: "Rejected",       value: stats.rejected, accent: "#b02020", bg: "rgba(176,32,32,0.08)"  },
-                    ].map(({ icon: Icon, label, value, accent, bg }) => (
-                        <div key={label} className="rh-stat-card">
-                            <div style={{ width: 38, height: 38, borderRadius: 8, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                <Icon size={17} color={accent} strokeWidth={2} />
-                            </div>
-                            <div>
-                                <div style={{ fontSize: 22, fontWeight: 700, color: "#0e2554", fontFamily: "'Playfair Display', serif", lineHeight: 1 }}>{value}</div>
-                                <div style={{ fontSize: 10, color: "#9090aa", marginTop: 3, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Main grid */}
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 320px", gap: 20, alignItems: "start" }}>
-
-                    {/* Recent requests */}
-                    <div className="rh-panel rh-fadein">
-                        <div className="rh-panel-header">
-                            <div className="rh-panel-title">Recent Requests</div>
-                            <button onClick={() => navigate("/resident/my-requests")} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "#163066", fontSize: 12, fontFamily: "'Source Serif 4', serif", cursor: "pointer", fontWeight: 600 }}>
-                                View all <ChevronRight size={13} />
-                            </button>
-                        </div>
-
-                        {requestsError && (
-                            <div style={{ margin: "12px 20px 0", background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", color: "#b02020", fontSize: 12, display: "flex", gap: 7, alignItems: "center" }}>
-                                <AlertCircle size={12} />
-                                {requestsError}
-                            </div>
-                        )}
-
-                        {loadingRequests && [1, 2, 3].map((i) => (
-                            <div key={i} className="rh-req-row">
-                                <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f0ece4", flexShrink: 0 }} />
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ width: "55%", height: 12, background: "#f0ece4", borderRadius: 4, marginBottom: 6 }} />
-                                    <div style={{ width: "35%", height: 10, background: "#f5f2ee", borderRadius: 4 }} />
+                                <div
+                                    style={{
+                                        width: 34,
+                                        height: 34,
+                                        borderRadius: "50%",
+                                        border: "1.5px solid rgba(201,162,39,0.5)",
+                                        overflow: "hidden",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    <img
+                                        src="/logo.png"
+                                        alt="Seal"
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            objectFit: "cover",
+                                        }}
+                                    />
                                 </div>
-                                <div style={{ width: 64, height: 20, background: "#f0ece4", borderRadius: 20 }} />
+                                <div>
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display', serif",
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: "#fff",
+                                            lineHeight: 1.2,
+                                        }}
+                                    >
+                                        CertiFast
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 9,
+                                            color: "rgba(201,162,39,0.7)",
+                                            letterSpacing: "1.5px",
+                                            textTransform: "uppercase",
+                                        }}
+                                    >
+                                        Resident Portal
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {!isMobile && (
+                            <div
+                                style={{
+                                    fontFamily: "'Playfair Display', serif",
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: "#fff",
+                                }}
+                            >
+                                Good day, {firstName}
+                            </div>
+                        )}
+                        {/* Logout — mobile only (desktop uses sidebar) */}
+                        {isMobile && (
+                            <button onClick={onLogout} title="Log out"
+                                style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontFamily: "'Source Serif 4', serif", fontWeight: 600 }}>
+                                <LogOut size={14} strokeWidth={2} />
+                                Log Out
+                            </button>
+                        )}
+                    </div>
+                    <div
+                        style={{
+                            height: 2,
+                            background:
+                                "linear-gradient(90deg, #c9a227, #f0d060, #c9a227)",
+                        }}
+                    />
+                </div>
+
+                {/* ── CONTENT ── */}
+                <div
+                    style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        padding: isMobile ? "20px 16px 80px" : "28px 24px 40px",
+                    }}
+                >
+                    {/* Welcome banner — with office hours on the right */}
+                    <div
+                        className="rh-fadein"
+                        style={{
+                            background:
+                                "linear-gradient(135deg, #0e2554 0%, #163066 60%, #1a3a7a 100%)",
+                            borderRadius: 10,
+                            padding: isMobile ? "22px 20px" : "26px 32px",
+                            marginBottom: 22,
+                            position: "relative",
+                            overflow: "hidden",
+                        }}
+                    >
+                        <div
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                backgroundImage:
+                                    "linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px)",
+                                backgroundSize: "32px 32px",
+                                pointerEvents: "none",
+                            }}
+                        />
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: -20,
+                                right: -20,
+                                width: 120,
+                                height: 120,
+                                borderRadius: "50%",
+                                background: "rgba(201,162,39,0.06)",
+                                border: "1px solid rgba(201,162,39,0.1)",
+                            }}
+                        />
+                        <div
+                            style={{
+                                position: "relative",
+                                display: "flex",
+                                alignItems: isMobile ? "flex-start" : "center",
+                                justifyContent: "space-between",
+                                gap: 20,
+                                flexDirection: isMobile ? "column" : "row",
+                            }}
+                        >
+                            {/* Left — greeting */}
+                            <div>
+                                <p
+                                    style={{
+                                        fontSize: 11,
+                                        color: "rgba(201,162,39,0.8)",
+                                        letterSpacing: "1.5px",
+                                        textTransform: "uppercase",
+                                        fontFamily: "'Source Serif 4', serif",
+                                        margin: "0 0 6px",
+                                    }}
+                                >
+                                    Good day,
+                                </p>
+                                <p
+                                    style={{
+                                        fontFamily: "'Playfair Display', serif",
+                                        fontSize: isMobile ? 20 : 24,
+                                        fontWeight: 700,
+                                        color: "#fff",
+                                        margin: "0 0 6px",
+                                    }}
+                                >
+                                    {name}
+                                </p>
+                                <p
+                                    style={{
+                                        fontSize: 12.5,
+                                        color: "rgba(255,255,255,0.55)",
+                                        fontFamily: "'Source Serif 4', serif",
+                                        margin: "0 0 18px",
+                                    }}
+                                >
+                                    Barangay East Tapinac · City of Olongapo
+                                </p>
+                                <button
+                                    onClick={() =>
+                                        navigate("/resident/submit-request")
+                                    }
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                        padding: "10px 22px",
+                                        background:
+                                            "linear-gradient(135deg, #c9a227, #9a7515)",
+                                        color: "#fff",
+                                        border: "none",
+                                        borderRadius: 4,
+                                        fontFamily: "'Playfair Display', serif",
+                                        fontSize: 13,
+                                        fontWeight: 700,
+                                        letterSpacing: 1.5,
+                                        textTransform: "uppercase",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    <Plus size={14} /> Request a Certificate
+                                </button>
+                            </div>
+
+                            {/* Right — office hours */}
+                            <div
+                                style={{
+                                    flexShrink: 0,
+                                    background: "rgba(255,255,255,0.06)",
+                                    border: "1px solid rgba(201,162,39,0.2)",
+                                    borderRadius: 8,
+                                    padding: "14px 18px",
+                                    minWidth: isMobile ? "100%" : 210,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 7,
+                                        marginBottom: 10,
+                                    }}
+                                >
+                                    <Bell size={12} color="#c9a227" />
+                                    <span
+                                        style={{
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            color: "#c9a227",
+                                            letterSpacing: "1.2px",
+                                            textTransform: "uppercase",
+                                        }}
+                                    >
+                                        Office Hours
+                                    </span>
+                                </div>
+                                <div
+                                    style={{
+                                        fontSize: 12,
+                                        color: "rgba(255,255,255,0.75)",
+                                        lineHeight: 1.9,
+                                        fontFamily: "'Source Serif 4', serif",
+                                    }}
+                                >
+                                    <div>
+                                        <span
+                                            style={{
+                                                color: "rgba(255,255,255,0.4)",
+                                                fontSize: 11,
+                                                display: "inline-block",
+                                                width: 72,
+                                            }}
+                                        >
+                                            Mon – Fri
+                                        </span>
+                                        8:00 AM – 5:00 PM
+                                    </div>
+                                    <div>
+                                        <span
+                                            style={{
+                                                color: "rgba(255,255,255,0.4)",
+                                                fontSize: 11,
+                                                display: "inline-block",
+                                                width: 72,
+                                            }}
+                                        >
+                                            Saturday
+                                        </span>
+                                        8:00 AM – 12:00 PM
+                                    </div>
+                                    <div>
+                                        <span
+                                            style={{
+                                                color: "rgba(255,255,255,0.4)",
+                                                fontSize: 11,
+                                                display: "inline-block",
+                                                width: 72,
+                                            }}
+                                        >
+                                            Sun & Hol.
+                                        </span>
+                                        Closed
+                                    </div>
+                                </div>
+                                <div
+                                    style={{
+                                        marginTop: 10,
+                                        paddingTop: 10,
+                                        borderTop:
+                                            "1px solid rgba(201,162,39,0.15)",
+                                        fontSize: 10.5,
+                                        color: "rgba(255,255,255,0.38)",
+                                        lineHeight: 1.5,
+                                    }}
+                                >
+                                    54 - 14th St. cor. Gallagher St., Olongapo
+                                    City
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Stats row */}
+                    <div
+                        className="rh-fadein"
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: isMobile
+                                ? "1fr 1fr"
+                                : "repeat(4,1fr)",
+                            gap: 12,
+                            marginBottom: 22,
+                        }}
+                    >
+                        {[
+                            {
+                                icon: FileText,
+                                label: "Total Requests",
+                                value: stats.total,
+                                accent: "#0e2554",
+                                bg: "rgba(14,37,84,0.08)",
+                            },
+                            {
+                                icon: Clock,
+                                label: "In Progress",
+                                value: stats.pending,
+                                accent: "#b86800",
+                                bg: "rgba(184,104,0,0.08)",
+                            },
+                            {
+                                icon: CheckCircle,
+                                label: "Released",
+                                value: stats.released,
+                                accent: "#1a7a4a",
+                                bg: "rgba(26,122,74,0.08)",
+                            },
+                            {
+                                icon: XCircle,
+                                label: "Rejected",
+                                value: stats.rejected,
+                                accent: "#b02020",
+                                bg: "rgba(176,32,32,0.08)",
+                            },
+                        ].map(({ icon: Icon, label, value, accent, bg }) => (
+                            <div key={label} className="rh-stat-card">
+                                <div
+                                    style={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: 8,
+                                        background: bg,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    <Icon
+                                        size={17}
+                                        color={accent}
+                                        strokeWidth={2}
+                                    />
+                                </div>
+                                <div>
+                                    <div
+                                        style={{
+                                            fontSize: 22,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                            fontFamily:
+                                                "'Playfair Display', serif",
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        {value}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 10,
+                                            color: "#9090aa",
+                                            marginTop: 3,
+                                            textTransform: "uppercase",
+                                            letterSpacing: 1,
+                                        }}
+                                    >
+                                        {label}
+                                    </div>
+                                </div>
                             </div>
                         ))}
-
-                        {!loadingRequests && recentRequests.length === 0 ? (
-                            <div style={{ padding: "36px 20px", textAlign: "center", color: "#9090aa", fontSize: 13, fontStyle: "italic" }}>
-                                No requests yet. Submit your first one!
-                            </div>
-                        ) : (
-                            !loadingRequests && recentRequests.map((req) => {
-                                const isRejected = req.status === "rejected";
-                                const isExpanded = expandedReasonId === req.request_id;
-                                const rejectionReason = req.rejection_reason || "No rejection reason was provided by the admin.";
-
-                                return (
-                                    <div key={req.request_id}>
-                                        <div className="rh-req-row">
-                                            <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f8f6f1", border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                <StatusIcon status={req.status} />
-                                            </div>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{req.type}</div>
-                                                <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
-                                                    {req.request_id} · Submitted {formatDate(req.requested_at)}
-                                                </div>
-                                            </div>
-                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                                                <StatusBadge status={req.status} />
-                                                {isRejected && (
-                                                    <button
-                                                        onClick={() => setExpandedReasonId(isExpanded ? null : req.request_id)}
-                                                        style={{ background: "none", border: "none", color: "#b02020", fontSize: 10.5, fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontFamily: "'Source Serif 4', serif" }}
-                                                    >
-                                                        {isExpanded ? "Hide reason" : "View reason"}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {isRejected && isExpanded && (
-                                            <div style={{ margin: "0 20px 12px 70px", background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "10px 12px", fontSize: 11.5, color: "#7a1f1f", lineHeight: 1.6 }}>
-                                                <strong style={{ color: "#b02020" }}>Rejection Reason:</strong> {rejectionReason}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })
-                        )}
-
-                        <div style={{ padding: "12px 20px", background: "#f8f6f1", borderTop: "1px solid #e4dfd4", fontSize: 11, color: "#9090aa", display: "flex", alignItems: "center", gap: 6 }}>
-                            <AlertCircle size={11} />
-                            Processing time is typically 1–3 business days. Visit the barangay office to claim released certificates.
-                        </div>
                     </div>
 
-                    {/* Right sidebar */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-                        {/* Available Certificates */}
+                    {/* Main grid */}
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: isMobile ? "1fr" : "1fr 320px",
+                            gap: 20,
+                            alignItems: "start",
+                        }}
+                    >
+                        {/* Recent requests */}
                         <div className="rh-panel rh-fadein">
                             <div className="rh-panel-header">
-                                <div className="rh-panel-title">Available Certificates</div>
+                                <div className="rh-panel-title">
+                                    Recent Requests
+                                </div>
+                                <button
+                                    onClick={() =>
+                                        navigate("/resident/my-requests")
+                                    }
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        background: "none",
+                                        border: "none",
+                                        color: "#163066",
+                                        fontSize: 12,
+                                        fontFamily: "'Source Serif 4', serif",
+                                        cursor: "pointer",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    View all <ChevronRight size={13} />
+                                </button>
                             </div>
-                            <div style={{ padding: "8px 0" }}>
-                                {[
-                                    { name: "Barangay Clearance",           fee: true  },
-                                    { name: "Certificate of Residency",     fee: false },
-                                    { name: "Certificate of Indigency",     fee: false },
-                                    { name: "Business Permit",              fee: true  },
-                                    { name: "Good Moral Certificate",       fee: false },
-                                    { name: "Cert. of Live Birth (Endorsement)", fee: false },
-                                ].map((cert) => (
-                                    <div key={cert.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 20px", borderBottom: "1px solid #f0ece4" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a7a4a", flexShrink: 0 }} />
-                                            <span style={{ fontSize: 12, color: "#1a1a2e" }}>{cert.name}</span>
+
+                            {requestsError && (
+                                <div
+                                    style={{
+                                        margin: "12px 20px 0",
+                                        background: "#fdecea",
+                                        border: "1px solid #f5c6c6",
+                                        borderRadius: 6,
+                                        padding: "10px 12px",
+                                        color: "#b02020",
+                                        fontSize: 12,
+                                        display: "flex",
+                                        gap: 7,
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <AlertCircle size={12} />
+                                    {requestsError}
+                                </div>
+                            )}
+
+                            {loadingRequests &&
+                                [1, 2, 3].map((i) => (
+                                    <div key={i} className="rh-req-row">
+                                        <div
+                                            style={{
+                                                width: 36,
+                                                height: 36,
+                                                borderRadius: 8,
+                                                background: "#f0ece4",
+                                                flexShrink: 0,
+                                            }}
+                                        />
+                                        <div style={{ flex: 1 }}>
+                                            <div
+                                                style={{
+                                                    width: "55%",
+                                                    height: 12,
+                                                    background: "#f0ece4",
+                                                    borderRadius: 4,
+                                                    marginBottom: 6,
+                                                }}
+                                            />
+                                            <div
+                                                style={{
+                                                    width: "35%",
+                                                    height: 10,
+                                                    background: "#f5f2ee",
+                                                    borderRadius: 4,
+                                                }}
+                                            />
                                         </div>
-                                        <span style={{ fontSize: 10, color: cert.fee ? "#b86800" : "#9090aa", fontWeight: cert.fee ? 600 : 400 }}>
-                                            {cert.fee ? "₱ Fee" : "Free"}
-                                        </span>
+                                        <div
+                                            style={{
+                                                width: 64,
+                                                height: 20,
+                                                background: "#f0ece4",
+                                                borderRadius: 20,
+                                            }}
+                                        />
                                     </div>
                                 ))}
-                            </div>
 
+                            {!loadingRequests && recentRequests.length === 0 ? (
+                                <div
+                                    style={{
+                                        padding: "36px 20px",
+                                        textAlign: "center",
+                                        color: "#9090aa",
+                                        fontSize: 13,
+                                        fontStyle: "italic",
+                                    }}
+                                >
+                                    No requests yet. Submit your first one!
+                                </div>
+                            ) : (
+                                !loadingRequests &&
+                                recentRequests.map((req) => {
+                                    const isRejected =
+                                        req.status === "rejected";
+                                    const isExpanded =
+                                        expandedReasonId === req.request_id;
+                                    const rejectionReason =
+                                        req.rejection_reason ||
+                                        "No rejection reason was provided by the admin.";
+
+                                    return (
+                                        <div key={req.request_id}>
+                                            <div className="rh-req-row">
+                                                <div
+                                                    style={{
+                                                        width: 36,
+                                                        height: 36,
+                                                        borderRadius: 8,
+                                                        background: "#f8f6f1",
+                                                        border: "1px solid #e4dfd4",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent:
+                                                            "center",
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    <StatusIcon
+                                                        status={req.status}
+                                                    />
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        flex: 1,
+                                                        minWidth: 0,
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            fontSize: 13,
+                                                            fontWeight: 600,
+                                                            color: "#1a1a2e",
+                                                            whiteSpace:
+                                                                "nowrap",
+                                                            overflow: "hidden",
+                                                            textOverflow:
+                                                                "ellipsis",
+                                                        }}
+                                                    >
+                                                        {req.type}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: 10.5,
+                                                            color: "#9090aa",
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        {req.request_id} ·
+                                                        Submitted{" "}
+                                                        {formatDate(
+                                                            req.requested_at,
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        alignItems: "flex-end",
+                                                        gap: 6,
+                                                    }}
+                                                >
+                                                    <StatusBadge
+                                                        status={req.status}
+                                                    />
+                                                    {isRejected && (
+                                                        <button
+                                                            onClick={() =>
+                                                                setExpandedReasonId(
+                                                                    isExpanded
+                                                                        ? null
+                                                                        : req.request_id,
+                                                                )
+                                                            }
+                                                            style={{
+                                                                background:
+                                                                    "none",
+                                                                border: "none",
+                                                                color: "#b02020",
+                                                                fontSize: 10.5,
+                                                                fontWeight: 700,
+                                                                cursor: "pointer",
+                                                                textDecoration:
+                                                                    "underline",
+                                                                padding: 0,
+                                                                fontFamily:
+                                                                    "'Source Serif 4', serif",
+                                                            }}
+                                                        >
+                                                            {isExpanded
+                                                                ? "Hide reason"
+                                                                : "View reason"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {isRejected && isExpanded && (
+                                                <div
+                                                    style={{
+                                                        margin: "0 20px 12px 70px",
+                                                        background: "#fdecea",
+                                                        border: "1px solid #f5c6c6",
+                                                        borderRadius: 6,
+                                                        padding: "10px 12px",
+                                                        fontSize: 11.5,
+                                                        color: "#7a1f1f",
+                                                        lineHeight: 1.6,
+                                                    }}
+                                                >
+                                                    <strong
+                                                        style={{
+                                                            color: "#b02020",
+                                                        }}
+                                                    >
+                                                        Rejection Reason:
+                                                    </strong>{" "}
+                                                    {rejectionReason}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+
+                            <div
+                                style={{
+                                    padding: "12px 20px",
+                                    background: "#f8f6f1",
+                                    borderTop: "1px solid #e4dfd4",
+                                    fontSize: 11,
+                                    color: "#9090aa",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                }}
+                            >
+                                <AlertCircle size={11} />
+                                Processing time is typically 1–3 business days.
+                                Visit the barangay office to claim released
+                                certificates.
+                            </div>
                         </div>
 
-
+                        {/* Right sidebar */}
+                        <div
+                            style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 16,
+                            }}
+                        >
+                            {/* Available Certificates */}
+                            <div className="rh-panel rh-fadein">
+                                <div className="rh-panel-header">
+                                    <div className="rh-panel-title">
+                                        Available Certificates
+                                    </div>
+                                </div>
+                                <div style={{ padding: "8px 0" }}>
+                                    {[
+                                        {
+                                            name: "Barangay Clearance",
+                                            fee: true,
+                                        },
+                                        {
+                                            name: "Certificate of Residency",
+                                            fee: false,
+                                        },
+                                        {
+                                            name: "Certificate of Indigency",
+                                            fee: false,
+                                        },
+                                        { name: "Business Permit", fee: true },
+                                        {
+                                            name: "Good Moral Certificate",
+                                            fee: false,
+                                        },
+                                        {
+                                            name: "Cert. of Live Birth (Endorsement)",
+                                            fee: false,
+                                        },
+                                    ].map((cert) => (
+                                        <div
+                                            key={cert.name}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                padding: "9px 20px",
+                                                borderBottom:
+                                                    "1px solid #f0ece4",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 8,
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        width: 6,
+                                                        height: 6,
+                                                        borderRadius: "50%",
+                                                        background: "#1a7a4a",
+                                                        flexShrink: 0,
+                                                    }}
+                                                />
+                                                <span
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: "#1a1a2e",
+                                                    }}
+                                                >
+                                                    {cert.name}
+                                                </span>
+                                            </div>
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: cert.fee
+                                                        ? "#b86800"
+                                                        : "#9090aa",
+                                                    fontWeight: cert.fee
+                                                        ? 600
+                                                        : 400,
+                                                }}
+                                            >
+                                                {cert.fee ? "₱ Fee" : "Free"}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* ── MOBILE BOTTOM NAV ── */}
-            {isMobile && (
-                <div className="rh-bottom-nav">
-                    {[
-                        { key: "home",    icon: Home,        label: "Home",    path: "/resident/home"           },
-                        { key: "request", icon: Plus,        label: "Request", path: "/resident/submit-request" },
-                        { key: "history", icon: FileText,    label: "History", path: "/resident/my-requests"    },
-                        { key: "qr",      icon: QrCode,      label: "My QR",   path: "/resident/my-qr"          },
-                        { key: "profile", icon: UserCircle,  label: "Profile", path: "/resident/profile"        },
-                    ].map(({ key, icon: Icon, label, path }) => (
-                        <button key={key} className={`rh-nav-btn${activeNav === key ? " active" : ""}`} onClick={() => { setActiveNav(key); navigate(path); }}>
-                            <Icon size={20} strokeWidth={1.8} />
-                            {label}
-                        </button>
-                    ))}
-                </div>
-            )}
+                {/* ── MOBILE BOTTOM NAV ── */}
+                {isMobile && <ResidentBottomNav active="home" />}
+            </div>
+            {/* end inner flex */}
         </div>
+
     );
 }

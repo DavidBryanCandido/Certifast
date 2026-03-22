@@ -1,13 +1,24 @@
-const express = require("express");
-const router = express.Router();
+const express  = require("express");
+const router   = express.Router();
+const multer   = require("multer");
 const {
     residentRegister,
     residentLogin,
     adminLogin,
 } = require("../controllers/authController");
 
-router.post("/resident/register", residentRegister);
-router.post("/resident/login", residentLogin);
-router.post("/admin/login", adminLogin);
+// multer — memory storage, 5 MB limit, images only
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits:  { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        const allowed = ["image/jpeg", "image/png", "image/webp"];
+        cb(null, allowed.includes(file.mimetype));
+    },
+});
+
+router.post("/resident/register", upload.single("id_image"), residentRegister);
+router.post("/resident/login",    residentLogin);
+router.post("/admin/login",       adminLogin);
 
 module.exports = router;
