@@ -37,6 +37,7 @@ import residentProfileService from "../../services/residentProfileService";
 import requestService from "../../services/requestService";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
+import ResidentTopbar from "../../components/ResidentTopbar";
 
 // ─── Styles ───────────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-sr]")) {
@@ -516,88 +517,20 @@ export default function SubmitRequest({ resident, onLogout }) {
         setSuccess(null);
     }
 
+    function formatRequestId(raw) {
+        const num = Number(raw);
+        if (!Number.isFinite(num)) return String(raw || "");
+        return `REQ-${String(num).padStart(4, "0")}`;
+    }
+
     // ─── Topbar ───────────────────────────────────────────────
     const Topbar = (
-        <div className="sr-topbar">
-            <div className="sr-topbar-inner">
-                {/* Brand — mobile only; desktop has sidebar */}
-                {isMobile && (
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            flex: 1,
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: "50%",
-                                border: "1.5px solid rgba(201,162,39,0.5)",
-                                overflow: "hidden",
-                                flexShrink: 0,
-                            }}
-                        >
-                            <img
-                                src="/logo.png"
-                                alt="Seal"
-                                style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                }}
-                            />
-                        </div>
-                        <div>
-                            <div
-                                style={{
-                                    fontFamily: "'Playfair Display', serif",
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    color: "#fff",
-                                    lineHeight: 1.2,
-                                }}
-                            >
-                                CertiFast
-                            </div>
-                            <div
-                                style={{
-                                    fontSize: 9,
-                                    color: "rgba(201,162,39,0.7)",
-                                    letterSpacing: "1.5px",
-                                    textTransform: "uppercase",
-                                }}
-                            >
-                                Resident Portal
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {!isMobile && (
-                    <div
-                        style={{
-                            fontFamily: "'Playfair Display', serif",
-                            fontSize: 15,
-                            fontWeight: 600,
-                            color: "#fff",
-                            flex: 1,
-                        }}
-                    >
-                        New Request
-                    </div>
-                )}
-                {isMobile && (
-                    <button onClick={onLogout} title="Log out"
-                        style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontFamily: "'Source Serif 4', serif", fontWeight: 600 }}>
-                        <LogOut size={14} strokeWidth={2} />
-                        Log Out
-                    </button>
-                )}
-            </div>
-            <div className="sr-gold-line" />
-        </div>
+        <ResidentTopbar
+            resident={resident}
+            onLogout={onLogout}
+            isMobile={isMobile}
+            pageTitle="New Request"
+        />
     );
 
     // ─── Success screen ───────────────────────────────────────
@@ -723,7 +656,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                             color: "#0e2554",
                                         }}
                                     >
-                                        {success.request_id}
+                                        {formatRequestId(success.request_id)}
                                     </div>
                                 </div>
                             </div>

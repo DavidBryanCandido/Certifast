@@ -16,3 +16,4 @@ client/build/
 .DS_Store
 Thumbs.dbenv
 .env
+env

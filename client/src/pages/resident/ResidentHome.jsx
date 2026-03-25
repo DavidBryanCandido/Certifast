@@ -27,6 +27,7 @@ import {
 import requestService from "../../services/requestService";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
+import ResidentTopbar from "../../components/ResidentTopbar";
 
 // ─── Inject styles ────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-home]")) {
@@ -93,9 +94,10 @@ if (!document.head.querySelector("[data-resident-home]")) {
     .rh-action-btn.primary:hover { opacity: 0.92; transform: translateY(-1px); }
     /* BADGE */
     .rh-badge-pending  { font-size: 10px; background: #fff7e6; color: #b86800; border: 1px solid #f5d78e; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
+    .rh-badge-processing { font-size: 10px; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
+    .rh-badge-ready { font-size: 10px; background: #e8f5ee; color: #1a7a4a; border: 1px solid #a8d8bc; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
     .rh-badge-released { font-size: 10px; background: #e8f5ee; color: #1a7a4a; border: 1px solid #a8d8bc; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
     .rh-badge-rejected { font-size: 10px; background: #fdecea; color: #b02020; border: 1px solid #f5c6c6; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
-    .rh-badge-processing { font-size: 10px; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
 
     @keyframes rhFadeUp {
         from { opacity: 0; transform: translateY(16px); }
@@ -115,27 +117,40 @@ function formatDate(str) {
     });
 }
 
+function formatRequestId(raw) {
+    const num = Number(raw);
+    if (!Number.isFinite(num)) return String(raw || "");
+    return `REQ-${String(num).padStart(4, "0")}`;
+}
+
 function StatusBadge({ status }) {
+    const normalized = String(status || "").toLowerCase();
     const map = {
         pending: { cls: "rh-badge-pending", label: "Pending" },
         processing: { cls: "rh-badge-processing", label: "Processing" },
+        approved: { cls: "rh-badge-processing", label: "Approved" },
+        ready: { cls: "rh-badge-ready", label: "Ready for Pickup" },
         released: { cls: "rh-badge-released", label: "Released" },
-        rejected: { cls: "rh-badge-rejected", label: "Rejected" },
+        rejected: { cls: "rh-badge-rejected", label: "Denied" },
     };
-    const { cls, label } = map[status] || {
+    const { cls, label } = map[normalized] || {
         cls: "rh-badge-pending",
-        label: status,
+        label: status ? String(status) : "Pending",
     };
     return <span className={cls}>{label}</span>;
 }
 
 function StatusIcon({ status }) {
+    const normalized = String(status || "").toLowerCase();
     const props = { size: 16, strokeWidth: 2 };
-    if (status === "released")
+    if (normalized === "released")
         return <CheckCircle {...props} color="#1a7a4a" />;
-    if (status === "rejected") return <XCircle {...props} color="#b02020" />;
-    if (status === "processing")
+    if (normalized === "ready")
+        return <CheckCircle {...props} color="#1a7a4a" />;
+    if (normalized === "approved" || normalized === "processing")
         return <FileCheck {...props} color="#3730a3" />;
+    if (normalized === "rejected")
+        return <XCircle {...props} color="#b02020" />;
     return <Clock {...props} color="#b86800" />;
 }
 
@@ -146,7 +161,6 @@ export default function ResidentHome({ resident, onLogout }) {
     const [requests, setRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [requestsError, setRequestsError] = useState("");
-    const [expandedReasonId, setExpandedReasonId] = useState(null);
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -202,18 +216,24 @@ export default function ResidentHome({ resident, onLogout }) {
         };
     }, []);
 
-    const isMobile = width < 768;
+    const isMobile = width < 640;
+    const isTablet = width >= 640 && width < 1024;
     const name = resident?.full_name || resident?.name || "Resident";
     const firstName = name.split(" ")[0];
 
     // Stats
     const stats = {
         total: requests.length,
-        pending: requests.filter(
-            (r) => r.status === "pending" || r.status === "processing",
+        pending: requests.filter((r) => {
+            const s = String(r.status || "").toLowerCase();
+            return ["pending", "processing", "approved", "ready"].includes(s);
+        }).length,
+        released: requests.filter(
+            (r) => String(r.status || "").toLowerCase() === "released",
         ).length,
-        released: requests.filter((r) => r.status === "released").length,
-        rejected: requests.filter((r) => r.status === "rejected").length,
+        rejected: requests.filter(
+            (r) => String(r.status || "").toLowerCase() === "rejected",
+        ).length,
     };
 
     const recentRequests = [...requests]
@@ -244,100 +264,22 @@ export default function ResidentHome({ resident, onLogout }) {
                     minWidth: 0,
                 }}
             >
-                {/* ── TOPBAR ── */}
-                <div className="rh-topbar">
-                    <div className="rh-topbar-inner">
-                        {isMobile && (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    flex: 1,
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        width: 34,
-                                        height: 34,
-                                        borderRadius: "50%",
-                                        border: "1.5px solid rgba(201,162,39,0.5)",
-                                        overflow: "hidden",
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    <img
-                                        src="/logo.png"
-                                        alt="Seal"
-                                        style={{
-                                            width: "100%",
-                                            height: "100%",
-                                            objectFit: "cover",
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <div
-                                        style={{
-                                            fontFamily:
-                                                "'Playfair Display', serif",
-                                            fontSize: 13,
-                                            fontWeight: 700,
-                                            color: "#fff",
-                                            lineHeight: 1.2,
-                                        }}
-                                    >
-                                        CertiFast
-                                    </div>
-                                    <div
-                                        style={{
-                                            fontSize: 9,
-                                            color: "rgba(201,162,39,0.7)",
-                                            letterSpacing: "1.5px",
-                                            textTransform: "uppercase",
-                                        }}
-                                    >
-                                        Resident Portal
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {!isMobile && (
-                            <div
-                                style={{
-                                    fontFamily: "'Playfair Display', serif",
-                                    fontSize: 15,
-                                    fontWeight: 600,
-                                    color: "#fff",
-                                }}
-                            >
-                                Good day, {firstName}
-                            </div>
-                        )}
-                        {/* Logout — mobile only (desktop uses sidebar) */}
-                        {isMobile && (
-                            <button onClick={onLogout} title="Log out"
-                                style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 5, color: "#fff", cursor: "pointer", fontSize: 12, fontFamily: "'Source Serif 4', serif", fontWeight: 600 }}>
-                                <LogOut size={14} strokeWidth={2} />
-                                Log Out
-                            </button>
-                        )}
-                    </div>
-                    <div
-                        style={{
-                            height: 2,
-                            background:
-                                "linear-gradient(90deg, #c9a227, #f0d060, #c9a227)",
-                        }}
-                    />
-                </div>
+                <ResidentTopbar
+                    resident={resident}
+                    onLogout={onLogout}
+                    isMobile={isMobile}
+                />
 
                 {/* ── CONTENT ── */}
                 <div
                     style={{
                         width: "100%",
                         boxSizing: "border-box",
-                        padding: isMobile ? "20px 16px 80px" : "28px 24px 40px",
+                        padding: isMobile
+                            ? "16px 14px 80px"
+                            : isTablet
+                              ? "20px 18px 30px"
+                              : "28px 24px 40px",
                     }}
                 >
                     {/* Welcome banner — with office hours on the right */}
@@ -580,7 +522,7 @@ export default function ResidentHome({ resident, onLogout }) {
                             },
                             {
                                 icon: XCircle,
-                                label: "Rejected",
+                                label: "Denied",
                                 value: stats.rejected,
                                 accent: "#b02020",
                                 bg: "rgba(176,32,32,0.08)",
@@ -638,7 +580,8 @@ export default function ResidentHome({ resident, onLogout }) {
                     <div
                         style={{
                             display: "grid",
-                            gridTemplateColumns: isMobile ? "1fr" : "1fr 320px",
+                            gridTemplateColumns:
+                                isMobile || isTablet ? "1fr" : "1fr 320px",
                             gap: 20,
                             alignItems: "start",
                         }}
@@ -747,13 +690,13 @@ export default function ResidentHome({ resident, onLogout }) {
                             ) : (
                                 !loadingRequests &&
                                 recentRequests.map((req) => {
-                                    const isRejected =
-                                        req.status === "rejected";
-                                    const isExpanded =
-                                        expandedReasonId === req.request_id;
+                                    const isDenied =
+                                        String(
+                                            req.status || "",
+                                        ).toLowerCase() === "rejected";
                                     const rejectionReason =
                                         req.rejection_reason ||
-                                        "No rejection reason was provided by the admin.";
+                                        "No denial reason was provided by the admin.";
 
                                     return (
                                         <div key={req.request_id}>
@@ -803,8 +746,10 @@ export default function ResidentHome({ resident, onLogout }) {
                                                             marginTop: 2,
                                                         }}
                                                     >
-                                                        {req.request_id} ·
-                                                        Submitted{" "}
+                                                        {formatRequestId(
+                                                            req.request_id,
+                                                        )}{" "}
+                                                        · Submitted{" "}
                                                         {formatDate(
                                                             req.requested_at,
                                                         )}
@@ -821,61 +766,29 @@ export default function ResidentHome({ resident, onLogout }) {
                                                     <StatusBadge
                                                         status={req.status}
                                                     />
-                                                    {isRejected && (
-                                                        <button
-                                                            onClick={() =>
-                                                                setExpandedReasonId(
-                                                                    isExpanded
-                                                                        ? null
-                                                                        : req.request_id,
-                                                                )
-                                                            }
+                                                    {isDenied && (
+                                                        <div
                                                             style={{
                                                                 background:
-                                                                    "none",
-                                                                border: "none",
-                                                                color: "#b02020",
+                                                                    "#fdecea",
+                                                                border: "1px solid #f5c6c6",
+                                                                borderRadius: 6,
+                                                                padding:
+                                                                    "5px 9px",
+                                                                marginTop: 4,
                                                                 fontSize: 10.5,
-                                                                fontWeight: 700,
-                                                                cursor: "pointer",
-                                                                textDecoration:
-                                                                    "underline",
-                                                                padding: 0,
-                                                                fontFamily:
-                                                                    "'Source Serif 4', serif",
+                                                                color: "#7a1f1f",
+                                                                lineHeight: 1.4,
+                                                                textAlign:
+                                                                    "right",
+                                                                maxWidth: 240,
                                                             }}
                                                         >
-                                                            {isExpanded
-                                                                ? "Hide reason"
-                                                                : "View reason"}
-                                                        </button>
+                                                            {rejectionReason}
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
-
-                                            {isRejected && isExpanded && (
-                                                <div
-                                                    style={{
-                                                        margin: "0 20px 12px 70px",
-                                                        background: "#fdecea",
-                                                        border: "1px solid #f5c6c6",
-                                                        borderRadius: 6,
-                                                        padding: "10px 12px",
-                                                        fontSize: 11.5,
-                                                        color: "#7a1f1f",
-                                                        lineHeight: 1.6,
-                                                    }}
-                                                >
-                                                    <strong
-                                                        style={{
-                                                            color: "#b02020",
-                                                        }}
-                                                    >
-                                                        Rejection Reason:
-                                                    </strong>{" "}
-                                                    {rejectionReason}
-                                                </div>
-                                            )}
                                         </div>
                                     );
                                 })
@@ -1001,6 +914,5 @@ export default function ResidentHome({ resident, onLogout }) {
             </div>
             {/* end inner flex */}
         </div>
-
     );
 }

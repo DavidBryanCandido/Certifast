@@ -104,7 +104,10 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
     .rbn-fab-bg {
         width: 62px; height: 62px;
         border-radius: 50%;
-        background: #f4f2ed;
+        background: #ffffff;
+        border: 1px solid #e4dfd4;
+        box-shadow: 0 2px 18px rgba(0,0,0,0.16);
+        opacity: 1;
         position: absolute;
         top: -18px;
         left: 50%;
@@ -132,21 +135,54 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
         background: linear-gradient(90deg, transparent, #0e2554, transparent);
         opacity: 0;
         transition: opacity 0.2s;
+        z-index: 0;
     }
     .rbn-item.active .rbn-top-line { opacity: 1; }
 
-    /* Page padding utility */
-    .rbn-page-padding { padding-bottom: 76px !important; }
+    /* Center FAB layer priority */
+    .rbn-fab-wrap { z-index: 2; }
+    .rbn-fab-bg { z-index: 1; }
+    .rbn-fab { z-index: 3; }
+
+    /* Page padding utility (safe bottom space) */
+    .rbn-page-padding { padding-bottom: 0 !important; }
+
+    /* Only apply extra bottom safe padding on mobile width where fixed nav is active */
+    @media (max-width: 768px) {
+        .rh-root { padding-bottom: 98px !important; }
+        .rbn-page-padding { padding-bottom: 82px !important; }
+    }
+
+    @media (min-width: 769px) {
+        .rh-root { padding-bottom: 0 !important; }
+        .rbn-page-padding { padding-bottom: 0 !important; }
+    }
     `;
     document.head.appendChild(s);
 }
 
 const NAV_ITEMS = [
-    { key: "home",    icon: Home,        label: "Home",       path: "/resident/home"           },
-    { key: "history", icon: FileText,    label: "Requests",   path: "/resident/my-requests"    },
-    { key: "request", icon: Plus,        label: "New Request", path: "/resident/submit-request", isFab: true },
-    { key: "qr",      icon: QrCode,      label: "My QR",      path: "/resident/my-qr"          },
-    { key: "profile", icon: UserCircle,  label: "Profile",    path: "/resident/profile"        },
+    { key: "home", icon: Home, label: "Home", path: "/resident/home" },
+    {
+        key: "history",
+        icon: FileText,
+        label: "Requests",
+        path: "/resident/my-requests",
+    },
+    {
+        key: "request",
+        icon: Plus,
+        label: "New Request",
+        path: "/resident/submit-request",
+        isFab: true,
+    },
+    { key: "qr", icon: QrCode, label: "My QR", path: "/resident/my-qr" },
+    {
+        key: "profile",
+        icon: UserCircle,
+        label: "Profile",
+        path: "/resident/profile",
+    },
 ];
 
 export default function ResidentBottomNav({ active: activeProp }) {
@@ -154,18 +190,24 @@ export default function ResidentBottomNav({ active: activeProp }) {
     const location = useLocation();
 
     // Derive active from prop or URL
-    const activeKey = activeProp || (() => {
-        const p = location.pathname;
-        if (p === "/resident/home")           return "home";
-        if (p === "/resident/my-requests")    return "history";
-        if (p === "/resident/submit-request") return "request";
-        if (p === "/resident/my-qr")          return "qr";
-        if (p === "/resident/profile")        return "profile";
-        return "home";
-    })();
+    const activeKey =
+        activeProp ||
+        (() => {
+            const p = location.pathname;
+            if (p === "/resident/home") return "home";
+            if (p === "/resident/my-requests") return "history";
+            if (p === "/resident/submit-request") return "request";
+            if (p === "/resident/my-qr") return "qr";
+            if (p === "/resident/profile") return "profile";
+            return "home";
+        })();
 
     return (
-        <div className="rbn-bar" role="navigation" aria-label="Resident navigation">
+        <div
+            className="rbn-bar"
+            role="navigation"
+            aria-label="Resident navigation"
+        >
             {NAV_ITEMS.map(({ key, icon: Icon, label, path, isFab }) => {
                 const isActive = activeKey === key;
 
@@ -180,7 +222,11 @@ export default function ResidentBottomNav({ active: activeProp }) {
                         >
                             <div className="rbn-fab-bg" />
                             <div className="rbn-fab">
-                                <Icon size={24} color="#fff" strokeWidth={2.5} />
+                                <Icon
+                                    size={24}
+                                    color="#fff"
+                                    strokeWidth={2.5}
+                                />
                             </div>
                             <span style={{ marginTop: -2 }}>{label}</span>
                         </button>
@@ -198,10 +244,11 @@ export default function ResidentBottomNav({ active: activeProp }) {
                         <div className="rbn-top-line" />
                         <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                         <span>{label}</span>
-                        {isActive
-                            ? <div className="rbn-active-dot" />
-                            : <div className="rbn-dot-placeholder" />
-                        }
+                        {isActive ? (
+                            <div className="rbn-active-dot" />
+                        ) : (
+                            <div className="rbn-dot-placeholder" />
+                        )}
                     </button>
                 );
             })}

@@ -13,7 +13,8 @@ CREATE TABLE requests (
   processed_by integer,
   processed_at timestamp without time zone,
   released_by integer,
-  released_at timestamp without time zone
+  released_at timestamp without time zone,
+  denial_category text
 );
 
 ALTER TABLE requests ADD PRIMARY KEY (request_id);
@@ -96,6 +97,22 @@ ALTER TABLE barangay_settings ADD PRIMARY KEY (setting_key);
 
 ALTER TABLE barangay_settings ADD FOREIGN KEY (updated_by) REFERENCES admin_accounts(admin_id);
 
+CREATE TABLE notifications (
+  notification_id integer DEFAULT nextval('notifications_notification_id_seq'::regclass) NOT NULL,
+  resident_id integer,
+  type character varying NOT NULL,
+  title character varying NOT NULL,
+  message text,
+  request_id integer,
+  is_read boolean DEFAULT false,
+  created_at timestamp without time zone DEFAULT now()
+);
+
+ALTER TABLE notifications ADD PRIMARY KEY (notification_id);
+
+ALTER TABLE notifications ADD FOREIGN KEY (request_id) REFERENCES requests(request_id);
+ALTER TABLE notifications ADD FOREIGN KEY (resident_id) REFERENCES residents(resident_id);
+
 CREATE TABLE puroks (
   purok_id integer DEFAULT nextval('puroks_purok_id_seq'::regclass) NOT NULL,
   name character varying NOT NULL,
@@ -140,7 +157,8 @@ CREATE TABLE residents (
   id_type character varying,
   id_image_url character varying,
   verified_by integer,
-  verified_at timestamp without time zone
+  verified_at timestamp without time zone,
+  nationality character varying DEFAULT 'Filipino'::character varying
 );
 
 ALTER TABLE residents ADD PRIMARY KEY (resident_id);

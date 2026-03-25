@@ -41,7 +41,8 @@ function mapAuditType(actionType, targetTable) {
     if (act.includes("logout")) return "logout";
     if (act.includes("walk")) return "walkin";
     if (act.includes("qr")) return "qrscan";
-    if (act.includes("setting") || table === "system_settings") return "settings";
+    if (act.includes("setting") || table === "system_settings")
+        return "settings";
     if (act.includes("request") || table === "requests") return "request";
     return "request";
 }
@@ -101,6 +102,26 @@ async function createAuditLog({
     }
 }
 
+// Helper to create notifications for residents
+async function createNotification({
+    residentId,
+    type,
+    title,
+    message,
+    requestId = null,
+}) {
+    try {
+        await pool.query(
+            `INSERT INTO notifications (resident_id, type, title, message, request_id)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [residentId, type, title, message, requestId],
+        );
+    } catch (err) {
+        console.error("createNotification error:", err);
+        // Don't fail the main operation if notification creation fails
+    }
+}
+
 async function getDashboardStats(req, res) {
     try {
         const result = await pool.query(
@@ -135,9 +156,8 @@ async function getDashboardStats(req, res) {
 
 async function getRecentRequests(req, res) {
     const rawLimit = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(rawLimit) && rawLimit > 0
-        ? Math.min(rawLimit, 25)
-        : 5;
+    const limit =
+        Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 25) : 5;
 
     try {
         const result = await pool.query(
@@ -180,7 +200,7 @@ async function approveRequest(req, res) {
                  rejection_reason = NULL
              WHERE request_id = $1
                AND status = 'pending'
-             RETURNING request_id, status, processed_at`,
+             RETURNING request_id, resident_id, status, processed_at`,
             [requestId, req.admin.id],
         );
 
@@ -189,6 +209,17 @@ async function approveRequest(req, res) {
                 message: "Request cannot be approved in its current status",
             });
         }
+
+        // Create notification for resident
+        const request = result.rows[0];
+        await createNotification({
+            residentId: request.resident_id,
+            type: "request_update",
+            title: "Request Approved",
+            message:
+                "Your certificate request has been approved and is now being processed.",
+            requestId: request.request_id,
+        });
 
         return res.json({
             message: "Request approved successfully",
@@ -209,7 +240,9 @@ async function rejectRequest(req, res) {
     }
 
     if (!reason) {
-        return res.status(400).json({ message: "Rejection reason is required" });
+        return res
+            .status(400)
+            .json({ message: "Rejection reason is required" });
     }
 
     try {
@@ -221,7 +254,7 @@ async function rejectRequest(req, res) {
                  processed_at = NOW()
              WHERE request_id = $1
                AND status IN ('pending', 'approved')
-             RETURNING request_id, status, rejection_reason, processed_at`,
+             RETURNING request_id, resident_id, status, rejection_reason, processed_at`,
             [requestId, req.admin.id, reason],
         );
 
@@ -230,6 +263,16 @@ async function rejectRequest(req, res) {
                 message: "Request cannot be rejected in its current status",
             });
         }
+
+        // Create notification for resident
+        const request = result.rows[0];
+        await createNotification({
+            residentId: request.resident_id,
+            type: "request_update",
+            title: "Request Denied",
+            message: `Your certificate request has been denied. Reason: ${reason}`,
+            requestId: request.request_id,
+        });
 
         return res.json({
             message: "Request rejected successfully",
@@ -267,7 +310,9 @@ async function issueWalkIn(req, res) {
     const { certType, residentName, address, purpose } = req.body;
 
     if (!certType || !String(certType).trim()) {
-        return res.status(400).json({ message: "Certificate type is required" });
+        return res
+            .status(400)
+            .json({ message: "Certificate type is required" });
     }
     if (!residentName || !String(residentName).trim()) {
         return res.status(400).json({ message: "Resident name is required" });
@@ -428,15 +473,20 @@ async function getResidentStats(req, res) {
 
 async function getResidents(req, res) {
     const search = String(req.query.search || "").trim();
-    const statusRaw = String(req.query.status || "").trim().toLowerCase();
-    const sortRaw = String(req.query.sort || "name").trim().toLowerCase();
+    const statusRaw = String(req.query.status || "")
+        .trim()
+        .toLowerCase();
+    const sortRaw = String(req.query.sort || "name")
+        .trim()
+        .toLowerCase();
     const pageRaw = Number.parseInt(req.query.page, 10);
     const limitRaw = Number.parseInt(req.query.limit, 10);
 
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0
-        ? Math.min(limitRaw, 100)
-        : 10;
+    const limit =
+        Number.isFinite(limitRaw) && limitRaw > 0
+            ? Math.min(limitRaw, 100)
+            : 10;
     const offset = (page - 1) * limit;
 
     const where = [];
@@ -459,11 +509,12 @@ async function getResidents(req, res) {
     }
 
     const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-    const orderBy = sortRaw === "date"
-        ? "res.created_at DESC, res.resident_id DESC"
-        : sortRaw === "requests"
-            ? "request_count DESC, res.full_name ASC"
-            : "res.full_name ASC";
+    const orderBy =
+        sortRaw === "date"
+            ? "res.created_at DESC, res.resident_id DESC"
+            : sortRaw === "requests"
+              ? "request_count DESC, res.full_name ASC"
+              : "res.full_name ASC";
 
     try {
         const countResult = await pool.query(
@@ -694,7 +745,14 @@ async function getReportsOverview(req, res) {
         const statusRow = statusResult.rows[0] || {};
         const statsRow = statsResult.rows[0] || {};
 
-        const certPalette = ["#0e2554", "#1a7a4a", "#b86800", "#1a4a8a", "#6a3db8", "#b02020"];
+        const certPalette = [
+            "#0e2554",
+            "#1a7a4a",
+            "#b86800",
+            "#1a4a8a",
+            "#6a3db8",
+            "#b02020",
+        ];
 
         return res.json({
             data: {
@@ -781,7 +839,7 @@ async function markRequestReady(req, res) {
                  processed_at = NOW()
              WHERE request_id = $1
                AND status = 'approved'
-             RETURNING request_id, status, processed_at`,
+             RETURNING request_id, resident_id, status, processed_at`,
             [requestId, req.admin.id],
         );
 
@@ -790,6 +848,17 @@ async function markRequestReady(req, res) {
                 message: "Request cannot be marked ready in its current status",
             });
         }
+
+        // Create notification for resident
+        const request = result.rows[0];
+        await createNotification({
+            residentId: request.resident_id,
+            type: "request_update",
+            title: "Certificate Ready for Pickup",
+            message:
+                "Your certificate is ready for pickup at the barangay office.",
+            requestId: request.request_id,
+        });
 
         return res.json({
             message: "Request marked ready for pickup",
@@ -815,7 +884,7 @@ async function releaseRequest(req, res) {
                  released_at = NOW()
              WHERE request_id = $1
                AND status = 'ready'
-             RETURNING request_id, status, released_at`,
+             RETURNING request_id, resident_id, status, released_at`,
             [requestId, req.admin.id],
         );
 
@@ -824,6 +893,17 @@ async function releaseRequest(req, res) {
                 message: "Request cannot be released in its current status",
             });
         }
+
+        // Create notification for resident
+        const request = result.rows[0];
+        await createNotification({
+            residentId: request.resident_id,
+            type: "request_update",
+            title: "Certificate Released",
+            message:
+                "Your certificate has been successfully released and is now available.",
+            requestId: request.request_id,
+        });
 
         return res.json({
             message: "Request released successfully",
@@ -881,16 +961,21 @@ async function getAuditLogs(req, res) {
     if (!ensureSuperadmin(req, res)) return;
 
     const search = String(req.query.search || "").trim();
-    const type = String(req.query.type || "").trim().toLowerCase();
+    const type = String(req.query.type || "")
+        .trim()
+        .toLowerCase();
     const actor = String(req.query.actor || "").trim();
-    const date = String(req.query.date || "").trim().toLowerCase();
+    const date = String(req.query.date || "")
+        .trim()
+        .toLowerCase();
     const pageRaw = Number.parseInt(req.query.page, 10);
     const limitRaw = Number.parseInt(req.query.limit, 10);
 
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0
-        ? Math.min(limitRaw, 100)
-        : 10;
+    const limit =
+        Number.isFinite(limitRaw) && limitRaw > 0
+            ? Math.min(limitRaw, 100)
+            : 10;
     const offset = (page - 1) * limit;
 
     const where = [];
@@ -932,7 +1017,9 @@ async function getAuditLogs(req, res) {
         } else if (type === "settings") {
             where.push("LOWER(COALESCE(al.action_type, '')) LIKE '%setting%'");
         } else if (type === "request") {
-            where.push("(LOWER(COALESCE(al.action_type, '')) LIKE '%request%' OR COALESCE(al.target_table, '') = 'requests')");
+            where.push(
+                "(LOWER(COALESCE(al.action_type, '')) LIKE '%request%' OR COALESCE(al.target_table, '') = 'requests')",
+            );
         }
     }
 
@@ -1066,14 +1153,20 @@ async function createAccount(req, res) {
     const fullName = String(req.body?.full_name || "").trim();
     const username = String(req.body?.username || "").trim();
     const password = String(req.body?.password || "");
-    const roleRaw = String(req.body?.role || "staff").trim().toLowerCase();
+    const roleRaw = String(req.body?.role || "staff")
+        .trim()
+        .toLowerCase();
     const role = roleRaw === "admin" ? "admin" : "staff";
 
     if (!fullName || !username || !password) {
-        return res.status(400).json({ message: "full_name, username and password are required" });
+        return res
+            .status(400)
+            .json({ message: "full_name, username and password are required" });
     }
     if (password.length < 8) {
-        return res.status(400).json({ message: "Password must be at least 8 characters" });
+        return res
+            .status(400)
+            .json({ message: "Password must be at least 8 characters" });
     }
 
     try {
@@ -1131,14 +1224,25 @@ async function updateAccount(req, res) {
 
     const fullName = String(req.body?.full_name || "").trim();
     const username = String(req.body?.username || "").trim();
-    const roleRaw = String(req.body?.role || "staff").trim().toLowerCase();
-    const statusRaw = String(req.body?.status || "active").trim().toLowerCase();
+    const roleRaw = String(req.body?.role || "staff")
+        .trim()
+        .toLowerCase();
+    const statusRaw = String(req.body?.status || "active")
+        .trim()
+        .toLowerCase();
 
     if (!fullName || !username) {
-        return res.status(400).json({ message: "full_name and username are required" });
+        return res
+            .status(400)
+            .json({ message: "full_name and username are required" });
     }
 
-    const role = roleRaw === "admin" ? "admin" : roleRaw === "superadmin" ? "superadmin" : "staff";
+    const role =
+        roleRaw === "admin"
+            ? "admin"
+            : roleRaw === "superadmin"
+              ? "superadmin"
+              : "staff";
     const status = statusRaw === "inactive" ? "inactive" : "active";
 
     try {
@@ -1197,7 +1301,9 @@ async function resetAccountPassword(req, res) {
         return res.status(400).json({ message: "Invalid account ID" });
     }
     if (!newPassword || newPassword.length < 8) {
-        return res.status(400).json({ message: "New password must be at least 8 characters" });
+        return res
+            .status(400)
+            .json({ message: "New password must be at least 8 characters" });
     }
 
     try {
@@ -1242,7 +1348,9 @@ async function deactivateAccount(req, res) {
     }
 
     if (accountId === req.admin.id) {
-        return res.status(400).json({ message: "You cannot deactivate your own account" });
+        return res
+            .status(400)
+            .json({ message: "You cannot deactivate your own account" });
     }
 
     try {

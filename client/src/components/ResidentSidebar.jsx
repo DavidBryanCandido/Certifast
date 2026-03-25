@@ -1,7 +1,7 @@
 // =============================================================
 // FILE: client/src/components/ResidentSidebar.jsx
 // =============================================================
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Home,
@@ -31,6 +31,57 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
         border-right: 1px solid rgba(201,162,39,0.15);
         z-index: 50;
         overflow: hidden;
+        transition: width 0.2s ease;
+    }
+    .rsb-wrap.collapsed {
+        width: 82px;
+    }
+    .rsb-wrap.collapsed .rsb-brand-text,
+    .rsb-wrap.collapsed .rsb-item-label,
+    .rsb-wrap.collapsed .rsb-request-label,
+    .rsb-wrap.collapsed .rsb-section-label,
+    .rsb-wrap.collapsed .rsb-profile-info,
+    .rsb-wrap.collapsed .rsb-logout-label {
+        display: none;
+    }
+    .rsb-wrap.collapsed .rsb-brand {
+        padding: 14px 0;
+        justify-content: center;
+        text-align: center;
+    }
+    .rsb-wrap.collapsed .rsb-brand > div:first-child {
+        width: 54px !important;
+        height: 54px !important;
+    }
+    .rsb-wrap.collapsed .rsb-item {
+        justify-content: center;
+        padding: 10px 0;
+    }
+    .rsb-wrap.collapsed .rsb-item .rsb-item-label,
+    .rsb-wrap.collapsed .rsb-request-btn .rsb-request-label,
+    .rsb-wrap.collapsed .rsb-profile-info,
+    .rsb-wrap.collapsed .rsb-logout-label,
+    .rsb-wrap.collapsed .rsb-section-label,
+    .rsb-wrap.collapsed .rsb-brand-text {
+        display: none;
+    }
+    .rsb-wrap.collapsed .rsb-request-btn {
+        justify-content: center;
+        padding: 10px 0;
+        min-width: 0;
+        border-left-width: 0;
+        border-bottom: 3px solid #c9a227;
+        margin: 4px 9px;
+        width: calc(100% - 18px);
+        border-radius: 6px;
+    }
+    .rsb-wrap.collapsed .rsb-profile-row {
+        justify-content: center;
+        padding: 10px 0;
+    }
+    .rsb-wrap.collapsed .rsb-logout {
+        justify-content: center;
+        padding: 10px 0;
     }
     .rsb-brand {
         padding: 20px 16px 18px;
@@ -184,6 +235,16 @@ const NAV_ITEMS = [
 ];
 
 export default function ResidentSidebar({ active, resident, onLogout }) {
+    const [collapsed, setCollapsed] = useState(
+        window.innerWidth < 1100 && window.innerWidth >= 640,
+    );
+
+    useEffect(() => {
+        const fn = () =>
+            setCollapsed(window.innerWidth < 1100 && window.innerWidth >= 640);
+        window.addEventListener("resize", fn);
+        return () => window.removeEventListener("resize", fn);
+    }, []);
     const navigate = useNavigate();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
 
@@ -203,7 +264,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
 
     return (
         <>
-            <div className="rsb-wrap">
+            <div className={`rsb-wrap${collapsed ? " collapsed" : ""}`}>
                 {/* Brand — centered, bigger logo */}
                 <div className="rsb-brand">
                     <div
@@ -218,7 +279,10 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                     >
                         <img
                             src="https://fyihciqyaugzhqeezxci.supabase.co/storage/v1/object/public/certifast-uploads/branding/logo.png"
-                            onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = "/logo.png"; }}
+                            onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = "/logo.png";
+                            }}
                             alt="Seal"
                             style={{
                                 width: "100%",
@@ -227,7 +291,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                             }}
                         />
                     </div>
-                    <div>
+                    <div className="rsb-brand-text">
                         <div
                             style={{
                                 fontFamily: "'Playfair Display', serif",
@@ -275,7 +339,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                                 size={16}
                                 strokeWidth={active === key ? 2.5 : 2}
                             />
-                            {label}
+                            <span className="rsb-item-label">{label}</span>
                         </button>
                     ))}
                     <div
@@ -289,7 +353,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                         onClick={() => navigate("/resident/submit-request")}
                     >
                         <Plus size={16} strokeWidth={2.5} />
-                        New Request
+                        <span className="rsb-request-label">New Request</span>
                     </button>
                 </div>
 
@@ -317,7 +381,10 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                         >
                             {initials}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                            className="rsb-profile-info"
+                            style={{ flex: 1, minWidth: 0 }}
+                        >
                             <div
                                 style={{
                                     fontSize: 12,
@@ -347,7 +414,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                         onClick={() => setShowLogoutModal(true)}
                     >
                         <LogOut size={15} strokeWidth={2} />
-                        Log Out
+                        <span className="rsb-logout-label">Log Out</span>
                     </button>
                 </div>
             </div>

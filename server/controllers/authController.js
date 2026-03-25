@@ -15,23 +15,38 @@ const supabase = createClient(
 //         street_other, address_house, address_street, id_type }
 async function residentRegister(req, res) {
     const {
-        first_name, middle_name, last_name,
-        email, password, contact_number, date_of_birth,
-        house_number, purok_id, street_id, street_other,
-        address_house, address_street,
-        id_type, civil_status, nationality,
+        first_name,
+        middle_name,
+        last_name,
+        email,
+        password,
+        contact_number,
+        date_of_birth,
+        house_number,
+        purok_id,
+        street_id,
+        street_other,
+        address_house,
+        address_street,
+        id_type,
+        civil_status,
+        nationality,
     } = req.body;
 
     // Compose full_name from parts
-    const full_name = [first_name, middle_name, last_name]
-        .map(s => (s || "").trim())
-        .filter(Boolean)
-        .join(" ") || req.body.full_name;
+    const full_name =
+        [first_name, middle_name, last_name]
+            .map((s) => (s || "").trim())
+            .filter(Boolean)
+            .join(" ") || req.body.full_name;
 
     if (!first_name || !last_name || !email || !password) {
         return res
             .status(400)
-            .json({ message: "first_name, last_name, email and password are required" });
+            .json({
+                message:
+                    "first_name, last_name, email and password are required",
+            });
     }
 
     try {
@@ -41,7 +56,9 @@ async function residentRegister(req, res) {
             [email],
         );
         if (existing.rows.length > 0) {
-            return res.status(409).json({ message: "Email already registered" });
+            return res
+                .status(409)
+                .json({ message: "Email already registered" });
         }
 
         const password_hash = await bcrypt.hash(password, 10);
@@ -49,9 +66,12 @@ async function residentRegister(req, res) {
         // ── Upload ID image to Supabase Storage if provided ──
         let id_image_url = null;
         if (req.file) {
-            const ext      = req.file.mimetype === "image/png" ? "png"
-                           : req.file.mimetype === "image/webp" ? "webp"
-                           : "jpg";
+            const ext =
+                req.file.mimetype === "image/png"
+                    ? "png"
+                    : req.file.mimetype === "image/webp"
+                      ? "webp"
+                      : "jpg";
             const filename = `resident-ids/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
             const { error: uploadError } = await supabase.storage
@@ -88,21 +108,30 @@ async function residentRegister(req, res) {
             )
             RETURNING resident_id, full_name, first_name, last_name, email, status`,
             [
-                full_name, first_name, middle_name || null, last_name,
-                email, password_hash, contact_number || null, date_of_birth || null,
+                full_name,
+                first_name,
+                middle_name || null,
+                last_name,
+                email,
+                password_hash,
+                contact_number || null,
+                date_of_birth || null,
                 house_number || null,
-                (purok_id && Number(purok_id) > 0) ? Number(purok_id) : null,
-                (street_id && Number(street_id) > 0) ? Number(street_id) : null,
+                purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,
+                street_id && Number(street_id) > 0 ? Number(street_id) : null,
                 street_other || null,
-                address_house || null, address_street || null,
-                id_type || null, id_image_url,
+                address_house || null,
+                address_street || null,
+                id_type || null,
+                id_image_url,
                 civil_status || null,
-                nationality || 'Filipino',
+                nationality || "Filipino",
             ],
         );
 
         return res.status(201).json({
-            message: "Account created successfully. Your registration is under review. Please come back in 1–3 business days.",
+            message:
+                "Account created successfully. Your registration is under review. Please come back in 1–3 business days.",
             resident: result.rows[0],
         });
     } catch (err) {
@@ -141,20 +170,29 @@ async function residentLogin(req, res) {
         if (resident.status === "pending_verification") {
             return res
                 .status(403)
-                .json({ message: "Your account is still under review. Please come back in 1–3 business days once the barangay has verified your ID." });
+                .json({
+                    message:
+                        "Your account is still under review. Please come back in 1–3 business days once the barangay has verified your ID.",
+                });
         }
 
         // Block inactive accounts
         if (resident.status === "inactive") {
             return res
                 .status(403)
-                .json({ message: "Your account has been deactivated. Please contact the barangay office." });
+                .json({
+                    message:
+                        "Your account has been deactivated. Please contact the barangay office.",
+                });
         }
 
         if (resident.status !== "active") {
             return res
                 .status(403)
-                .json({ message: "Your account is not active. Please contact the barangay office." });
+                .json({
+                    message:
+                        "Your account is not active. Please contact the barangay office.",
+                });
         }
 
         const match = await bcrypt.compare(password, resident.password_hash);
@@ -196,11 +234,9 @@ async function residentChangePassword(req, res) {
     const { current_password, new_password } = req.body;
 
     if (!current_password || !new_password) {
-        return res
-            .status(400)
-            .json({
-                message: "Current password and new password are required",
-            });
+        return res.status(400).json({
+            message: "Current password and new password are required",
+        });
     }
     if (new_password.length < 8) {
         return res
@@ -301,9 +337,31 @@ async function adminLogin(req, res) {
     }
 }
 
+// GET /api/address-options
+// → { puroks: [{purok_id, name},...], streets: [{street_id, name},...] }
+async function getAddressOptions(req, res) {
+    try {
+        const puroks = await pool.query(
+            "SELECT purok_id, name FROM puroks WHERE is_active = true ORDER BY sort_order",
+        );
+        const streets = await pool.query(
+            "SELECT street_id, name FROM streets WHERE is_active = true ORDER BY sort_order",
+        );
+
+        return res.json({
+            puroks: puroks.rows,
+            streets: streets.rows,
+        });
+    } catch (err) {
+        console.error("getAddressOptions error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 module.exports = {
     residentRegister,
     residentLogin,
     residentChangePassword,
     adminLogin,
+    getAddressOptions,
 };
