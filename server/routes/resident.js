@@ -1,3 +1,4 @@
+// certifast/routes/resident.js
 const express = require("express");
 const router = express.Router();
 const { residentChangePassword } = require("../controllers/authController");

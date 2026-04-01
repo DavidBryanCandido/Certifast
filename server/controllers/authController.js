@@ -1,3 +1,4 @@
+// certifast/controllers/authController.js
 const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
@@ -41,12 +42,9 @@ async function residentRegister(req, res) {
             .join(" ") || req.body.full_name;
 
     if (!first_name || !last_name || !email || !password) {
-        return res
-            .status(400)
-            .json({
-                message:
-                    "first_name, last_name, email and password are required",
-            });
+        return res.status(400).json({
+            message: "first_name, last_name, email and password are required",
+        });
     }
 
     try {
@@ -168,31 +166,25 @@ async function residentLogin(req, res) {
 
         // Block pending_verification accounts with a clear message
         if (resident.status === "pending_verification") {
-            return res
-                .status(403)
-                .json({
-                    message:
-                        "Your account is still under review. Please come back in 1–3 business days once the barangay has verified your ID.",
-                });
+            return res.status(403).json({
+                message:
+                    "Your account is still under review. Please come back in 1–3 business days once the barangay has verified your ID.",
+            });
         }
 
         // Block inactive accounts
         if (resident.status === "inactive") {
-            return res
-                .status(403)
-                .json({
-                    message:
-                        "Your account has been deactivated. Please contact the barangay office.",
-                });
+            return res.status(403).json({
+                message:
+                    "Your account has been deactivated. Please contact the barangay office.",
+            });
         }
 
         if (resident.status !== "active") {
-            return res
-                .status(403)
-                .json({
-                    message:
-                        "Your account is not active. Please contact the barangay office.",
-                });
+            return res.status(403).json({
+                message:
+                    "Your account is not active. Please contact the barangay office.",
+            });
         }
 
         const match = await bcrypt.compare(password, resident.password_hash);

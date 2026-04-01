@@ -1,3 +1,4 @@
+-- certifast/database/supabase_export.sql
 CREATE TABLE requests (
   request_id integer DEFAULT nextval('requests_request_id_seq'::regclass) NOT NULL,
   resident_id integer,

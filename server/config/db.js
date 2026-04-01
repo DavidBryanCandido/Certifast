@@ -1,3 +1,4 @@
+// certifast/config/db.js
 const { Pool } = require("pg");
 
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
@@ -17,7 +18,7 @@ const pool = new Pool(
               user: process.env.DB_USER,
               password: process.env.DB_PASSWORD,
               ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
-          }
+          },
 );
 
 module.exports = pool;

@@ -1,3 +1,4 @@
+// certifast/controllers/adminController.js
 const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 

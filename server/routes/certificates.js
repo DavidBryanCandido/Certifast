@@ -1,3 +1,4 @@
+// certifast/routes/certificates.js
 const express = require("express");
 const router = express.Router();
 const { getTemplates } = require("../controllers/templateController");

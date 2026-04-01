@@ -300,7 +300,7 @@ export function AdminSidebar({
             badge: badgeCounts.manageRequests,
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
-        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
+        { key: "reports", label: "Reports & Exports", Icon: BarChart2 },
     ];
 
     const saItems = [
@@ -345,7 +345,16 @@ export function AdminSidebar({
                 }}
             >
                 <div style={sd.brandSeal}>
-                    <img src="/logo.png" alt="Barangay Seal" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
+                    <img
+                        src="/logo.png"
+                        alt="Barangay Seal"
+                        style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                        }}
+                    />
                 </div>
                 {!collapsed && (
                     <div>
@@ -428,7 +437,7 @@ export function AdminMobileSidebar({
             badge: badgeCounts.manageRequests,
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
-        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
+        { key: "reports", label: "Reports & Exports", Icon: BarChart2 },
     ];
     const saItems = [
         { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
@@ -488,7 +497,16 @@ export function AdminMobileSidebar({
                         }}
                     >
                         <div style={sd.brandSeal}>
-                            <img src="/logo.png" alt="Barangay Seal" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover" }} />
+                            <img
+                                src="/logo.png"
+                                alt="Barangay Seal"
+                                style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: "50%",
+                                    objectFit: "cover",
+                                }}
+                            />
                         </div>
                         <div>
                             <div style={sd.brandName}>CertiFast</div>
@@ -528,9 +546,7 @@ export function AdminMobileSidebar({
                         <div style={sd.userName}>
                             {admin?.name || "Dante Administrador"}
                         </div>
-                        <div style={sd.userRole}>
-                            {admin?.role || "Admin"}
-                        </div>
+                        <div style={sd.userRole}>{admin?.role || "Admin"}</div>
                     </div>
                     <button
                         className="admin-logout-btn cf-logout-btn mr-logout-btn rep-logout-btn lg-logout-btn wi-logout-btn"

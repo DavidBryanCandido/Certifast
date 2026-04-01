@@ -165,7 +165,7 @@ if (!document.head.querySelector("[data-qr-print]")) {
     document.head.appendChild(s);
 }
 
-function WalletCard({ name, formattedId, qrValue }) {
+function WalletCard({ name, formattedId, qrValue, logoSrc }) {
     return (
         <div className="wc">
             <div className="wc-head">
@@ -173,17 +173,20 @@ function WalletCard({ name, formattedId, qrValue }) {
                     <div className="wc-brand">CertiFast</div>
                     <div className="wc-sub">Brgy. East Tapinac</div>
                 </div>
-                <img
-                    src="/logo.png"
-                    alt=""
-                    style={{
-                        width: "6mm",
-                        height: "6mm",
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                        opacity: 0.9,
-                    }}
-                />
+                {/* logoSrc is a preloaded base64 data URL — guaranteed present during print */}
+                {logoSrc && (
+                    <img
+                        src={logoSrc}
+                        alt=""
+                        style={{
+                            width: "6mm",
+                            height: "6mm",
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            opacity: 0.9,
+                        }}
+                    />
+                )}
             </div>
             <div className="wc-gold" />
             <div className="wc-body">
@@ -213,12 +216,28 @@ export default function MyQRCode({ resident, onLogout }) {
     const [width, setWidth] = useState(window.innerWidth);
     const [downloading, setDownloading] = useState(false);
     const [showPrintSheet, setShowPrintSheet] = useState(false);
+    const [logoSrc, setLogoSrc] = useState("");
     const qrCanvasRef = useRef(null);
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
         window.addEventListener("resize", fn);
         return () => window.removeEventListener("resize", fn);
+    }, []);
+
+    // Preload logo as base64 data URL on mount so it's ready before print dialog opens
+    useEffect(() => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            const c = document.createElement("canvas");
+            c.width = img.width;
+            c.height = img.height;
+            c.getContext("2d").drawImage(img, 0, 0);
+            setLogoSrc(c.toDataURL("image/png"));
+        };
+        img.onerror = () => setLogoSrc("/logo.png"); // fallback to path if canvas fails
+        img.src = "/logo.png";
     }, []);
 
     const isMobile = width < 768;
@@ -231,40 +250,54 @@ export default function MyQRCode({ resident, onLogout }) {
     const downloadCard = async () => {
         setDownloading(true);
         try {
-            const W = 540,
-                H = 856,
-                R = 28;
+            // ── CR80 wallet card at 300 DPI ──────────────────────────────
+            // Physical size: 54 × 85.6 mm  (standard ID/credit card, ISO 7810 ID-1)
+            // 300 DPI → 1 mm = 300/25.4 ≈ 11.811 px
+            // W = 54  × 11.811 = 637.8 → 638 px
+            // H = 85.6 × 11.811 = 1011.0 → 1011 px
+            // When printed at exactly 54 × 85.6 mm it will be sharp at 300 DPI.
+            const W = 638,
+                H = 1011,
+                R = 32;
+
             const canvas = document.createElement("canvas");
             canvas.width = W;
             canvas.height = H;
             const ctx = canvas.getContext("2d");
 
+            // ── 1. Clip to rounded rect — all drawing stays inside clean corners ──
             ctx.beginPath();
             ctx.roundRect(0, 0, W, H, R);
             ctx.clip();
 
+            // White base
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, W, H);
 
+            // ── Header (scaled: 110 × 638/540 ≈ 130) ──
             ctx.fillStyle = "#0e2554";
-            ctx.fillRect(0, 0, W, 110);
+            ctx.fillRect(0, 0, W, 130);
 
+            // Gold accent line (scaled: 10 → 12)
             const grad = ctx.createLinearGradient(0, 0, W, 0);
             grad.addColorStop(0, "#c9a227");
             grad.addColorStop(0.5, "#f0d060");
             grad.addColorStop(1, "#c9a227");
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 110, W, 10);
+            ctx.fillRect(0, 130, W, 12);
 
+            // Brand name (scaled: 38 → 45)
             ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 38px Georgia, serif";
+            ctx.font = "bold 45px Georgia, serif";
             ctx.textAlign = "left";
-            ctx.fillText("CertiFast", 28, 65);
+            ctx.fillText("CertiFast", 33, 76);
 
+            // Brand sub (scaled: 18 → 21)
             ctx.fillStyle = "rgba(201,162,39,0.9)";
-            ctx.font = "18px Georgia, serif";
-            ctx.fillText("BRGY. EAST TAPINAC", 28, 92);
+            ctx.font = "21px Georgia, serif";
+            ctx.fillText("BRGY. EAST TAPINAC", 33, 108);
 
+            // Logo — circle avatar top-right (scaled proportionally)
             try {
                 await new Promise((resolve) => {
                     const img = new Image();
@@ -272,9 +305,9 @@ export default function MyQRCode({ resident, onLogout }) {
                     img.onload = () => {
                         ctx.save();
                         ctx.beginPath();
-                        ctx.arc(W - 55, 55, 28, 0, Math.PI * 2);
+                        ctx.arc(W - 65, 65, 33, 0, Math.PI * 2);
                         ctx.clip();
-                        ctx.drawImage(img, W - 83, 27, 56, 56);
+                        ctx.drawImage(img, W - 98, 32, 66, 66);
                         ctx.restore();
                         resolve();
                     };
@@ -284,11 +317,12 @@ export default function MyQRCode({ resident, onLogout }) {
                 });
             } catch {}
 
+            // ── Name with word-wrap (scaled: 34 → 40, lineH 42 → 50, nameY 188 → 222) ──
             ctx.textAlign = "center";
             ctx.fillStyle = "#0e2554";
-            ctx.font = "bold 34px Georgia, serif";
+            ctx.font = "bold 40px Georgia, serif";
 
-            const maxW = W - 60;
+            const maxW = W - 70;
             const words = name.split(" ");
             const lines = [];
             let cur = "";
@@ -303,23 +337,23 @@ export default function MyQRCode({ resident, onLogout }) {
             }
             if (cur) lines.push(cur);
 
-            const lineH = 42;
-            const nameY = 188;
+            const lineH = 50;
+            const nameY = 222;
             lines.forEach((ln, i) =>
                 ctx.fillText(ln, W / 2, nameY + i * lineH),
             );
-
             const belowName = nameY + lines.length * lineH;
 
+            // ── Resident ID RES-XXXX (scaled: 21 → 25) ──
             ctx.fillStyle = "#888888";
-            ctx.font = "21px 'Courier New', monospace";
-            ctx.letterSpacing = "1px";
-            ctx.fillText(formattedId, W / 2, belowName + 34);
+            ctx.font = "25px 'Courier New', monospace";
+            ctx.fillText(formattedId, W / 2, belowName + 40);
 
+            // ── QR code (scaled: 300 → 355) ──
             const qrCanvas = qrCanvasRef.current?.querySelector("canvas");
-            const qrDrawSize = 300;
+            const qrDrawSize = 355;
             const qrX = (W - qrDrawSize) / 2;
-            const qrY = belowName + 72;
+            const qrY = belowName + 85;
 
             if (qrCanvas) {
                 ctx.fillStyle = "#ffffff";
@@ -327,42 +361,46 @@ export default function MyQRCode({ resident, onLogout }) {
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.roundRect(
-                    qrX - 14,
-                    qrY - 14,
-                    qrDrawSize + 28,
-                    qrDrawSize + 28,
-                    12,
+                    qrX - 16,
+                    qrY - 16,
+                    qrDrawSize + 32,
+                    qrDrawSize + 32,
+                    14,
                 );
                 ctx.fill();
                 ctx.stroke();
                 ctx.drawImage(qrCanvas, qrX, qrY, qrDrawSize, qrDrawSize);
             }
 
-            const addrY = qrY + qrDrawSize + 36;
+            // ── Address (scaled: 20 → 24) ──
+            const addrY = qrY + qrDrawSize + 42;
             ctx.fillStyle = "#888888";
-            ctx.font = "20px Georgia, serif";
+            ctx.font = "24px Georgia, serif";
             ctx.fillText("Olongapo City, Zambales", W / 2, addrY);
 
-            const footerH = 96;
+            // ── Footer pinned to card bottom (scaled: 96 → 114) ──
+            const footerH = 114;
             const footerY = H - footerH;
             ctx.fillStyle = "#f8f6f1";
             ctx.fillRect(0, footerY, W, footerH);
             ctx.fillStyle = "#e4dfd4";
             ctx.fillRect(0, footerY, W, 1);
             ctx.fillStyle = "#aaaaaa";
-            ctx.font = "18px Georgia, serif";
+            ctx.font = "21px Georgia, serif";
             ctx.fillText(
                 "Show to staff when claiming your certificate.",
                 W / 2,
-                footerY + 42,
+                footerY + 50,
             );
 
+            // ── Outer border stroke (inside clip, corners always clean) ──
             ctx.strokeStyle = "#ddd8cc";
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.roundRect(1.5, 1.5, W - 3, H - 3, R);
             ctx.stroke();
 
+            // ── Trigger download ──
             const lastName = getLastName(name);
             const link = document.createElement("a");
             link.download = `${lastName} Resident Card.png`;
@@ -1152,6 +1190,7 @@ export default function MyQRCode({ resident, onLogout }) {
                             name={name}
                             formattedId={formattedId}
                             qrValue={qrValue}
+                            logoSrc={logoSrc}
                         />
                         <div className="ps-cut">
                             ✂ Standard wallet / ID card size — 54 × 85.6 mm

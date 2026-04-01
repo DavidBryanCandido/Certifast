@@ -1,3 +1,4 @@
+// certifast/controllers/residentController.js
 const pool = require("../db/pool");
 
 // GET /api/resident/profile

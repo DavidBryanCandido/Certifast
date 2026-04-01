@@ -1,3 +1,4 @@
+// certifast/middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
 
 // For residents only

@@ -1,3 +1,4 @@
+//
 const pool = require("../db/pool");
 
 // GET /api/certificates/templates
