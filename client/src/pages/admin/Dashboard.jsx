@@ -1,14 +1,11 @@
 // =============================================================
 // FILE: client/src/pages/admin/Dashboard.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/dashboard/stats → { totalRequests, pending, released, residents, walkIn }
-//   - GET /api/requests?limit=5&sort=latest → recent requests array
-//   - GET /api/dashboard/cert-breakdown → [{ name, count }]
-//   - GET /api/dashboard/activity → recent activity log entries
-//   - GET /api/requests/ready-count → number of ready-for-pickup requests
-//   - POST /api/qr/verify → { body: { qrData } } → resident/request info
-//   - All endpoints require adminToken in Authorization header
+// TODO (Backend Dev — Harry):
+//   - Add `ready` count to getDashboardStats SQL query:
+//       (SELECT COUNT(*)::int FROM requests WHERE status = 'ready') AS ready
+//     Then add `ready: row.ready || 0` to the returned stats object.
+//     This will make the "X ready" badge on the Scan QR button live.
 // =============================================================
 
 import { useState, useEffect, useCallback } from "react";
@@ -35,15 +32,14 @@ import {
     Menu,
 } from "lucide-react";
 import adminDashboardService from "../../services/adminDashboardService";
+import reportsService from "../../services/reportsService";
+import logsService from "../../services/logsService";
 
 import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
 import AdminQRScannerModal from "../../components/AdminQRScannerModal";
-
-// TODO: import { useAdminAuth } from "../../context/AdminAuthContext";
-// TODO: import { getDashboardStats, getRecentRequests, ... } from "../../services/dashboardService";
 
 // =============================================================
 // useWindowSize hook
@@ -191,150 +187,53 @@ if (!document.head.querySelector("[data-cf-dashboard]")) {
 }
 
 // =============================================================
-// Mock data
+// Static config (not mock data — these don't change)
 // =============================================================
-const MOCK_STATS = [
-    {
-        label: "Total Requests",
-        value: 148,
-        color: "navy",
-        iconColor: "#0e2554",
-        iconBg: "#e8eef8",
-        change: "+12% from last month",
-        changeType: "up",
-    },
-    {
-        label: "Pending",
-        value: 12,
-        color: "amber",
-        iconColor: "#b86800",
-        iconBg: "#fff3e0",
-        change: "Needs attention",
-        changeType: "warn",
-    },
-    {
-        label: "Released",
-        value: 124,
-        color: "green",
-        iconColor: "#1a7a4a",
-        iconBg: "#e8f5ee",
-        change: "+8% this month",
-        changeType: "up",
-    },
-    {
-        label: "Residents",
-        value: 392,
-        color: "gold",
-        iconColor: "#9a7515",
-        iconBg: "#f5edce",
-        change: "+5 this week",
-        changeType: "up",
-    },
-    {
-        label: "Walk-in Issued",
-        value: 34,
-        color: "purple",
-        iconColor: "#6a3db8",
-        iconBg: "#f3eeff",
-        change: "+4 this week",
-        changeType: "up",
-    },
-];
 
-const MOCK_REQUESTS = [
-    {
-        id: "#REQ-0148",
-        name: "Juan dela Cruz",
-        type: "Barangay Clearance",
-        date: "Mar 11, 2026",
-        status: "pending",
-        action: "Review",
-        hasFee: true,
-    },
-    {
-        id: "#REQ-0147",
-        name: "Maria Santos",
-        type: "Certificate of Residency",
-        date: "Mar 11, 2026",
-        status: "approved",
-        action: "View",
-        hasFee: false,
-    },
-    {
-        id: "#REQ-0146",
-        name: "Ricardo Mendoza",
-        type: "Certificate of Indigency",
-        date: "Mar 10, 2026",
-        status: "ready",
-        action: "Scan QR",
-        hasFee: false,
-    },
-    {
-        id: "#REQ-0145",
-        name: "Lorna Reyes",
-        type: "Business Permit",
-        date: "Mar 10, 2026",
-        status: "pending",
-        action: "Review",
-        hasFee: true,
-    },
-    {
-        id: "#REQ-0144",
-        name: "Eduardo Bautista",
-        type: "Barangay Clearance",
-        date: "Mar 9, 2026",
-        status: "released",
-        action: "View",
-        hasFee: true,
-    },
-];
+// Maps an audit log row to a dot color for the activity feed
+function activityDot(type, description) {
+    const desc = String(description || "").toLowerCase();
+    switch (type) {
+        case "login":
+            return "#c9a227";
+        case "logout":
+            return "#9090aa";
+        case "walkin":
+            return "#6a3db8";
+        case "qrscan":
+            return "#3a6abf";
+        case "settings":
+            return "#b86800";
+        case "request":
+            if (desc.includes("released") || desc.includes("approved"))
+                return "#2da866";
+            if (desc.includes("rejected") || desc.includes("denied"))
+                return "#d04040";
+            return "#3a6abf";
+        default:
+            return "#9090aa";
+    }
+}
 
-const MOCK_CERT_BREAKDOWN = [
-    { name: "Barangay Clearance", count: 58, pct: 100 },
-    { name: "Certificate of Residency", count: 34, pct: 59 },
-    { name: "Certificate of Indigency", count: 27, pct: 47 },
-    { name: "Business Permit", count: 18, pct: 31 },
-    { name: "Good Moral Certificate", count: 11, pct: 19 },
-];
-
-const MOCK_ACTIVITY = [
-    {
-        dot: "#2da866",
-        text: (
-            <>
-                <strong>REQ-0147</strong> approved by Staff Reyes
-            </>
-        ),
-        time: "Today, 10:42 AM",
-    },
-    {
-        dot: "#3a6abf",
-        text: (
-            <>
-                <strong>REQ-0146</strong> marked Ready for Pickup
-            </>
-        ),
-        time: "Today, 9:15 AM",
-    },
-    {
-        dot: "#c9a227",
-        text: (
-            <>
-                New resident <strong>Juan dela Cruz</strong> registered
-            </>
-        ),
-        time: "Today, 8:30 AM",
-    },
-    {
-        dot: "#d04040",
-        text: (
-            <>
-                <strong>REQ-0143</strong> rejected — incomplete info
-            </>
-        ),
-        time: "Yesterday, 4:55 PM",
-    },
-];
+// Formats an ISO timestamp as "Today, 10:42 AM" / "Yesterday, 4:55 PM" / "Mar 14, 3:00 PM"
+function formatActivityTime(isoStr) {
+    if (!isoStr) return "—";
+    const d = new Date(isoStr);
+    const now = new Date();
+    const time = d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+    if (d.toDateString() === now.toDateString()) return `Today, ${time}`;
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString())
+        return `Yesterday, ${time}`;
+    return (
+        d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+        `, ${time}`
+    );
+}
 
 const BADGE = {
     pending: { bg: "#fff3e0", color: "#b86800", label: "Pending" },
@@ -565,11 +464,20 @@ function formatDateShort() {
 // =============================================================
 // Request Drawer
 // =============================================================
-function RequestDrawer({ drawerKey, onClose, isMobile, onRequestUpdated, onLogout }) {
-    const { key: dk, hasFee: reqHasFee, requestId } =
-        typeof drawerKey === "object"
-            ? drawerKey
-            : { key: drawerKey, hasFee: false, requestId: null };
+function RequestDrawer({
+    drawerKey,
+    onClose,
+    isMobile,
+    onRequestUpdated,
+    onLogout,
+}) {
+    const {
+        key: dk,
+        hasFee: reqHasFee,
+        requestId,
+    } = typeof drawerKey === "object"
+        ? drawerKey
+        : { key: drawerKey, hasFee: false, requestId: null };
     const data = {
         ...DRAWER_STATES[dk],
         hasFee: reqHasFee ?? DRAWER_STATES[dk]?.hasFee,
@@ -611,11 +519,16 @@ function RequestDrawer({ drawerKey, onClose, isMobile, onRequestUpdated, onLogou
             await onRequestUpdated?.();
             onClose();
         } catch (err) {
-            if (err?.response?.status === 401 || err?.response?.status === 403) {
+            if (
+                err?.response?.status === 401 ||
+                err?.response?.status === 403
+            ) {
                 onLogout?.();
                 return;
             }
-            setActionError(err?.response?.data?.message || "Failed to approve request.");
+            setActionError(
+                err?.response?.data?.message || "Failed to approve request.",
+            );
         } finally {
             setActionLoading(false);
         }
@@ -632,15 +545,23 @@ function RequestDrawer({ drawerKey, onClose, isMobile, onRequestUpdated, onLogou
         setActionError("");
 
         try {
-            await adminDashboardService.rejectRequest(requestId, rejectReason.trim());
+            await adminDashboardService.rejectRequest(
+                requestId,
+                rejectReason.trim(),
+            );
             await onRequestUpdated?.();
             onClose();
         } catch (err) {
-            if (err?.response?.status === 401 || err?.response?.status === 403) {
+            if (
+                err?.response?.status === 401 ||
+                err?.response?.status === 403
+            ) {
                 onLogout?.();
                 return;
             }
-            setActionError(err?.response?.data?.message || "Failed to reject request.");
+            setActionError(
+                err?.response?.data?.message || "Failed to reject request.",
+            );
         } finally {
             setActionLoading(false);
         }
@@ -1354,8 +1275,14 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         released: 0,
         residents: 0,
         walkIn: 0,
+        // TODO (Harry): add `ready` count to getDashboardStats SQL:
+        //   (SELECT COUNT(*)::int FROM requests WHERE status = 'ready') AS ready
+        // then set it here: ready: row.ready || 0
+        ready: 0,
     });
     const [recentRequests, setRecentRequests] = useState([]);
+    const [certBreakdown, setCertBreakdown] = useState([]);
+    const [recentActivity, setRecentActivity] = useState([]);
     const [dashboardLoading, setDashboardLoading] = useState(true);
     const [dashboardError, setDashboardError] = useState("");
 
@@ -1367,10 +1294,13 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             setDashboardError("");
 
             try {
-                const [statsRes, recentRes] = await Promise.all([
-                    adminDashboardService.getStats(),
-                    adminDashboardService.getRecentRequests(5),
-                ]);
+                const [statsRes, recentRes, reportsRes, logsRes] =
+                    await Promise.all([
+                        adminDashboardService.getStats(),
+                        adminDashboardService.getRecentRequests(5),
+                        reportsService.getOverview("month").catch(() => null),
+                        logsService.getLogs({ limit: 5 }).catch(() => null),
+                    ]);
 
                 if (!mounted) return;
 
@@ -1378,8 +1308,8 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                 const nextRecent = Array.isArray(recentRes?.data)
                     ? recentRes.data
                     : Array.isArray(recentRes)
-                        ? recentRes
-                        : [];
+                      ? recentRes
+                      : [];
 
                 setStatsData({
                     totalRequests: nextStats.totalRequests || 0,
@@ -1387,6 +1317,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                     released: nextStats.released || 0,
                     residents: nextStats.residents || 0,
                     walkIn: nextStats.walkIn || 0,
+                    ready: nextStats.ready || 0, // TODO (Harry): wire in SQL
                 });
 
                 setRecentRequests(
@@ -1396,19 +1327,52 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         name: row.resident_name || "Unknown Resident",
                         type: row.cert_type || "Certificate Request",
                         date: row.requested_at
-                            ? new Date(row.requested_at).toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                              })
+                            ? new Date(row.requested_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                  },
+                              )
                             : "—",
                         status: String(row.status || "pending").toLowerCase(),
                         hasFee: Boolean(row.has_fee),
                     })),
                 );
+
+                // ── Cert breakdown from reports overview ──
+                const rawBreakdown = reportsRes?.data?.byCertType || [];
+                const maxCount = Math.max(
+                    1,
+                    ...rawBreakdown.map((c) => c.count || 0),
+                );
+                setCertBreakdown(
+                    rawBreakdown.slice(0, 5).map((c) => ({
+                        name: c.label || "—",
+                        count: c.count || 0,
+                        pct: Math.round(((c.count || 0) / maxCount) * 100),
+                    })),
+                );
+
+                // ── Recent activity from audit logs ──
+                const rawLogs = logsRes?.data || [];
+                setRecentActivity(
+                    rawLogs.map((row) => ({
+                        dot: activityDot(row.type, row.description),
+                        text:
+                            row.description ||
+                            row.action_type ||
+                            "System activity",
+                        time: formatActivityTime(row.created_at),
+                    })),
+                );
             } catch (err) {
                 if (!mounted) return;
-                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                if (
+                    err?.response?.status === 401 ||
+                    err?.response?.status === 403
+                ) {
                     onLogout?.();
                     return;
                 }
@@ -1489,7 +1453,6 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const handleNavigate = (page) => {
         setActivePage(page);
         if (navProp) navProp(page);
-        console.log("Navigate to:", page);
     };
 
     const handleLogout = () => {
@@ -1715,18 +1678,35 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {!dashboardLoading && recentRequests.length === 0 && (
-                                                <tr>
-                                                    <td style={d.td} colSpan={6}>
-                                                        <div style={{ textAlign: "center", color: "#9090aa", fontStyle: "italic", padding: "16px 0" }}>
-                                                            No recent requests found.
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
+                                            {!dashboardLoading &&
+                                                recentRequests.length === 0 && (
+                                                    <tr>
+                                                        <td
+                                                            style={d.td}
+                                                            colSpan={6}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    textAlign:
+                                                                        "center",
+                                                                    color: "#9090aa",
+                                                                    fontStyle:
+                                                                        "italic",
+                                                                    padding:
+                                                                        "16px 0",
+                                                                }}
+                                                            >
+                                                                No recent
+                                                                requests found.
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
 
                                             {recentRequests.map((req) => {
-                                                const b = BADGE[req.status] || BADGE.pending;
+                                                const b =
+                                                    BADGE[req.status] ||
+                                                    BADGE.pending;
                                                 const sm =
                                                     STATUS_MAP[req.status];
                                                 return (
@@ -1828,7 +1808,8 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                             {
                                                                                 key: sm.drawerKey,
                                                                                 hasFee: req.hasFee,
-                                                                                requestId: req.rawId,
+                                                                                requestId:
+                                                                                    req.rawId,
                                                                             },
                                                                         )
                                                                     }
@@ -1848,14 +1829,24 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             ) : (
                                 /* Mobile: card list */
                                 <div>
-                                    {!dashboardLoading && recentRequests.length === 0 && (
-                                        <div style={{ padding: "20px 16px", textAlign: "center", color: "#9090aa", fontStyle: "italic", fontSize: 12.5 }}>
-                                            No recent requests found.
-                                        </div>
-                                    )}
+                                    {!dashboardLoading &&
+                                        recentRequests.length === 0 && (
+                                            <div
+                                                style={{
+                                                    padding: "20px 16px",
+                                                    textAlign: "center",
+                                                    color: "#9090aa",
+                                                    fontStyle: "italic",
+                                                    fontSize: 12.5,
+                                                }}
+                                            >
+                                                No recent requests found.
+                                            </div>
+                                        )}
 
                                     {recentRequests.map((req) => {
-                                        const b = BADGE[req.status] || BADGE.pending;
+                                        const b =
+                                            BADGE[req.status] || BADGE.pending;
                                         const sm = STATUS_MAP[req.status];
                                         return (
                                             <div
@@ -2025,19 +2016,21 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                 gap: 6,
                                             }}
                                         >
-                                            {/* TODO: replace 7 with live ready count from API */}
-                                            <span
-                                                style={{
-                                                    background: "#1a4a8a",
-                                                    color: "#fff",
-                                                    fontSize: 10,
-                                                    fontWeight: 700,
-                                                    padding: "3px 9px",
-                                                    borderRadius: 20,
-                                                }}
-                                            >
-                                                7 ready
-                                            </span>
+                                            {/* Ready count — wire statsData.ready once Harry adds it to getDashboardStats */}
+                                            {statsData.ready > 0 && (
+                                                <span
+                                                    style={{
+                                                        background: "#1a4a8a",
+                                                        color: "#fff",
+                                                        fontSize: 10,
+                                                        fontWeight: 700,
+                                                        padding: "3px 9px",
+                                                        borderRadius: 20,
+                                                    }}
+                                                >
+                                                    {statsData.ready} ready
+                                                </span>
+                                            )}
                                             <ChevronRight
                                                 size={14}
                                                 color="#4a6a9a"
@@ -2110,51 +2103,67 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                     </span>
                                 </div>
                                 <div>
-                                    {MOCK_CERT_BREAKDOWN.map((cert) => (
-                                        <div key={cert.name} style={d.certRow}>
-                                            <div style={{ flex: 1 }}>
-                                                <div
-                                                    style={{
-                                                        fontSize: 12,
-                                                        color: "#1a1a2e",
-                                                        marginBottom: 5,
-                                                    }}
-                                                >
-                                                    {cert.name}
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        height: 5,
-                                                        background: "#eee",
-                                                        borderRadius: 3,
-                                                        overflow: "hidden",
-                                                    }}
-                                                >
+                                    {certBreakdown.length === 0 ? (
+                                        <div
+                                            style={{
+                                                padding: "20px 22px",
+                                                fontSize: 12.5,
+                                                color: "#9090aa",
+                                                fontStyle: "italic",
+                                            }}
+                                        >
+                                            No certificate data yet.
+                                        </div>
+                                    ) : (
+                                        certBreakdown.map((cert) => (
+                                            <div
+                                                key={cert.name}
+                                                style={d.certRow}
+                                            >
+                                                <div style={{ flex: 1 }}>
                                                     <div
                                                         style={{
-                                                            height: "100%",
-                                                            borderRadius: 3,
-                                                            background:
-                                                                "linear-gradient(90deg,#0e2554,#1e3d7a)",
-                                                            width: `${cert.pct}%`,
+                                                            fontSize: 12,
+                                                            color: "#1a1a2e",
+                                                            marginBottom: 5,
                                                         }}
-                                                    />
+                                                    >
+                                                        {cert.name}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            height: 5,
+                                                            background: "#eee",
+                                                            borderRadius: 3,
+                                                            overflow: "hidden",
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                height: "100%",
+                                                                borderRadius: 3,
+                                                                background:
+                                                                    "linear-gradient(90deg,#0e2554,#1e3d7a)",
+                                                                width: `${cert.pct}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        fontFamily:
+                                                            "'Playfair Display',serif",
+                                                        fontSize: 15,
+                                                        color: "#0e2554",
+                                                        fontWeight: 700,
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    {cert.count}
                                                 </div>
                                             </div>
-                                            <div
-                                                style={{
-                                                    fontFamily:
-                                                        "'Playfair Display',serif",
-                                                    fontSize: 15,
-                                                    color: "#0e2554",
-                                                    fontWeight: 700,
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                {cert.count}
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))
+                                    )}
                                 </div>
                             </div>
 
@@ -2166,40 +2175,53 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                     </span>
                                 </div>
                                 <div>
-                                    {MOCK_ACTIVITY.map((item, i) => (
-                                        <div key={i} style={d.activityItem}>
-                                            <div
-                                                style={{
-                                                    width: 8,
-                                                    height: 8,
-                                                    borderRadius: "50%",
-                                                    background: item.dot,
-                                                    marginTop: 5,
-                                                    flexShrink: 0,
-                                                }}
-                                            />
-                                            <div>
+                                    {recentActivity.length === 0 ? (
+                                        <div
+                                            style={{
+                                                padding: "20px 22px",
+                                                fontSize: 12.5,
+                                                color: "#9090aa",
+                                                fontStyle: "italic",
+                                            }}
+                                        >
+                                            No recent activity.
+                                        </div>
+                                    ) : (
+                                        recentActivity.map((item, i) => (
+                                            <div key={i} style={d.activityItem}>
                                                 <div
                                                     style={{
-                                                        fontSize: 12,
-                                                        color: "#4a4a6a",
-                                                        lineHeight: 1.5,
+                                                        width: 8,
+                                                        height: 8,
+                                                        borderRadius: "50%",
+                                                        background: item.dot,
+                                                        marginTop: 5,
+                                                        flexShrink: 0,
                                                     }}
-                                                >
-                                                    {item.text}
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        fontSize: 10,
-                                                        color: "#9090aa",
-                                                        marginTop: 2,
-                                                    }}
-                                                >
-                                                    {item.time}
+                                                />
+                                                <div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: "#4a4a6a",
+                                                            lineHeight: 1.5,
+                                                        }}
+                                                    >
+                                                        {item.text}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: 10,
+                                                            color: "#9090aa",
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        {item.time}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -2209,133 +2231,6 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         </div>
     );
 }
-
-// =============================================================
-// Styles
-// =============================================================
-const sd = {
-    sidebar: {
-        minHeight: "100vh",
-        background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",
-        display: "flex",
-        flexDirection: "column",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        bottom: 0,
-        zIndex: 100,
-        borderRight: "1px solid rgba(201,162,39,0.15)",
-        transition: "width 0.2s",
-    },
-    brand: {
-        padding: "20px 20px 16px",
-        borderBottom: "1px solid rgba(201,162,39,0.18)",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-    },
-    brandSeal: {
-        width: 38,
-        height: 38,
-        borderRadius: "50%",
-        border: "1.5px solid rgba(201,162,39,0.5)",
-        background: "rgba(201,162,39,0.1)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        overflow: "hidden",
-    },
-    brandName: {
-        fontFamily: "'Playfair Display',serif",
-        fontSize: 14,
-        fontWeight: 700,
-        color: "#fff",
-        lineHeight: 1.2,
-    },
-    brandSub: {
-        fontSize: 9,
-        color: "rgba(201,162,39,0.7)",
-        letterSpacing: "1.5px",
-        textTransform: "uppercase",
-        marginTop: 1,
-    },
-    goldBar: {
-        height: 3,
-        background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
-        flexShrink: 0,
-    },
-    sectionLabel: {
-        fontSize: 9,
-        color: "rgba(201,162,39,0.5)",
-        letterSpacing: "2px",
-        textTransform: "uppercase",
-        padding: "18px 20px 8px",
-        fontWeight: 600,
-    },
-    navBadge: {
-        marginLeft: "auto",
-        background: "#c9a227",
-        color: "#091a3e",
-        fontSize: 9,
-        fontWeight: 700,
-        padding: "2px 7px",
-        borderRadius: 10,
-        fontFamily: "'Courier New',monospace",
-    },
-    navBadgeSA: {
-        marginLeft: "auto",
-        background: "rgba(201,162,39,0.25)",
-        color: "#c9a227",
-        fontSize: 9,
-        fontWeight: 700,
-        padding: "2px 7px",
-        borderRadius: 10,
-    },
-    superAdminSection: {
-        marginTop: "auto",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
-        paddingTop: 8,
-        paddingBottom: 8,
-    },
-    userRow: {
-        padding: "14px 20px",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-    },
-    userAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: "50%",
-        background: "rgba(201,162,39,0.15)",
-        border: "1.5px solid rgba(201,162,39,0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 12,
-        color: "#c9a227",
-        fontWeight: 700,
-        flexShrink: 0,
-    },
-    userInfo: { flex: 1, minWidth: 0 },
-    userName: {
-        fontSize: 11.5,
-        color: "#fff",
-        fontWeight: 600,
-        whiteSpace: "nowrap",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-    },
-    userRole: {
-        fontSize: 9.5,
-        color: "#c9a227",
-        letterSpacing: "1px",
-        textTransform: "uppercase",
-        marginTop: 1,
-    },
-};
 
 const d = {
     topbar: {
@@ -2446,75 +2341,6 @@ const d = {
         gap: 12,
         padding: "12px 22px",
         borderBottom: "1px solid #f0ece4",
-    },
-};
-
-const qr = {
-    overlay: {
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.6)",
-        zIndex: 300,
-        display: "flex",
-    },
-    modal: {
-        background: "#fff",
-        overflow: "hidden",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-    },
-    header: {
-        background: "linear-gradient(135deg,#0e2554,#163066)",
-        padding: "20px 24px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-    },
-    headerTitle: {
-        fontFamily: "'Playfair Display',serif",
-        fontSize: 16,
-        fontWeight: 700,
-        color: "#fff",
-        margin: 0,
-    },
-    headerSub: { fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 3 },
-    closeBtn: {
-        background: "rgba(255,255,255,0.1)",
-        border: "none",
-        borderRadius: 4,
-        width: 32,
-        height: 32,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    scanBox: {
-        position: "relative",
-        width: 240,
-        height: 240,
-        margin: "0 auto 20px",
-        borderRadius: 8,
-        overflow: "hidden",
-        background: "#111",
-    },
-    scanLine: {
-        position: "absolute",
-        left: 12,
-        right: 12,
-        height: 2,
-        background: "linear-gradient(90deg,transparent,#c9a227,transparent)",
-        animation: "scanline 2s ease-in-out infinite",
-    },
-    scanningLabel: {
-        position: "absolute",
-        bottom: 10,
-        left: 0,
-        right: 0,
-        fontSize: 9,
-        color: "rgba(255,255,255,0.3)",
-        letterSpacing: "1px",
-        textTransform: "uppercase",
-        textAlign: "center",
     },
 };
 
