@@ -9,41 +9,42 @@ const getAdminHeaders = () => ({
 
 const accountService = {
     getAccounts: async () => {
-        const res = await axios.get(`${API}/admin/accounts`, getAdminHeaders());
+        const headers = getAdminHeaders();
+        const res = await axios.get(`${API}/admin/accounts`, headers);
         return res.data;
     },
 
     createAccount: async (payload) => {
-        const res = await axios.post(
-            `${API}/admin/accounts`,
-            payload,
-            getAdminHeaders(),
-        );
+        const headers = getAdminHeaders();
+        const res = await axios.post(`${API}/admin/accounts`, payload, headers);
         return res.data;
     },
 
     updateAccount: async (accountId, payload) => {
+        const headers = getAdminHeaders();
         const res = await axios.put(
             `${API}/admin/accounts/${accountId}`,
             payload,
-            getAdminHeaders(),
+            headers,
         );
         return res.data;
     },
 
     resetPassword: async (accountId, newPassword) => {
+        const headers = getAdminHeaders();
         const res = await axios.put(
             `${API}/admin/accounts/${accountId}/password`,
             { new_password: newPassword },
-            getAdminHeaders(),
+            headers,
         );
         return res.data;
     },
 
     deactivateAccount: async (accountId) => {
+        const headers = getAdminHeaders();
         const res = await axios.delete(
             `${API}/admin/accounts/${accountId}`,
-            getAdminHeaders(),
+            headers,
         );
         return res.data;
     },

@@ -130,6 +130,7 @@ async function getDashboardStats(req, res) {
                 (SELECT COUNT(*)::int FROM requests) AS total_requests,
                 (SELECT COUNT(*)::int FROM requests WHERE status = 'pending') AS pending,
                 (SELECT COUNT(*)::int FROM requests WHERE status = 'released') AS released,
+                (SELECT COUNT(*)::int FROM requests WHERE status = 'ready') AS ready,
                 (SELECT COUNT(*)::int FROM residents WHERE status = 'active') AS residents,
                 (
                     SELECT COUNT(*)::int
@@ -145,6 +146,7 @@ async function getDashboardStats(req, res) {
                 totalRequests: row.total_requests || 0,
                 pending: row.pending || 0,
                 released: row.released || 0,
+                ready: row.ready || 0,
                 residents: row.residents || 0,
                 walkIn: row.walk_in_issued || 0,
             },
@@ -165,9 +167,17 @@ async function getRecentRequests(req, res) {
             `SELECT
                 r.request_id,
                 r.cert_type,
+                r.purpose,
+                r.rejection_reason,
                 r.requested_at,
                 r.status,
                 COALESCE(res.full_name, 'Unknown Resident') AS resident_name,
+                res.email AS resident_email,
+                res.contact_number AS resident_contact,
+                res.address_house AS resident_address_house,
+                res.address_street AS resident_address_street,
+                res.civil_status AS resident_civil,
+                res.nationality AS resident_nationality,
                 COALESCE(ct.has_fee, false) AS has_fee
              FROM requests r
              LEFT JOIN residents res

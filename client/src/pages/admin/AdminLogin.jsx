@@ -363,7 +363,18 @@ export default function AdminLogin() {
                 localStorage.setItem("certifast_admin_token", response.token);
                 localStorage.setItem(
                     "certifast_admin_auth",
-                    JSON.stringify({ token: response.token, admin: response.data }),
+                    JSON.stringify({
+                        token: response.token,
+                        admin: response.admin || response.data || null,
+                    }),
+                );
+                console.log(
+                    "[AdminLogin] localStorage.certifast_admin_auth",
+                    localStorage.getItem("certifast_admin_auth"),
+                );
+                console.log(
+                    "[AdminLogin] localStorage.certifast_admin_token",
+                    localStorage.getItem("certifast_admin_token"),
                 );
             }
 
@@ -407,7 +418,16 @@ export default function AdminLogin() {
                 {/* Card header */}
                 <div style={s.cardHeader}>
                     <div style={s.sealWrap}>
-                        <img src="/logo.png" alt="Barangay Seal" style={{ width: 86, height: 86, borderRadius: "50%", objectFit: "cover" }} />
+                        <img
+                            src="/logo.png"
+                            alt="Barangay Seal"
+                            style={{
+                                width: 86,
+                                height: 86,
+                                borderRadius: "50%",
+                                objectFit: "cover",
+                            }}
+                        />
                     </div>
                     <p style={s.republicLabel}>Republic of the Philippines</p>
                     <p style={s.barangayName}>Barangay East Tapinac</p>

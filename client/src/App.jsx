@@ -40,15 +40,15 @@ function readStoredAuth(storageKey) {
 }
 
 function useSessionData() {
-    return useMemo(() => {
-        const adminState = readStoredAuth("certifast_admin_auth");
-        const residentState = readStoredAuth("certifast_resident_auth");
+    const adminState = readStoredAuth("certifast_admin_auth");
+    const residentState = readStoredAuth("certifast_resident_auth");
+    console.log("[useSessionData] certifast_admin_auth", adminState);
+    console.log("[useSessionData] certifast_resident_auth", residentState);
 
-        return {
-            admin: adminState?.admin || null,
-            resident: residentState?.resident || null,
-        };
-    }, []);
+    return {
+        admin: adminState?.admin || null,
+        resident: residentState?.resident || null,
+    };
 }
 
 const ADMIN_ONLY_ROUTES = [
@@ -60,8 +60,13 @@ const ADMIN_ONLY_ROUTES = [
 function AdminPage({ Component, adminOnly = false }) {
     const navigate = useNavigate();
     const { admin } = useSessionData();
+    console.log("[AdminPage] session admin:", admin);
 
-    const resolvedAdmin = admin || { name: "Administrator", role: "admin" };
+    if (!admin) {
+        return <Navigate to="/admin/login" replace />;
+    }
+
+    const resolvedAdmin = admin; // Use actual logged-in admin object
 
     const handleAdminNavigate = (pageKey) => {
         const route = ADMIN_KEY_TO_ROUTE[pageKey];
@@ -74,8 +79,15 @@ function AdminPage({ Component, adminOnly = false }) {
         navigate("/admin/login");
     };
 
-    // Redirect staff away from admin-only pages
-    if (adminOnly && resolvedAdmin.role !== "admin") {
+    // Redirect non-admin users away from admin-only pages
+    const resolvedRole = String(resolvedAdmin.role || "")
+        .trim()
+        .toLowerCase();
+    if (
+        adminOnly &&
+        resolvedRole !== "admin" &&
+        resolvedRole !== "superadmin"
+    ) {
         return <Navigate to="/admin/dashboard" replace />;
     }
 
@@ -164,7 +176,7 @@ export default function App() {
             />
             <Route
                 path="/admin/manage-accounts"
-                element={<AdminPage Component={ManageAccounts} adminOnly />}
+                element={<AdminPage Component={ManageAccounts} />}
             />
             <Route
                 path="/admin/settings"

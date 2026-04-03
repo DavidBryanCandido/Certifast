@@ -320,6 +320,7 @@ async function adminLogin(req, res) {
             admin: {
                 id: admin.admin_id,
                 name: admin.full_name,
+                username: admin.username,
                 role: admin.role,
             },
         });

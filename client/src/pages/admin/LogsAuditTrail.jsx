@@ -149,7 +149,11 @@ function formatDate() {
     });
 }
 function formatDateShort() {
-    return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
 }
 
 // =============================================================
@@ -644,6 +648,49 @@ export default function LogsAuditTrail({
     const width = useWindowSize();
     const isMobile = width < 768;
     const isTablet = width >= 768 && width < 1024;
+    const role = String(admin?.role || "")
+        .trim()
+        .toLowerCase();
+    const isSuperAdmin = role === "admin" || role === "superadmin";
+
+    if (!isSuperAdmin) {
+        return (
+            <div
+                style={{
+                    minHeight: "100vh",
+                    background: "#f8f6f1",
+                    padding: "32px",
+                }}
+            >
+                <div
+                    style={{
+                        background: "#fff",
+                        border: "1px solid #e4dfd4",
+                        borderRadius: 6,
+                        padding: 20,
+                        maxWidth: 720,
+                        margin: "0 auto",
+                    }}
+                >
+                    <h2
+                        style={{
+                            margin: 0,
+                            fontFamily: "'Playfair Display',serif",
+                            fontSize: 20,
+                            color: "#0e2554",
+                        }}
+                    >
+                        Restricted Access
+                    </h2>
+                    <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
+                        This page is restricted to Superadmin accounts only. All
+                        system activity is recorded automatically. Logs cannot
+                        be deleted or modified.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     const [activePage, setActivePage] = useState("logs");
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -740,11 +787,21 @@ export default function LogsAuditTrail({
             setActors([]);
             setTotalLogs(0);
             setTotalPages(1);
-            setError(err?.response?.data?.message || "Failed to load audit logs.");
+            setError(
+                err?.response?.data?.message || "Failed to load audit logs.",
+            );
         } finally {
             setLoading(false);
         }
-    }, [actorFilter, currentPage, dateFilter, onLogout, rowsPerPage, search, typeFilter]);
+    }, [
+        actorFilter,
+        currentPage,
+        dateFilter,
+        onLogout,
+        rowsPerPage,
+        search,
+        typeFilter,
+    ]);
 
     const loadStats = useCallback(async () => {
         try {
@@ -926,30 +983,6 @@ export default function LogsAuditTrail({
                                 Superadmin view — all system activity
                             </span>
                         )}
-                    </div>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            background: "#f0ebff",
-                            border: "1px solid #d4c8f0",
-                            borderRadius: 4,
-                            padding: "5px 12px",
-                            flexShrink: 0,
-                        }}
-                    >
-                        <Lock size={11} color="#6a3db8" strokeWidth={2} />
-                        <span
-                            style={{
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: "#6a3db8",
-                                letterSpacing: ".5px",
-                            }}
-                        >
-                            SUPERADMIN ONLY
-                        </span>
                     </div>
                     {!isMobile && (
                         <div

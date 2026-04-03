@@ -14,32 +14,36 @@ function getAdminHeaders() {
 
 const adminDashboardService = {
     getStats: async () => {
-        const res = await axios.get(`${API}/admin/dashboard/stats`, getAdminHeaders());
+        const headers = getAdminHeaders();
+        const res = await axios.get(`${API}/admin/dashboard/stats`, headers);
         return res.data;
     },
 
     getRecentRequests: async (limit = 5) => {
+        const headers = getAdminHeaders();
         const res = await axios.get(
             `${API}/admin/dashboard/recent-requests?limit=${limit}`,
-            getAdminHeaders(),
+            headers,
         );
         return res.data;
     },
 
     approveRequest: async (requestId) => {
+        const headers = getAdminHeaders();
         const res = await axios.post(
             `${API}/admin/requests/${requestId}/approve`,
             {},
-            getAdminHeaders(),
+            headers,
         );
         return res.data;
     },
 
     rejectRequest: async (requestId, reason) => {
+        const headers = getAdminHeaders();
         const res = await axios.post(
             `${API}/admin/requests/${requestId}/reject`,
             { reason },
-            getAdminHeaders(),
+            headers,
         );
         return res.data;
     },

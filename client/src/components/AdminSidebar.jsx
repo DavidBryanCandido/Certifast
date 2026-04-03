@@ -141,6 +141,10 @@ function useAdminSidebarStyles() {
         .wi-logout-btn:hover {
             color: rgba(255, 255, 255, 0.7);
         }
+        .admin-gold-bar { margin-bottom: 0; }
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .admin-gold-bar { margin-bottom: 10px; }
+        }
         `;
         document.head.appendChild(style);
     }, []);
@@ -288,7 +292,10 @@ export function AdminSidebar({
 }) {
     useAdminSidebarStyles();
 
-    const isAdmin = admin?.role === "admin";
+    const role = String(admin?.role || "")
+        .trim()
+        .toLowerCase();
+    const isAdmin = role === "admin" || role === "superadmin";
 
     const navItems = [
         { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -301,13 +308,15 @@ export function AdminSidebar({
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
         { key: "reports", label: "Reports & Exports", Icon: BarChart2 },
+        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
     ];
 
-    const saItems = [
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "settings", label: "System Settings", Icon: Settings },
-    ];
+    const saItems = isAdmin
+        ? [
+              { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
+              { key: "settings", label: "System Settings", Icon: Settings },
+          ]
+        : [];
 
     const navBtn = ({ item }) =>
         collapsed ? (
@@ -363,7 +372,7 @@ export function AdminSidebar({
                     </div>
                 )}
             </div>
-            <div style={sd.goldBar} />
+            <div style={sd.goldBar} className="admin-gold-bar" />
             {!collapsed && <div style={sd.sectionLabel}>Main Menu</div>}
             {navItems.map((item) => navBtn({ item }))}
             <div style={{ flex: 1 }} />
@@ -384,15 +393,25 @@ export function AdminSidebar({
                     padding: collapsed ? "14px 0" : "14px 20px",
                 }}
             >
-                <div style={sd.userAvatar}>{initials(admin?.name || "DA")}</div>
+                <div style={sd.userAvatar}>
+                    {initials(admin?.name || admin?.username || "DA")}
+                </div>
                 {!collapsed && (
                     <>
                         <div style={sd.userInfo}>
                             <div style={sd.userName}>
-                                {admin?.name || "Dante Administrador"}
+                                {admin?.name ||
+                                    admin?.username ||
+                                    "Dante Administrador"}
                             </div>
-                            <div style={sd.userRole}>
-                                {admin?.role || "Admin"}
+                            <div style={{ ...sd.userRole, fontSize: 10 }}>
+                                Username: {admin?.username || "-"}
+                            </div>
+                            <div style={{ ...sd.userRole, marginTop: 2 }}>
+                                Role:{" "}
+                                {admin?.role
+                                    ? String(admin.role).toUpperCase()
+                                    : "-"}
                             </div>
                         </div>
                         <button
@@ -418,7 +437,10 @@ export function AdminMobileSidebar({
 }) {
     useAdminSidebarStyles();
 
-    const isAdmin = admin?.role === "admin";
+    const role = String(admin?.role || "")
+        .trim()
+        .toLowerCase();
+    const isAdmin = role === "admin" || role === "superadmin";
 
     useEffect(() => {
         document.body.style.overflow = "hidden";
@@ -438,12 +460,14 @@ export function AdminMobileSidebar({
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
         { key: "reports", label: "Reports & Exports", Icon: BarChart2 },
-    ];
-    const saItems = [
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
         { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "settings", label: "System Settings", Icon: Settings },
     ];
+    const saItems = isAdmin
+        ? [
+              { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
+              { key: "settings", label: "System Settings", Icon: Settings },
+          ]
+        : [];
 
     const navBtn = ({ item }) => (
         <button
@@ -526,7 +550,7 @@ export function AdminMobileSidebar({
                         <X size={18} />
                     </button>
                 </div>
-                <div style={sd.goldBar} />
+                <div style={sd.goldBar} className="admin-gold-bar" />
                 <div style={sd.sectionLabel}>Main Menu</div>
                 {navItems.map((item) => navBtn({ item }))}
                 <div style={{ flex: 1 }} />
@@ -540,13 +564,23 @@ export function AdminMobileSidebar({
                 )}
                 <div style={sd.userRow}>
                     <div style={sd.userAvatar}>
-                        {initials(admin?.name || "DA")}
+                        {initials(admin?.name || admin?.username || "DA")}
                     </div>
                     <div style={sd.userInfo}>
                         <div style={sd.userName}>
-                            {admin?.name || "Dante Administrador"}
+                            {admin?.name ||
+                                admin?.username ||
+                                "Dante Administrador"}
                         </div>
-                        <div style={sd.userRole}>{admin?.role || "Admin"}</div>
+                        <div style={{ ...sd.userRole, fontSize: 10 }}>
+                            Username: {admin?.username || "-"}
+                        </div>
+                        <div style={{ ...sd.userRole, marginTop: 1 }}>
+                            Role:{" "}
+                            {admin?.role
+                                ? String(admin.role).toUpperCase()
+                                : "-"}
+                        </div>
                     </div>
                     <button
                         className="admin-logout-btn cf-logout-btn mr-logout-btn rep-logout-btn lg-logout-btn wi-logout-btn"
