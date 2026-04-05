@@ -18,6 +18,7 @@ import SubmitRequest from "./pages/resident/SubmitRequest";
 import MyRequests from "./pages/resident/MyRequests";
 import MyQRCode from "./pages/resident/MyQRCode";
 import ResidentProfile from "./pages/resident/ResidentProfile";
+import ResidentNotifications from "./pages/resident/ResidentNotifications";
 
 const ADMIN_KEY_TO_ROUTE = {
     dashboard: "/admin/dashboard",
@@ -141,6 +142,19 @@ function ResidentProfileRoute() {
     return <ResidentProfile resident={resident} onLogout={handleLogout} />;
 }
 
+function ResidentNotificationsRoute() {
+    const navigate = useNavigate();
+    const { resident } = useSessionData();
+    const handleLogout = () => {
+        localStorage.removeItem("certifast_resident_auth");
+        localStorage.removeItem("certifast_resident_token");
+        navigate("/resident/login");
+    };
+    return (
+        <ResidentNotifications resident={resident} onLogout={handleLogout} />
+    );
+}
+
 export default function App() {
     return (
         <Routes>
@@ -213,6 +227,10 @@ export default function App() {
             <Route
                 path="/resident/profile"
                 element={<ResidentProfileRoute />}
+            />
+            <Route
+                path="/resident/notifications"
+                element={<ResidentNotificationsRoute />}
             />
 
             <Route

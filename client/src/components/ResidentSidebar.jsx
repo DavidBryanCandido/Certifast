@@ -163,6 +163,10 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
         transition: background 0.15s;
     }
     .rsb-profile-row:hover { background: rgba(255,255,255,0.04); }
+    .rsb-profile-row.rsb-active {
+        background: rgba(201,162,39,0.12);
+        border-left: 3px solid #c9a227;
+    }
     .rsb-logout {
         display: flex;
         align-items: center;
@@ -360,7 +364,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                 {/* Bottom — resident info + logout */}
                 <div className="rsb-bottom">
                     <div
-                        className="rsb-profile-row"
+                        className={`rsb-profile-row${active === "profile" ? " rsb-active" : ""}`}
                         onClick={() => navigate("/resident/profile")}
                     >
                         <div
@@ -407,7 +411,6 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                                 View Profile
                             </div>
                         </div>
-                        <UserCircle size={14} color="rgba(255,255,255,0.2)" />
                     </div>
                     <button
                         className="rsb-logout"
