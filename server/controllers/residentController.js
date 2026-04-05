@@ -1,5 +1,6 @@
 // certifast/controllers/residentController.js
 const pool = require("../db/pool");
+const { createAuditLog } = require("../utils/logger");
 
 // GET /api/resident/profile
 async function getProfile(req, res) {
@@ -110,6 +111,18 @@ async function updateProfile(req, res) {
             ],
         );
 
+        await createAuditLog({
+            actorId: resident_id,
+            actorName:
+                req.resident?.full_name || req.resident?.email || "Resident",
+            actorRole: "resident",
+            actionType: "profile",
+            targetTable: "residents",
+            targetId: resident_id,
+            description: `Resident updated their profile information`,
+            ipAddress: req.ip,
+        });
+
         // Re-fetch with joins so the response includes purok_name and street_name
         const joined = await pool.query(
             `SELECT r.resident_id, r.full_name, r.first_name, r.middle_name, r.last_name,
@@ -165,6 +178,19 @@ async function createRequest(req, res) {
                 source || "resident",
             ],
         );
+
+        await createAuditLog({
+            actorId: resident_id,
+            actorName:
+                req.resident?.full_name || req.resident?.email || "Resident",
+            actorRole: "resident",
+            actionType: "request",
+            targetTable: "requests",
+            targetId: result.rows[0].request_id,
+            description: `Resident requested ${certType} certificate`,
+            ipAddress: req.ip,
+        });
+
         return res.status(201).json({ request: result.rows[0] });
     } catch (err) {
         console.error("createRequest error:", err);

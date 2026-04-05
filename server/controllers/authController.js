@@ -3,6 +3,7 @@ const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
+const { createAuditLog } = require("../utils/logger");
 
 // Supabase client — uses service role key so it can write to storage
 const supabase = createClient(
@@ -195,6 +196,17 @@ async function residentLogin(req, res) {
                 .json({ message: "Invalid email or password" });
         }
 
+        await createAuditLog({
+            actorId: resident.resident_id,
+            actorName: resident.full_name,
+            actorRole: "resident",
+            actionType: "login",
+            targetTable: "residents",
+            targetId: resident.resident_id,
+            description: `Successful login to CertiFast resident portal`,
+            ipAddress: req.ip,
+        });
+
         const token = jwt.sign(
             {
                 id: resident.resident_id,
@@ -263,6 +275,18 @@ async function residentChangePassword(req, res) {
             [newHash, resident_id],
         );
 
+        await createAuditLog({
+            actorId: resident_id,
+            actorName:
+                req.resident?.full_name || req.resident?.email || "Resident",
+            actorRole: "resident",
+            actionType: "password",
+            targetTable: "residents",
+            targetId: resident_id,
+            description: `Resident changed their password`,
+            ipAddress: req.ip,
+        });
+
         return res.json({ message: "Password updated successfully" });
     } catch (err) {
         console.error("residentChangePassword error:", err);
@@ -303,6 +327,17 @@ async function adminLogin(req, res) {
             "UPDATE admin_accounts SET last_login = now() WHERE admin_id = $1",
             [admin.admin_id],
         );
+
+        await createAuditLog({
+            actorId: admin.admin_id,
+            actorName: admin.username,
+            actorRole: admin.role,
+            actionType: "login",
+            targetTable: "admin_accounts",
+            targetId: admin.admin_id,
+            description: `Successful login to CertiFast admin panel`,
+            ipAddress: req.ip,
+        });
 
         const token = jwt.sign(
             {

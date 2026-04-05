@@ -1,6 +1,7 @@
 // certifast/controllers/adminController.js
 const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
+const { createAuditLog } = require("../utils/logger");
 
 function makeWalkInDocId(certificateId) {
     const now = new Date();
@@ -62,45 +63,6 @@ function ensureAdminOrSuperadmin(req, res) {
         return false;
     }
     return true;
-}
-
-async function createAuditLog({
-    actorId,
-    actorName,
-    actorRole,
-    actionType,
-    targetTable,
-    targetId,
-    description,
-    ipAddress,
-}) {
-    try {
-        await pool.query(
-            `INSERT INTO audit_logs (
-                actor_id,
-                actor_name,
-                actor_role,
-                action_type,
-                target_table,
-                target_id,
-                description,
-                ip_address,
-                created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-            [
-                actorId || null,
-                actorName || null,
-                actorRole || null,
-                actionType,
-                targetTable || null,
-                targetId || null,
-                description || null,
-                ipAddress || null,
-            ],
-        );
-    } catch (err) {
-        console.error("createAuditLog error:", err);
-    }
 }
 
 // Helper to create notifications for residents
@@ -232,6 +194,17 @@ async function approveRequest(req, res) {
             requestId: request.request_id,
         });
 
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "request",
+            targetTable: "requests",
+            targetId: requestId,
+            description: `Request #${requestId} status changed to approved`,
+            ipAddress: req.ip,
+        });
+
         return res.json({
             message: "Request approved successfully",
             request: result.rows[0],
@@ -283,6 +256,17 @@ async function rejectRequest(req, res) {
             title: "Request Denied",
             message: `Your certificate request has been denied. Reason: ${reason}`,
             requestId: request.request_id,
+        });
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "request",
+            targetTable: "requests",
+            targetId: requestId,
+            description: `Request #${requestId} status changed to rejected: ${reason}`,
+            ipAddress: req.ip,
         });
 
         return res.json({
@@ -387,6 +371,17 @@ async function issueWalkIn(req, res) {
         );
 
         await client.query("COMMIT");
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "walkin",
+            targetTable: "issued_certificates",
+            targetId: certificateId,
+            description: `Walk-in issuance: ${String(certType).trim()} for ${String(residentName).trim()}`,
+            ipAddress: req.ip,
+        });
 
         return res.status(201).json({
             id: `#WI-${String(certificateId).padStart(3, "0")}`,
@@ -871,6 +866,17 @@ async function markRequestReady(req, res) {
             requestId: request.request_id,
         });
 
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "request",
+            targetTable: "requests",
+            targetId: requestId,
+            description: `Request #${requestId} status changed to ready for pickup`,
+            ipAddress: req.ip,
+        });
+
         return res.json({
             message: "Request marked ready for pickup",
             request: result.rows[0],
@@ -914,6 +920,17 @@ async function releaseRequest(req, res) {
             message:
                 "Your certificate has been successfully released and is now available.",
             requestId: request.request_id,
+        });
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "request",
+            targetTable: "requests",
+            targetId: requestId,
+            description: `Request #${requestId} status changed to released`,
+            ipAddress: req.ip,
         });
 
         return res.json({

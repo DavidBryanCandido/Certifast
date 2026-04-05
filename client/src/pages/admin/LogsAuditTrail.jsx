@@ -82,6 +82,8 @@ if (!document.head.querySelector("[data-cf-logs]")) {
     .lg-badge.walkin   { background:#f0ebff; color:#6a3db8; }
     .lg-badge.qrscan   { background:#fff3e0; color:#b86800; }
     .lg-badge.settings { background:#fdecea; color:#b02020; }
+    .lg-badge.password { background:#fce4ec; color:#880e4f; }
+    .lg-badge.profile  { background:#e8f4fd; color:#01579b; }
     .lg-search-input {
       width:100%; padding:7px 12px 7px 32px; border:1.5px solid #e4dfd4;
       border-radius:4px; font-family:'Source Serif 4',serif; font-size:12px;
@@ -376,6 +378,8 @@ const TYPE_CONFIG = {
     walkin: { label: "Walk-in" },
     qrscan: { label: "QR Scan" },
     settings: { label: "Settings" },
+    password: { label: "Password" },
+    profile: { label: "Profile" },
 };
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50];
@@ -1202,6 +1206,8 @@ export default function LogsAuditTrail({
                             <option value="walkin">Walk-in Issuance</option>
                             <option value="qrscan">QR Scan</option>
                             <option value="settings">Settings Change</option>
+                            <option value="password">Password Change</option>
+                            <option value="profile">Profile Update</option>
                         </select>
                         <select
                             className="lg-select"

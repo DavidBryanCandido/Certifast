@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
     LayoutDashboard,
     FilePlus,
@@ -124,14 +124,18 @@ function useAdminSidebarStyles() {
         .rep-logout-btn,
         .lg-logout-btn,
         .wi-logout-btn {
-            background: none;
+            background: rgba(255, 255, 255, 0.12);
             border: none;
             cursor: pointer;
-            color: rgba(255, 255, 255, 0.35);
-            padding: 4px;
-            transition: color 0.15s;
+            color: rgba(255, 255, 255, 0.85);
+            padding: 10px 12px;
+            transition: all 0.15s;
             display: flex;
             align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            min-width: 38px;
+            min-height: 38px;
         }
         .admin-logout-btn:hover,
         .cf-logout-btn:hover,
@@ -139,11 +143,26 @@ function useAdminSidebarStyles() {
         .rep-logout-btn:hover,
         .lg-logout-btn:hover,
         .wi-logout-btn:hover {
-            color: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.22);
+            color: rgba(255, 255, 255, 1);
         }
         `;
         document.head.appendChild(style);
     }, []);
+}
+
+function useWindowSize() {
+    const [width, setWidth] = useState(
+        typeof window !== "undefined" ? window.innerWidth : 1024,
+    );
+
+    useEffect(() => {
+        const handleResize = () => setWidth(window.innerWidth);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    return width;
 }
 
 const sd = {
@@ -161,15 +180,18 @@ const sd = {
         transition: "width 0.2s",
     },
     brand: {
-        padding: "20px 20px 16px",
+        padding: "24px 20px 16px",
         borderBottom: "1px solid rgba(201,162,39,0.18)",
         display: "flex",
         alignItems: "center",
         gap: 10,
+        justifyContent: "center",
+        flexDirection: "column",
+        textAlign: "center",
     },
     brandSeal: {
-        width: 38,
-        height: 38,
+        width: 100,
+        height: 100,
         borderRadius: "50%",
         border: "1.5px solid rgba(201,162,39,0.5)",
         background: "rgba(201,162,39,0.1)",
@@ -177,20 +199,28 @@ const sd = {
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
+        marginBottom: 10,
     },
     brandName: {
         fontFamily: "'Playfair Display',serif",
-        fontSize: 14,
+        fontSize: 18,
         fontWeight: 700,
         color: "#fff",
-        lineHeight: 1.2,
+        lineHeight: 1.1,
     },
     brandSub: {
-        fontSize: 9,
-        color: "rgba(201,162,39,0.7)",
-        letterSpacing: "1.5px",
+        fontSize: 10,
+        color: "rgba(201,162,39,0.85)",
+        letterSpacing: "1px",
         textTransform: "uppercase",
-        marginTop: 1,
+        marginTop: 2,
+    },
+    brandTagline: {
+        fontSize: 12,
+        color: "rgba(255,255,255,0.72)",
+        marginTop: 4,
+        letterSpacing: "0.5px",
+        fontWeight: 500,
     },
     goldBar: {
         height: 3,
@@ -287,6 +317,10 @@ export function AdminSidebar({
     badgeCounts = {},
 }) {
     useAdminSidebarStyles();
+    const width = useWindowSize();
+    const logoSize = collapsed
+        ? 48
+        : Math.min(100, Math.max(60, Math.round(width * 0.08)));
 
     const role = String(admin?.role || "")
         .trim()
@@ -346,26 +380,33 @@ export function AdminSidebar({
             <div
                 style={{
                     ...sd.brand,
-                    justifyContent: collapsed ? "center" : "flex-start",
-                    padding: collapsed ? "18px 0" : "20px 20px 16px",
+                    justifyContent: "center",
+                    padding: collapsed ? "18px 0" : "24px 20px 16px",
                 }}
             >
-                <div style={sd.brandSeal}>
+                <div
+                    style={{
+                        ...sd.brandSeal,
+                        width: logoSize,
+                        height: logoSize,
+                    }}
+                >
                     <img
                         src="/logo.png"
                         alt="Barangay Seal"
                         style={{
-                            width: 34,
-                            height: 34,
+                            width: logoSize,
+                            height: logoSize,
                             borderRadius: "50%",
                             objectFit: "cover",
                         }}
                     />
                 </div>
                 {!collapsed && (
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                         <div style={sd.brandName}>CertiFast</div>
-                        <div style={sd.brandSub}>East Tapinac</div>
+                        <div style={sd.brandSub}>Barangay East Tapinac</div>
+                        <div style={sd.brandTagline}>Admin Portal</div>
                     </div>
                 )}
             </div>
@@ -439,6 +480,8 @@ export function AdminMobileSidebar({
     badgeCounts = {},
 }) {
     useAdminSidebarStyles();
+    const width = useWindowSize();
+    const logoSize = Math.min(100, Math.max(60, Math.round(width * 0.08)));
 
     const role = String(admin?.role || "")
         .trim()
@@ -517,7 +560,13 @@ export function AdminMobileSidebar({
                     zIndex: 1,
                 }}
             >
-                <div style={{ ...sd.brand, justifyContent: "space-between" }}>
+                <div
+                    style={{
+                        ...sd.brand,
+                        justifyContent: "space-between",
+                        flexDirection: "row",
+                    }}
+                >
                     <div
                         style={{
                             display: "flex",
@@ -525,21 +574,28 @@ export function AdminMobileSidebar({
                             gap: 10,
                         }}
                     >
-                        <div style={sd.brandSeal}>
+                        <div
+                            style={{
+                                ...sd.brandSeal,
+                                width: logoSize,
+                                height: logoSize,
+                            }}
+                        >
                             <img
                                 src="/logo.png"
                                 alt="Barangay Seal"
                                 style={{
-                                    width: 34,
-                                    height: 34,
+                                    width: logoSize,
+                                    height: logoSize,
                                     borderRadius: "50%",
                                     objectFit: "cover",
                                 }}
                             />
                         </div>
-                        <div>
+                        <div style={{ minWidth: 0 }}>
                             <div style={sd.brandName}>CertiFast</div>
-                            <div style={sd.brandSub}>East Tapinac</div>
+                            <div style={sd.brandSub}>Barangay East Tapinac</div>
+                            <div style={sd.brandTagline}>Admin Portal</div>
                         </div>
                     </div>
                     <button
