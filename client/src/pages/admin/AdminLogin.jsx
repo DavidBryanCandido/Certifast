@@ -4,7 +4,7 @@
 // TODO (Backend Dev):
 //   - Connect handleSubmit to POST /api/auth/admin/login
 //   - Expected request body: { username, password }
-//     (field is "Username / Employee ID" — not email)
+//     (field is "Username" — not email)
 //   - Expected response: { token, admin: { id, name, role } }
 //   - Store JWT token in localStorage as "adminToken"
 //   - Store admin info in AdminAuthContext
@@ -250,9 +250,9 @@ function ForgotPasswordModal({ onClose }) {
                             </span>
                         </p>
                         <p style={m.formatRow}>
-                            <span style={m.formatKey}>Employee ID: </span>
+                            <span style={m.formatKey}>Username: </span>
                             <span style={m.formatValHighlight}>
-                                [your employee ID]
+                                [your username]
                             </span>
                         </p>
                         <p style={m.formatRow}>
@@ -462,7 +462,7 @@ export default function AdminLogin() {
                         {/* Username */}
                         <div style={s.field}>
                             <label style={s.fieldLabel} htmlFor="username">
-                                Username / Employee ID
+                                Username
                             </label>
                             <div style={s.inputWrap}>
                                 <span style={s.inputIcon}>
