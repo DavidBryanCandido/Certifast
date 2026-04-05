@@ -1351,9 +1351,10 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     useEffect(() => {
         if (isSuperAdmin) loadAccounts();
     }, [loadAccounts, isSuperAdmin]);
+
     useEffect(() => {
-        if (activeTab === "residents") loadResidents();
-    }, [activeTab, loadResidents]);
+        loadResidents();
+    }, [loadResidents]);
 
     // ── Filtered staff rows ──
     const filtered = rows.filter((r) => {

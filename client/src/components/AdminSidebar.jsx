@@ -141,10 +141,6 @@ function useAdminSidebarStyles() {
         .wi-logout-btn:hover {
             color: rgba(255, 255, 255, 0.7);
         }
-        .admin-gold-bar { margin-bottom: 0; }
-        @media (min-width: 768px) and (max-width: 1023px) {
-            .admin-gold-bar { margin-bottom: 10px; }
-        }
         `;
         document.head.appendChild(style);
     }, []);
@@ -296,7 +292,9 @@ export function AdminSidebar({
         .trim()
         .toLowerCase();
     const isAdmin = role === "admin" || role === "superadmin";
+    const showAdminSection = isAdmin || role === "staff";
 
+    // ── Main Menu (visible to all logged-in admin users incl. staff) ──
     const navItems = [
         { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
         { key: "walkIn", label: "Walk-in Issuance", Icon: FilePlus },
@@ -307,16 +305,15 @@ export function AdminSidebar({
             badge: badgeCounts.manageRequests,
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
-        { key: "reports", label: "Reports & Exports", Icon: BarChart2 },
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
     ];
 
-    const saItems = isAdmin
-        ? [
-              { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
-              { key: "settings", label: "System Settings", Icon: Settings },
-          ]
-        : [];
+    // ── Admin-only section (bottom) — hidden from staff ──
+    const saItems = [
+        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
+        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
+        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
+        { key: "settings", label: "System Settings", Icon: Settings },
+    ];
 
     const navBtn = ({ item }) =>
         collapsed ? (
@@ -372,18 +369,28 @@ export function AdminSidebar({
                     </div>
                 )}
             </div>
-            <div style={sd.goldBar} className="admin-gold-bar" />
+            <div style={sd.goldBar} />
             {!collapsed && <div style={sd.sectionLabel}>Main Menu</div>}
             {navItems.map((item) => navBtn({ item }))}
             <div style={{ flex: 1 }} />
-            {isAdmin && (
+            {showAdminSection && (
                 <div style={sd.superAdminSection}>
                     {!collapsed && (
                         <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
                             Admin
                         </div>
                     )}
-                    {saItems.map((item) => navBtn({ item }))}
+                    {saItems
+                        .filter((item) => {
+                            if (role === "staff") {
+                                return (
+                                    item.key === "manageAccounts" ||
+                                    item.key === "reports"
+                                );
+                            }
+                            return true;
+                        })
+                        .map((item) => navBtn({ item }))}
                 </div>
             )}
             <div
@@ -404,11 +411,7 @@ export function AdminSidebar({
                                     admin?.username ||
                                     "Dante Administrador"}
                             </div>
-                            <div style={{ ...sd.userRole, fontSize: 10 }}>
-                                Username: {admin?.username || "-"}
-                            </div>
-                            <div style={{ ...sd.userRole, marginTop: 2 }}>
-                                Role:{" "}
+                            <div style={sd.userRole}>
                                 {admin?.role
                                     ? String(admin.role).toUpperCase()
                                     : "-"}
@@ -441,6 +444,7 @@ export function AdminMobileSidebar({
         .trim()
         .toLowerCase();
     const isAdmin = role === "admin" || role === "superadmin";
+    const showAdminSection = isAdmin || role === "staff";
 
     useEffect(() => {
         document.body.style.overflow = "hidden";
@@ -449,6 +453,7 @@ export function AdminMobileSidebar({
         };
     }, []);
 
+    // ── Main Menu (all staff) ──
     const navItems = [
         { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
         { key: "walkIn", label: "Walk-in Issuance", Icon: FilePlus },
@@ -459,15 +464,15 @@ export function AdminMobileSidebar({
             badge: badgeCounts.manageRequests,
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
-        { key: "reports", label: "Reports & Exports", Icon: BarChart2 },
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
     ];
-    const saItems = isAdmin
-        ? [
-              { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
-              { key: "settings", label: "System Settings", Icon: Settings },
-          ]
-        : [];
+
+    // ── Admin-only section (bottom) ──
+    const saItems = [
+        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
+        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
+        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
+        { key: "settings", label: "System Settings", Icon: Settings },
+    ];
 
     const navBtn = ({ item }) => (
         <button
@@ -550,16 +555,26 @@ export function AdminMobileSidebar({
                         <X size={18} />
                     </button>
                 </div>
-                <div style={sd.goldBar} className="admin-gold-bar" />
+                <div style={sd.goldBar} />
                 <div style={sd.sectionLabel}>Main Menu</div>
                 {navItems.map((item) => navBtn({ item }))}
                 <div style={{ flex: 1 }} />
-                {isAdmin && (
+                {showAdminSection && (
                     <div style={sd.superAdminSection}>
                         <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
                             Admin
                         </div>
-                        {saItems.map((item) => navBtn({ item }))}
+                        {saItems
+                            .filter((item) => {
+                                if (role === "staff") {
+                                    return (
+                                        item.key === "manageAccounts" ||
+                                        item.key === "reports"
+                                    );
+                                }
+                                return true;
+                            })
+                            .map((item) => navBtn({ item }))}
                     </div>
                 )}
                 <div style={sd.userRow}>
@@ -572,11 +587,7 @@ export function AdminMobileSidebar({
                                 admin?.username ||
                                 "Dante Administrador"}
                         </div>
-                        <div style={{ ...sd.userRole, fontSize: 10 }}>
-                            Username: {admin?.username || "-"}
-                        </div>
-                        <div style={{ ...sd.userRole, marginTop: 1 }}>
-                            Role:{" "}
+                        <div style={sd.userRole}>
                             {admin?.role
                                 ? String(admin.role).toUpperCase()
                                 : "-"}

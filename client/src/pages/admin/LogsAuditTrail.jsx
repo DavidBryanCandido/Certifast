@@ -1,16 +1,3 @@
-// =============================================================
-// FILE: client/src/pages/admin/LogsAuditTrail.jsx
-// SUPERADMIN ONLY — do not show in sidebar for regular staff
-// =============================================================
-// TODO (Backend Dev):
-//   - GET /api/logs?search=&type=&actor=&date=&page=&limit=
-//     → { logs: [...], total, page, totalPages }
-//   - GET /api/logs/stats → { total, today, activeSessions, settingsChanges }
-//   - GET /api/logs/:id → single log entry detail
-//   - Logs are immutable — no DELETE or UPDATE endpoints
-//   - All endpoints require adminToken + superadmin role
-// =============================================================
-
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -651,9 +638,9 @@ export default function LogsAuditTrail({
     const role = String(admin?.role || "")
         .trim()
         .toLowerCase();
-    const isSuperAdmin = role === "admin" || role === "superadmin";
+    const isAdmin = role === "admin" || role === "superadmin";
 
-    if (!isSuperAdmin) {
+    if (!isAdmin) {
         return (
             <div
                 style={{
@@ -683,7 +670,7 @@ export default function LogsAuditTrail({
                         Restricted Access
                     </h2>
                     <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
-                        This page is restricted to Superadmin accounts only. All
+                        This page is restricted to admin accounts only. All
                         system activity is recorded automatically. Logs cannot
                         be deleted or modified.
                     </p>
@@ -775,7 +762,7 @@ export default function LogsAuditTrail({
             if (err?.response?.status === 403) {
                 setError(
                     err?.response?.data?.message ||
-                        "Logs & Audit Trail is restricted to superadmin accounts.",
+                        "Logs & Audit Trail is restricted to admin accounts.",
                 );
                 setLogs([]);
                 setActors([]);
@@ -821,7 +808,7 @@ export default function LogsAuditTrail({
             if (err?.response?.status === 403) {
                 setError(
                     err?.response?.data?.message ||
-                        "Logs & Audit Trail is restricted to superadmin accounts.",
+                        "Logs & Audit Trail is restricted to admin accounts.",
                 );
             }
         }
@@ -980,7 +967,7 @@ export default function LogsAuditTrail({
                                     marginLeft: 10,
                                 }}
                             >
-                                Superadmin view — all system activity
+                                Admin view — all system activity
                             </span>
                         )}
                     </div>

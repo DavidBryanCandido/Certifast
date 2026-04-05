@@ -927,7 +927,7 @@ async function releaseRequest(req, res) {
 }
 
 async function getAuditStats(req, res) {
-    if (!ensureSuperadmin(req, res)) return;
+    if (!ensureAdminOrSuperadmin(req, res)) return;
 
     try {
         const result = await pool.query(
@@ -969,7 +969,7 @@ async function getAuditStats(req, res) {
 }
 
 async function getAuditLogs(req, res) {
-    if (!ensureSuperadmin(req, res)) return;
+    if (!ensureAdminOrSuperadmin(req, res)) return;
 
     const search = String(req.query.search || "").trim();
     const type = String(req.query.type || "")
@@ -1092,7 +1092,7 @@ async function getAuditLogs(req, res) {
 }
 
 async function getAuditLogById(req, res) {
-    if (!ensureSuperadmin(req, res)) return;
+    if (!ensureAdminOrSuperadmin(req, res)) return;
 
     const logId = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(logId) || logId <= 0) {
