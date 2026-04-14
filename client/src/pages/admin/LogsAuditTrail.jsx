@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     FilePlus,
@@ -421,23 +420,8 @@ function mapLogRow(row) {
 // =============================================================
 // Log Detail Drawer
 // =============================================================
-function LogDrawer({ log, onClose, isMobile }) {
-    useEffect(() => {
-        document.body.style.overflow = "hidden";
-        const fn = (e) => {
-            if (e.key === "Escape") onClose();
-        };
-        window.addEventListener("keydown", fn);
-        return () => {
-            document.body.style.overflow = "";
-            window.removeEventListener("keydown", fn);
-        };
-    }, [log?.id, onClose]);
-
-    if (!log) return null;
-    const cfg = TYPE_CONFIG[log.type] || TYPE_CONFIG.login;
-
-    const Row = ({ label, children, mono }) => (
+function LogDrawerRow({ label, children, mono = false }) {
+    return (
         <div style={{ marginBottom: 16 }}>
             <div
                 style={{
@@ -454,7 +438,6 @@ function LogDrawer({ log, onClose, isMobile }) {
             </div>
             <div
                 style={{
-                    fontSize: 13,
                     color: "#1a1a2e",
                     lineHeight: 1.5,
                     fontFamily: mono
@@ -467,6 +450,23 @@ function LogDrawer({ log, onClose, isMobile }) {
             </div>
         </div>
     );
+}
+
+function LogDrawer({ log, onClose, isMobile }) {
+    useEffect(() => {
+        document.body.style.overflow = "hidden";
+        const fn = (e) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", fn);
+        return () => {
+            document.body.style.overflow = "";
+            window.removeEventListener("keydown", fn);
+        };
+    }, [log?.id, onClose]);
+
+    if (!log) return null;
+    const cfg = TYPE_CONFIG[log.type] || TYPE_CONFIG.login;
 
     return (
         <>
@@ -538,17 +538,17 @@ function LogDrawer({ log, onClose, isMobile }) {
                     </button>
                 </div>
                 <div className="lg-drawer-body">
-                    <Row label="Action Type">
+                    <LogDrawerRow label="Action Type">
                         <span
                             className={`lg-badge ${log.type}`}
                             style={{ fontSize: 11, padding: "4px 12px" }}
                         >
                             {cfg.label}
                         </span>
-                    </Row>
-                    <Row label="Timestamp" mono>
+                    </LogDrawerRow>
+                    <LogDrawerRow label="Timestamp" mono>
                         {log.date} at {log.time}
-                    </Row>
+                    </LogDrawerRow>
                     <hr
                         style={{
                             border: "none",
@@ -556,10 +556,10 @@ function LogDrawer({ log, onClose, isMobile }) {
                             margin: "16px 0",
                         }}
                     />
-                    <Row label="Description">{log.desc}</Row>
-                    <Row label="Reference / Metadata" mono>
+                    <LogDrawerRow label="Description">{log.desc}</LogDrawerRow>
+                    <LogDrawerRow label="Reference / Metadata" mono>
                         {log.meta}
-                    </Row>
+                    </LogDrawerRow>
                     <hr
                         style={{
                             border: "none",
@@ -567,7 +567,7 @@ function LogDrawer({ log, onClose, isMobile }) {
                             margin: "16px 0",
                         }}
                     />
-                    <Row label="Performed By">
+                    <LogDrawerRow label="Performed By">
                         <strong>{log.actor}</strong>
                         <span
                             style={{
@@ -578,10 +578,10 @@ function LogDrawer({ log, onClose, isMobile }) {
                         >
                             ({log.role})
                         </span>
-                    </Row>
-                    <Row label="IP Address" mono>
+                    </LogDrawerRow>
+                    <LogDrawerRow label="IP Address" mono>
                         {log.ip}
-                    </Row>
+                    </LogDrawerRow>
                     <hr
                         style={{
                             border: "none",
@@ -635,7 +635,6 @@ export default function LogsAuditTrail({
     onLogout,
     onNavigate: navProp,
 }) {
-    const navigate = useNavigate();
     const width = useWindowSize();
     const isMobile = width < 768;
     const isTablet = width >= 768 && width < 1024;
@@ -643,45 +642,6 @@ export default function LogsAuditTrail({
         .trim()
         .toLowerCase();
     const isAdmin = role === "admin" || role === "superadmin";
-
-    if (!isAdmin) {
-        return (
-            <div
-                style={{
-                    minHeight: "100vh",
-                    background: "#f8f6f1",
-                    padding: "32px",
-                }}
-            >
-                <div
-                    style={{
-                        background: "#fff",
-                        border: "1px solid #e4dfd4",
-                        borderRadius: 6,
-                        padding: 20,
-                        maxWidth: 720,
-                        margin: "0 auto",
-                    }}
-                >
-                    <h2
-                        style={{
-                            margin: 0,
-                            fontFamily: "'Playfair Display',serif",
-                            fontSize: 20,
-                            color: "#0e2554",
-                        }}
-                    >
-                        Restricted Access
-                    </h2>
-                    <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
-                        This page is restricted to admin accounts only. All
-                        system activity is recorded automatically. Logs cannot
-                        be deleted or modified.
-                    </p>
-                </div>
-            </div>
-        );
-    }
 
     const [activePage, setActivePage] = useState("logs");
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -870,6 +830,45 @@ export default function LogsAuditTrail({
         amber: "linear-gradient(90deg,#b86800,#e08c20)",
         purple: "linear-gradient(90deg,#6a3db8,#9060e0)",
     };
+
+    if (!isAdmin) {
+        return (
+            <div
+                style={{
+                    minHeight: "100vh",
+                    background: "#f8f6f1",
+                    padding: "32px",
+                }}
+            >
+                <div
+                    style={{
+                        background: "#fff",
+                        border: "1px solid #e4dfd4",
+                        borderRadius: 6,
+                        padding: 20,
+                        maxWidth: 720,
+                        margin: "0 auto",
+                    }}
+                >
+                    <h2
+                        style={{
+                            margin: 0,
+                            fontFamily: "'Playfair Display',serif",
+                            fontSize: 20,
+                            color: "#0e2554",
+                        }}
+                    >
+                        Restricted Access
+                    </h2>
+                    <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
+                        This page is restricted to admin accounts only. All
+                        system activity is recorded automatically. Logs cannot
+                        be deleted or modified.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="lg-root">
@@ -1670,7 +1669,7 @@ export default function LogsAuditTrail({
 // =============================================================
 // Styles
 // =============================================================
-const sd = {
+const _SD = {
     sidebar: {
         minHeight: "100vh",
         background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",

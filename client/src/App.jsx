@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -58,7 +57,8 @@ const ADMIN_ONLY_ROUTES = [
     "/admin/settings",
 ];
 
-function AdminPage({ Component, adminOnly = false }) {
+function AdminPage({ PageComponent, adminOnly = false }) {
+    const ResolvedPage = PageComponent;
     const navigate = useNavigate();
     const { admin } = useSessionData();
     console.log("[AdminPage] session admin:", admin);
@@ -93,7 +93,7 @@ function AdminPage({ Component, adminOnly = false }) {
     }
 
     return (
-        <Component
+        <ResolvedPage
             admin={resolvedAdmin}
             onNavigate={handleAdminNavigate}
             onLogout={handleAdminLogout}
@@ -166,35 +166,35 @@ export default function App() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route
                 path="/admin/dashboard"
-                element={<AdminPage Component={Dashboard} />}
+                element={<AdminPage PageComponent={Dashboard} />}
             />
             <Route
                 path="/admin/walkin-issuance"
-                element={<AdminPage Component={WalkInIssuance} />}
+                element={<AdminPage PageComponent={WalkInIssuance} />}
             />
             <Route
                 path="/admin/manage-requests"
-                element={<AdminPage Component={ManageRequests} />}
+                element={<AdminPage PageComponent={ManageRequests} />}
             />
             <Route
                 path="/admin/resident-records"
-                element={<AdminPage Component={ResidentRecords} />}
+                element={<AdminPage PageComponent={ResidentRecords} />}
             />
             <Route
                 path="/admin/reports"
-                element={<AdminPage Component={Reports} />}
+                element={<AdminPage PageComponent={Reports} />}
             />
             <Route
                 path="/admin/logs-audit-trail"
-                element={<AdminPage Component={LogsAuditTrail} adminOnly />}
+                element={<AdminPage PageComponent={LogsAuditTrail} adminOnly />}
             />
             <Route
                 path="/admin/manage-accounts"
-                element={<AdminPage Component={ManageAccounts} />}
+                element={<AdminPage PageComponent={ManageAccounts} />}
             />
             <Route
                 path="/admin/settings"
-                element={<AdminPage Component={Settings} adminOnly />}
+                element={<AdminPage PageComponent={Settings} adminOnly />}
             />
             <Route path="/resident/login" element={<ResidentLoginRoute />} />
             <Route

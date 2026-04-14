@@ -1,24 +1,8 @@
 // =============================================================
 // FILE: client/src/pages/admin/ManageAccounts.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   Staff Accounts (existing):
-//   - GET  /api/accounts               → [{ admin_id, full_name, username, role, status, created_at, last_login }]
-//   - POST /api/accounts               → { full_name, username, password, role }
-//   - PUT  /api/accounts/:id           → { full_name, username, role, status }
-//   - PUT  /api/accounts/:id/password  → { new_password }
-//   - DELETE /api/accounts/:id         → deactivate
-//
-//   Resident Accounts (new):
-//   - GET  /api/admin/residents        → [{ resident_id, full_name, email, contact_number, status, created_at }]
-//   - PUT  /api/admin/residents/:id/password → { new_password }
-//   - PUT  /api/admin/residents/:id/status   → { status: 'active'|'inactive' }
-//
-//   All endpoints require adminToken in Authorization header
-// =============================================================
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     UserCog,
     UserPlus,
@@ -190,7 +174,8 @@ function avatarColor(name = "") {
 }
 
 // ─── Stat Card ────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, accent }) {
+function StatCard({ icon, label, value, accent }) {
+    const IconComp = icon;
     return (
         <div
             style={{
@@ -215,7 +200,7 @@ function StatCard({ icon: Icon, label, value, accent }) {
                     flexShrink: 0,
                 }}
             >
-                <Icon size={18} color={accent} />
+                <IconComp size={18} color={accent} />
             </div>
             <div>
                 <div
@@ -1313,7 +1298,6 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     }, [onLogout]);
 
     // ── Load resident accounts ──
-    // TODO (Backend Dev): GET /api/admin/residents → [{resident_id, full_name, email, contact_number, status, created_at, ...}]
     const loadResidents = useCallback(async () => {
         setResLoading(true);
         setResError("");
@@ -1462,7 +1446,6 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
 
     // ── Resident handlers ──
     const handleResidentPassword = async (password) => {
-        // TODO (Backend Dev): PUT /api/admin/residents/:id/password  body: { new_password }
         await axios.put(
             `${API}/admin/residents/${resModal.resident.resident_id}/password`,
             { new_password: password },
@@ -1477,7 +1460,6 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
             String(resident.status || "").toLowerCase() === "active";
         const next = isActive ? "inactive" : "active";
         try {
-            // TODO (Backend Dev): PUT /api/admin/residents/:id/status  body: { status }
             await axios.put(
                 `${API}/admin/residents/${resident.resident_id}/status`,
                 { status: next },

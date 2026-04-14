@@ -3,7 +3,6 @@
 // =============================================================
 
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     FilePlus,
@@ -288,7 +287,7 @@ function RequestDrawer({
         setStep("default");
         setRejectReason("");
         setActionError("");
-    }, [request?.rawId]);
+    }, [request]);
 
     useEffect(() => {
         document.body.style.overflow = "hidden";
@@ -1077,7 +1076,6 @@ function StatIcon({ color, type, size = 18 }) {
 // Dashboard
 // =============================================================
 export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
-    const navigate = useNavigate();
     const width = useWindowSize();
     const isMobile = width < 768;
     const isTablet = width >= 768 && width < 1024;
@@ -1230,11 +1228,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     }, [onLogout]);
 
     useEffect(() => {
-        let mounted = true;
         loadDashboardData();
-        return () => {
-            mounted = false;
-        };
     }, [loadDashboardData]);
 
     // Handle QR release confirmation from the scanner modal
@@ -1246,7 +1240,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             await loadDashboardData();
             setQrReleaseData(null);
             setSelectedRequest(null);
-        } catch (err) {
+        } catch {
             // errors surface inside the QR modal UI
         } finally {
             setQrReleaseLoading(false);

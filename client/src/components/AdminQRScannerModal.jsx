@@ -10,15 +10,9 @@
 //   isMobile            — boolean
 //
 //   // Optional — pass these when using from ManageRequests "Scan QR & Release"
-//   releaseRequestId    — request rawId to release after scan
 //   onReleaseConfirm()  — async callback that performs the API release
 //   releaseHasFee       — boolean; shows fee-collection warning before release
 //
-// TODO (Backend Dev):
-//   - Replace dummy lookup in handleDetected() with:
-//     POST /api/admin/scan-resident-qr  body: { resident_id }
-//     response: { resident: {...}, latestRequest: {...} | null }
-//   - Requires adminToken in Authorization header
 // =============================================================
 
 import { useEffect, useRef, useState } from "react";
@@ -36,63 +30,7 @@ import {
     CameraOff,
     ShieldCheck,
 } from "lucide-react";
-
-// ─── Dummy data (remove once real API is wired) ───────────────
-const DUMMY = {
-    "RES-0042": {
-        resident: {
-            resident_id: "RES-0042",
-            full_name: "Ricardo Mendoza",
-            address: "54-14th St., East Tapinac, Olongapo City",
-        },
-        latestRequest: {
-            request_id: "REQ-0145",
-            cert_type: "Certificate of Indigency",
-            status: "processing",
-            purpose: "Medical Assistance",
-            requested_at: "2025-03-08",
-            has_fee: false,
-        },
-    },
-    "RES-0031": {
-        resident: {
-            resident_id: "RES-0031",
-            full_name: "Felicidad Torres",
-            address: "22-7th St., East Tapinac, Olongapo City",
-        },
-        latestRequest: {
-            request_id: "REQ-0144",
-            cert_type: "Barangay Clearance",
-            status: "processing",
-            purpose: "Employment",
-            requested_at: "2025-03-10",
-            has_fee: true,
-        },
-    },
-    "RES-0019": {
-        resident: {
-            resident_id: "RES-0019",
-            full_name: "Jose Dela Cruz",
-            address: "11-3rd St., East Tapinac, Olongapo City",
-        },
-        latestRequest: null,
-    },
-};
-const FALLBACK = {
-    resident: {
-        resident_id: "RES-0001",
-        full_name: "Maria Santos",
-        address: "12 Rizal St., East Tapinac, Olongapo City",
-    },
-    latestRequest: {
-        request_id: "REQ-0100",
-        cert_type: "Barangay Clearance",
-        status: "processing",
-        purpose: "Employment",
-        requested_at: "2025-03-15",
-        has_fee: true,
-    },
-};
+import authService from "../services/authService";
 
 // ─── Helpers ──────────────────────────────────────────────────
 function fmtDate(str) {
@@ -123,7 +61,6 @@ export default function AdminQRScannerModal({
     onNavigate,
     isMobile,
     // Release-context props (optional — passed from ManageRequests)
-    releaseRequestId = null,
     onReleaseConfirm = null,
     releaseHasFee    = false,
 }) {
@@ -224,10 +161,39 @@ export default function AdminQRScannerModal({
             setState("error");
             return;
         }
-        // TODO: replace with POST /api/admin/scan-resident-qr
-        const result = DUMMY[match[1]] ?? FALLBACK;
-        setScanData(result);
-        setState("result");
+
+        const token = authService.getAdminToken();
+        if (!token) {
+            setErrorMsg("Admin session expired. Please log in again.");
+            setState("error");
+            return;
+        }
+
+        try {
+            const res = await fetch("http://localhost:5000/api/admin/scan-resident-qr", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ resident_id: match[1] }),
+            });
+
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(payload?.message || "Failed to verify QR code");
+            }
+
+            if (!payload?.resident) {
+                throw new Error("Invalid scan response from server");
+            }
+
+            setScanData(payload);
+            setState("result");
+        } catch (err) {
+            setErrorMsg(err.message || "Failed to verify resident QR code");
+            setState("error");
+        }
     }
 
     function handleReset() {

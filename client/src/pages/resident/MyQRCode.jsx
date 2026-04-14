@@ -315,7 +315,9 @@ export default function MyQRCode({ resident, onLogout }) {
                     img.src = "/logo.png";
                     setTimeout(resolve, 800);
                 });
-            } catch {}
+            } catch {
+                // Logo load failure should not block QR card generation.
+            }
 
             // ── Name with word-wrap (scaled: 34 → 40, lineH 42 → 50, nameY 188 → 222) ──
             ctx.textAlign = "center";

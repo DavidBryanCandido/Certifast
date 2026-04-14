@@ -1,20 +1,8 @@
 // =============================================================
 // FILE: client/src/pages/admin/ManageRequests.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/requests?status=&search=&certType=&dateRange=&sort=&page=&limit=
-//     → { requests: [...], total, page, totalPages }
-//   - GET /api/requests/:id → full request detail for drawer
-//   - POST /api/requests/:id/approve → approve pending request
-//   - POST /api/requests/:id/reject → body: { reason }
-//   - POST /api/requests/:id/mark-ready → after cert is printed
-//   - POST /api/requests/:id/release → body: { requestId }
-//   - All endpoints require adminToken in Authorization header
-//   - Status values: pending | approved | ready | released | rejected
-// =============================================================
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
 import {
     Search,
     ChevronLeft,
@@ -186,36 +174,68 @@ const DOT_COLORS = {
     grey:  "#ccc",
 };
 
-// Mock timeline — TODO: replace with real timeline from API
-const TIMELINE_MAP = {
-    pending: [
-        { dot: "gold",  text: "Request submitted by resident",     time: "Pending review" },
-        { dot: "grey",  text: "Awaiting staff review",             time: "Pending" },
-    ],
-    approved: [
-        { dot: "gold",  text: "Request submitted by resident",     time: "" },
-        { dot: "blue",  text: "Approved by staff",                 time: "" },
-        { dot: "grey",  text: "Awaiting print & signing",          time: "Pending" },
-    ],
-    ready: [
-        { dot: "gold",  text: "Request submitted by resident",     time: "" },
-        { dot: "blue",  text: "Approved by staff",                 time: "" },
-        { dot: "blue",  text: "Certificate printed",               time: "" },
-        { dot: "green", text: "Marked Ready for Pickup",           time: "" },
-        { dot: "grey",  text: "Awaiting resident pickup",          time: "Pending" },
-    ],
-    released: [
-        { dot: "gold",  text: "Request submitted by resident",     time: "" },
-        { dot: "blue",  text: "Approved by staff",                 time: "" },
-        { dot: "blue",  text: "Certificate printed",               time: "" },
-        { dot: "green", text: "Marked Ready for Pickup",           time: "" },
-        { dot: "green", text: "Released — QR verified by staff",   time: "" },
-    ],
-    rejected: [
-        { dot: "gold",  text: "Request submitted by resident",     time: "" },
-        { dot: "red",   text: "Rejected by staff",                 time: "" },
-    ],
-};
+function timelineTime(value, fallback = "") {
+    if (!value) return fallback;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return fallback;
+    return d.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function buildTimeline(request, status) {
+    const requestedAt = timelineTime(request.requestedAtIso, "Pending review");
+    const processedAt = timelineTime(request.processedAtIso, "");
+    const releasedAt = timelineTime(request.releasedAtIso, "");
+
+    if (status === "pending") {
+        return [
+            { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+            { dot: "grey", text: "Awaiting staff review", time: "Pending" },
+        ];
+    }
+
+    if (status === "approved") {
+        return [
+            { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+            { dot: "blue", text: "Approved by staff", time: processedAt },
+            { dot: "grey", text: "Awaiting print & signing", time: "Pending" },
+        ];
+    }
+
+    if (status === "ready") {
+        return [
+            { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+            { dot: "blue", text: "Approved by staff", time: processedAt },
+            { dot: "green", text: "Marked Ready for Pickup", time: processedAt || "Ready" },
+            { dot: "grey", text: "Awaiting resident pickup", time: "Pending" },
+        ];
+    }
+
+    if (status === "released") {
+        return [
+            { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+            { dot: "blue", text: "Approved by staff", time: processedAt },
+            { dot: "green", text: "Marked Ready for Pickup", time: processedAt || "Ready" },
+            { dot: "green", text: "Released - QR verified by staff", time: releasedAt },
+        ];
+    }
+
+    if (status === "rejected") {
+        return [
+            { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+            { dot: "red", text: "Rejected by staff", time: processedAt || "Rejected" },
+        ];
+    }
+
+    return [
+        { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+    ];
+}
 
 const ITEMS_PER_PAGE = 8;
 
@@ -247,7 +267,7 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
         setStep("default");
         setRejectReason("");
         setActionError("");
-    }, [request?.id]);
+    }, [request]);
 
     // Scroll-lock + escape key
     useEffect(() => {
@@ -264,7 +284,7 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
 
     const status = currentStatus || request.status;
     const badge  = BADGE_CFG[status] || BADGE_CFG.pending;
-    const timeline = TIMELINE_MAP[request.status] || TIMELINE_MAP.pending;
+    const timeline = buildTimeline(request, status);
 
     const handleApiError = (err) => {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -325,6 +345,134 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
         }
     };
 
+        const buildCertificateTemplateHtml = () => {
+                const now = new Date().toLocaleString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                });
+
+                return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${request.id} Certificate</title>
+<style>
+@page { size: A4; margin: 20mm; }
+body {
+    font-family: 'Times New Roman', serif;
+    color: #1a1a2e;
+    margin: 0;
+    padding: 0;
+}
+.sheet {
+    border: 1.5px solid #ddd;
+    padding: 28px 34px;
+}
+.header {
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 14px;
+    margin-bottom: 24px;
+}
+.header h1 { margin: 0; font-size: 24px; letter-spacing: .4px; }
+.header p { margin: 4px 0 0; font-size: 13px; color: #555; }
+.title {
+    text-align: center;
+    font-size: 20px;
+    margin: 22px 0 24px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+}
+.content {
+    font-size: 15px;
+    line-height: 1.9;
+    text-align: justify;
+}
+.content strong { color: #0e2554; }
+.meta {
+    margin-top: 28px;
+    padding-top: 12px;
+    border-top: 1px dashed #bbb;
+    font-size: 12px;
+    color: #666;
+}
+.signature {
+    margin-top: 48px;
+    text-align: right;
+}
+.signature .line {
+    width: 240px;
+    border-top: 1px solid #333;
+    margin-left: auto;
+    margin-bottom: 6px;
+}
+.signature .name { font-weight: 700; font-size: 13px; }
+.signature .role { font-size: 12px; color: #555; }
+</style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="header">
+            <h1>Barangay East Tapinac</h1>
+            <p>City of Olongapo</p>
+        </div>
+
+        <div class="title">${request.certType}</div>
+
+        <div class="content">
+            <p>To whom it may concern:</p>
+            <p>
+                This is to certify that <strong>${request.name}</strong>, residing at
+                <strong>${request.address || "N/A"}</strong>, is requesting this document for
+                the purpose of <strong>${request.purpose || "N/A"}</strong>.
+            </p>
+            <p>
+                Issued this <strong>${now}</strong> at Barangay East Tapinac, Olongapo City,
+                upon request for whatever legal purpose it may serve.
+            </p>
+        </div>
+
+        <div class="meta">
+            <p><strong>Request ID:</strong> ${request.id}</p>
+            <p><strong>Status:</strong> ${String(status || "").toUpperCase()}</p>
+        </div>
+
+        <div class="signature">
+            <div class="line"></div>
+            <div class="name">Punong Barangay</div>
+            <div class="role">(e-signature placeholder)</div>
+        </div>
+    </div>
+</body>
+</html>`;
+        };
+
+        const openCertificatePrintWindow = () => {
+                const win = window.open("", "_blank");
+                if (!win) {
+                        setActionError("Unable to open print window. Please allow pop-ups.");
+                        return false;
+                }
+
+                win.document.write(buildCertificateTemplateHtml());
+                win.document.close();
+                win.focus();
+                setTimeout(() => win.print(), 350);
+                return true;
+        };
+
+        const handlePrintCertificate = () => {
+                const opened = openCertificatePrintWindow();
+                if (opened) {
+                        setHasPrinted(true);
+                }
+        };
+
+    const handleReprint = () => {
+                openCertificatePrintWindow();
+    };
+
     const SectionTitle = ({ children }) => (
         <div className="mr-section-title">{children}</div>
     );
@@ -374,7 +522,7 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
                 </button>
                 <button className="mr-drawer-btn"
                     style={{ background: "#1a4a8a", color: "#fff" }}
-                    onClick={() => { setHasPrinted(true); window.print(); }}>
+                    onClick={handlePrintCertificate}>
                     <Printer size={13} /> {hasPrinted ? "Reprint" : "Print Certificate"}
                 </button>
                 <button className="mr-drawer-btn"
@@ -396,7 +544,8 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
         if (status === "ready") return (
             <>
                 <button className="mr-drawer-btn"
-                    style={{ background: "#e8eef8", color: "#1a4a8a", border: "1px solid #b8cce8" }}>
+                    style={{ background: "#e8eef8", color: "#1a4a8a", border: "1px solid #b8cce8" }}
+                    onClick={handleReprint}>
                     <Printer size={13} /> Reprint
                 </button>
                 <button className="mr-drawer-btn"
@@ -410,7 +559,8 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
         // ── Released ──
         if (status === "released") return (
             <button className="mr-drawer-btn"
-                style={{ background: "#e8eef8", color: "#1a4a8a", border: "1px solid #b8cce8" }}>
+                style={{ background: "#e8eef8", color: "#1a4a8a", border: "1px solid #b8cce8" }}
+                onClick={handleReprint}>
                 <Printer size={13} /> Reprint Certificate
             </button>
         );
@@ -624,7 +774,6 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
 // Main Component
 // =============================================================
 export default function ManageRequests({ admin, onLogout, onNavigate: navProp }) {
-    const navigate  = useNavigate();
     const width     = useWindowSize();
     const isMobile  = width < 768;
     const isTablet  = width >= 768 && width < 1024;
@@ -675,6 +824,9 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             civil:    row.resident_civil || "N/A",
             nationality:      "Filipino",
             rejection_reason: row.rejection_reason || "",
+            requestedAtIso:   row.requested_at || null,
+            processedAtIso:   row.processed_at || null,
+            releasedAtIso:    row.released_at || null,
             requestedAtMs:    requestedAt ? requestedAt.getTime() : 0,
         };
     }, []);
@@ -718,7 +870,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             await loadRequests();
             setQrReleaseData(null);
             setSelectedRequest(null);
-        } catch (err) {
+        } catch {
             // errors surface inside the QR modal's own UI
         } finally {
             setQrReleaseLoading(false);

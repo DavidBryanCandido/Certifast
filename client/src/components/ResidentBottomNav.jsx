@@ -208,42 +208,42 @@ export default function ResidentBottomNav({ active: activeProp }) {
             role="navigation"
             aria-label="Resident navigation"
         >
-            {NAV_ITEMS.map(({ key, icon: Icon, label, path, isFab }) => {
-                const isActive = activeKey === key;
+            {NAV_ITEMS.map((item) => {
+                const isActive = activeKey === item.key;
 
-                if (isFab) {
+                if (item.isFab) {
                     return (
                         <button
-                            key={key}
+                            key={item.key}
                             className={`rbn-fab-wrap${isActive ? " active" : ""}`}
-                            onClick={() => navigate(path)}
-                            aria-label={label}
+                            onClick={() => navigate(item.path)}
+                            aria-label={item.label}
                             aria-current={isActive ? "page" : undefined}
                         >
                             <div className="rbn-fab-bg" />
                             <div className="rbn-fab">
-                                <Icon
+                                <item.icon
                                     size={24}
                                     color="#fff"
                                     strokeWidth={2.5}
                                 />
                             </div>
-                            <span style={{ marginTop: -2 }}>{label}</span>
+                            <span style={{ marginTop: -2 }}>{item.label}</span>
                         </button>
                     );
                 }
 
                 return (
                     <button
-                        key={key}
+                        key={item.key}
                         className={`rbn-item${isActive ? " active" : ""}`}
-                        onClick={() => navigate(path)}
-                        aria-label={label}
+                        onClick={() => navigate(item.path)}
+                        aria-label={item.label}
                         aria-current={isActive ? "page" : undefined}
                     >
                         <div className="rbn-top-line" />
-                        <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                        <span>{label}</span>
+                        <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                        <span>{item.label}</span>
                         {isActive ? (
                             <div className="rbn-active-dot" />
                         ) : (

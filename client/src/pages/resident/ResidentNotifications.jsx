@@ -148,7 +148,6 @@ export default function ResidentNotifications({ resident, onLogout }) {
     }, []);
 
     const isMobile = width < 640;
-    const isTablet = width >= 640 && width < 1024;
 
     useEffect(() => {
         let mounted = true;

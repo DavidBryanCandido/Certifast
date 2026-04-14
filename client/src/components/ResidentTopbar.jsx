@@ -192,7 +192,9 @@ export default function ResidentTopbar({
             setNotifications((prev) =>
                 prev.map((n) => ({ ...n, is_read: true })),
             );
-        } catch {}
+        } catch {
+            // Ignore transient failures; UI can retry on next interaction.
+        }
     };
 
     const markRead = async (id) => {
@@ -204,7 +206,9 @@ export default function ResidentTopbar({
                 ),
             );
             setUnreadCount((prev) => Math.max(0, prev - 1));
-        } catch {}
+        } catch {
+            // Ignore transient failures; item state is refreshed on next fetch.
+        }
     };
 
     return (

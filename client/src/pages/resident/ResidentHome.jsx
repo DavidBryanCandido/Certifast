@@ -1,11 +1,6 @@
 // =============================================================
 // FILE: client/src/pages/resident/ResidentHome.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/resident/requests?limit=5 → recent requests (last 5)
-//   - GET /api/resident/stats → { total, pending, released, rejected }
-//   - All endpoints require residentToken in Authorization header
-// =============================================================
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -219,7 +214,6 @@ export default function ResidentHome({ resident, onLogout }) {
     const isMobile = width < 640;
     const isTablet = width >= 640 && width < 1024;
     const name = resident?.full_name || resident?.name || "Resident";
-    const firstName = name.split(" ")[0];
 
     // Stats
     const stats = {
@@ -527,23 +521,23 @@ export default function ResidentHome({ resident, onLogout }) {
                                 accent: "#b02020",
                                 bg: "rgba(176,32,32,0.08)",
                             },
-                        ].map(({ icon: Icon, label, value, accent, bg }) => (
-                            <div key={label} className="rh-stat-card">
+                        ].map((item) => (
+                            <div key={item.label} className="rh-stat-card">
                                 <div
                                     style={{
                                         width: 38,
                                         height: 38,
                                         borderRadius: 8,
-                                        background: bg,
+                                        background: item.bg,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         flexShrink: 0,
                                     }}
                                 >
-                                    <Icon
+                                    <item.icon
                                         size={17}
-                                        color={accent}
+                                        color={item.accent}
                                         strokeWidth={2}
                                     />
                                 </div>
@@ -558,7 +552,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                             lineHeight: 1,
                                         }}
                                     >
-                                        {value}
+                                        {item.value}
                                     </div>
                                     <div
                                         style={{
@@ -569,7 +563,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                             letterSpacing: 1,
                                         }}
                                     >
-                                        {label}
+                                        {item.label}
                                     </div>
                                 </div>
                             </div>

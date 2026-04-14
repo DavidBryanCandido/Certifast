@@ -1,15 +1,6 @@
 // =============================================================
 // FILE: client/src/pages/resident/ResidentLogin.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - Connect handleSubmit to POST /api/auth/resident/login
-//   - Expected request body: { email, password }
-//   - Expected response: { token, resident: { id, full_name, email } }
-//   - Store token in localStorage as "certifast_resident_token"
-//   - Store resident info as "certifast_resident_auth"
-//   - On success: navigate to /resident/home
-//   - On failure: show error from response
-// =============================================================
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";

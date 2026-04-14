@@ -1,14 +1,8 @@
 // =============================================================
 // FILE: client/src/pages/resident/MyRequests.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/resident/requests → { data: [...] }
-//   - All endpoints require residentToken in Authorization header
-//   - Status values: pending | processing | released | rejected
-// =============================================================
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     FileText,
     Clock,
@@ -87,7 +81,6 @@ function StatusIcon({ status }) {
 }
 
 export default function MyRequests({ resident, onLogout }) {
-    const navigate = useNavigate();
     const [width, setWidth] = useState(window.innerWidth);
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);

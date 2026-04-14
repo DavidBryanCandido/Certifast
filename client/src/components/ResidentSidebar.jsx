@@ -333,17 +333,17 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                 {/* Nav links */}
                 <div className="rsb-nav">
                     <div className="rsb-section-label">Menu</div>
-                    {NAV_ITEMS.map(({ key, icon: Icon, label, path }) => (
+                    {NAV_ITEMS.map((item) => (
                         <button
-                            key={key}
-                            className={`rsb-item${active === key ? " rsb-active" : ""}`}
-                            onClick={() => navigate(path)}
+                            key={item.key}
+                            className={`rsb-item${active === item.key ? " rsb-active" : ""}`}
+                            onClick={() => navigate(item.path)}
                         >
-                            <Icon
+                            <item.icon
                                 size={16}
-                                strokeWidth={active === key ? 2.5 : 2}
+                                strokeWidth={active === item.key ? 2.5 : 2}
                             />
-                            <span className="rsb-item-label">{label}</span>
+                            <span className="rsb-item-label">{item.label}</span>
                         </button>
                     ))}
                     <div

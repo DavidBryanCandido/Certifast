@@ -1,5 +1,6 @@
 // certifast/controllers/reportsController.js
 const pool = require("../db/pool");
+const { createAuditLog } = require("../utils/logger");
 
 const CERT_COLORS = {
     "Barangay Clearance": "#0e2554",
@@ -131,5 +132,83 @@ exports.getOverview = async (req, res) => {
     } catch (err) {
         console.error("Reports error:", err);
         return res.status(500).json({ message: "Failed to load reports." });
+    }
+};
+
+exports.getRecentExports = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT
+                log_id,
+                actor_name,
+                description,
+                created_at
+             FROM audit_logs
+             WHERE action_type = 'report_export'
+               AND target_table = 'reports'
+             ORDER BY created_at DESC, log_id DESC
+             LIMIT 20`,
+        );
+
+        const data = result.rows.map((row) => {
+            let payload = {};
+            try {
+                payload = JSON.parse(row.description || "{}");
+            } catch {
+                payload = {};
+            }
+
+            return {
+                id: `EXP-${String(row.log_id).padStart(3, "0")}`,
+                type: payload.type || "Report Export",
+                period: payload.period || "—",
+                format: payload.format || "CSV",
+                by: row.actor_name || "Admin",
+                generatedAt: new Date(row.created_at).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                }),
+            };
+        });
+
+        return res.json({ data });
+    } catch (err) {
+        console.error("getRecentExports error:", err);
+        return res.status(500).json({ message: "Failed to load recent exports." });
+    }
+};
+
+exports.logExport = async (req, res) => {
+    const type = String(req.body?.type || "").trim();
+    const format = String(req.body?.format || "").trim().toUpperCase();
+    const period = String(req.body?.period || "").trim();
+
+    if (!type || !format || !period) {
+        return res.status(400).json({
+            message: "type, format, and period are required",
+        });
+    }
+
+    try {
+        const description = JSON.stringify({ type, format, period });
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "report_export",
+            targetTable: "reports",
+            targetId: null,
+            description,
+            ipAddress: req.ip,
+        });
+
+        return res.json({ message: "Export logged successfully" });
+    } catch (err) {
+        console.error("logExport error:", err);
+        return res.status(500).json({ message: "Failed to log export." });
     }
 };

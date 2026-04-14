@@ -1,20 +1,6 @@
 // =============================================================
 // FILE: client/src/pages/resident/ResidentRegister.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - POST /api/auth/resident/register (multipart/form-data)
-//     Fields: first_name, middle_name, last_name, email, password,
-//             contact_number, address_house, address_street,
-//             id_type, id_image (file)
-//     → { message, resident_id }
-//   - Compose full_name = first_name + middle_name + last_name on insert
-//   - Set resident status = 'pending_verification' on creation
-//   - Barangay staff reviews the ID upload and approves/rejects in admin panel
-//   - On approve → status: 'active' → resident can log in
-//   - Update authController.js residentLogin to block pending accounts:
-//       if status === 'pending_verification' → 403:
-//       "Your account is under review. Please come back in 1–3 business days."
-// =============================================================
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -38,9 +24,10 @@ import {
 } from "lucide-react";
 import authService from "../../services/authService";
 
+const API = "http://localhost:5000/api";
+
 // ─── Address data ─────────────────────────────────────────────
 // Fallback lists — used while API loads or on fetch failure.
-// Frontend dropdowns switch to live DB data once /api/address-options is wired.
 const PUROKS_FALLBACK = [
     { purok_id: 1, name: "Purok 1" },
     { purok_id: 2, name: "Purok 2" },
@@ -236,7 +223,8 @@ function FieldGroup({ label, required, children, mb, style }) {
     );
 }
 
-function IconWrap({ icon: Icon, children }) {
+function IconWrap({ icon, children }) {
+    const IconComp = icon;
     return (
         <div style={{ position: "relative" }}>
             <span
@@ -251,7 +239,7 @@ function IconWrap({ icon: Icon, children }) {
                     zIndex: 1,
                 }}
             >
-                <Icon size={15} color="#0e2554" strokeWidth={2} />
+                <IconComp size={15} color="#0e2554" strokeWidth={2} />
             </span>
             {children}
         </div>
@@ -344,11 +332,9 @@ export default function ResidentRegister({ onSuccess }) {
     const [streets, setStreets] = useState(STREETS_FALLBACK);
 
     useEffect(() => {
-        // TODO (Backend Dev): GET /api/auth/address-options
-        //   → { puroks: [{purok_id, name},...], streets: [{street_id, name},...] }
         async function loadAddressOptions() {
             try {
-                const res = await fetch("/api/auth/address-options");
+                const res = await fetch(`${API}/auth/address-options`);
                 if (!res.ok) return;
                 const data = await res.json();
                 if (Array.isArray(data.puroks) && data.puroks.length)
@@ -493,7 +479,6 @@ export default function ResidentRegister({ onSuccess }) {
             const address_house = `${form.house_no}, ${purokName}`.trim();
             const address_street =
                 `${resolvedStreet}, Barangay East Tapinac, Olongapo City`.trim();
-            // TODO (Backend Dev): switch to FormData when backend accepts multipart uploads
             // Build FormData so the ID image can be sent as multipart
             const payload = new FormData();
             payload.append("first_name", form.first_name.trim());

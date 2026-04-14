@@ -14,6 +14,22 @@ const reportsService = {
         );
         return res.data;
     },
+
+    getRecentExports: async () => {
+        const res = await axios.get(`${API}/reports/exports`, {
+            headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        return res.data;
+    },
+
+    logExport: async ({ type, format, period }) => {
+        const res = await axios.post(
+            `${API}/reports/exports`,
+            { type, format, period },
+            { headers: { Authorization: `Bearer ${getToken()}` } },
+        );
+        return res.data;
+    },
 };
 
 export default reportsService;

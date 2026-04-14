@@ -448,6 +448,58 @@ async function getTodayWalkIn(req, res) {
     }
 }
 
+async function getWalkInReprint(req, res) {
+    const rawId = String(req.params.id || "").trim();
+    const digits = rawId.replace(/\D/g, "");
+    const certificateId = Number.parseInt(digits, 10);
+
+    if (!Number.isFinite(certificateId) || certificateId <= 0) {
+        return res.status(400).json({ message: "Invalid walk-in ID" });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT
+                ic.certificate_id,
+                ic.doc_id,
+                ic.cert_type,
+                ic.resident_name,
+                ic.address,
+                ic.purpose,
+                ic.issued_at,
+                COALESCE(a.full_name, a.username, 'Staff') AS issued_by_name
+             FROM issued_certificates ic
+             LEFT JOIN admin_accounts a
+               ON a.admin_id = ic.issued_by
+             WHERE ic.certificate_id = $1
+               AND (ic.source = 'walkin' OR ic.request_id IS NULL)
+             LIMIT 1`,
+            [certificateId],
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Walk-in record not found" });
+        }
+
+        const row = result.rows[0];
+        return res.json({
+            data: {
+                id: `#WI-${String(row.certificate_id).padStart(3, "0")}`,
+                docId: row.doc_id,
+                type: row.cert_type,
+                name: row.resident_name,
+                address: row.address || "",
+                purpose: row.purpose || "",
+                issuedBy: row.issued_by_name,
+                issuedAt: row.issued_at,
+            },
+        });
+    } catch (err) {
+        console.error("getWalkInReprint error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 async function getResidentStats(req, res) {
     try {
         const result = await pool.query(
@@ -616,6 +668,103 @@ async function getResidentById(req, res) {
     }
 }
 
+async function scanResidentQr(req, res) {
+    const residentCode = String(req.body?.resident_id || "").trim();
+    if (!residentCode) {
+        return res.status(400).json({ message: "resident_id is required" });
+    }
+
+    const normalized = residentCode.replace(/^#/, "").toUpperCase();
+    const match = normalized.match(/^RES-(\d+)$/);
+    const parsedResidentId = match
+        ? Number.parseInt(match[1], 10)
+        : Number.parseInt(normalized, 10);
+
+    if (!Number.isFinite(parsedResidentId) || parsedResidentId <= 0) {
+        return res.status(400).json({
+            message: "Invalid resident_id format. Use RES-XXXX or numeric ID",
+        });
+    }
+
+    try {
+        const residentResult = await pool.query(
+            `SELECT
+                resident_id,
+                full_name,
+                COALESCE(address_house, '') AS address_house,
+                COALESCE(address_street, '') AS address_street
+             FROM residents
+             WHERE resident_id = $1
+             LIMIT 1`,
+            [parsedResidentId],
+        );
+
+        if (residentResult.rows.length === 0) {
+            return res.status(404).json({ message: "Resident not found" });
+        }
+
+        const residentRow = residentResult.rows[0];
+        const residentAddress = [residentRow.address_house, residentRow.address_street]
+            .filter(Boolean)
+            .join(", ");
+
+        const requestResult = await pool.query(
+            `SELECT
+                request_id,
+                cert_type,
+                status,
+                purpose,
+                requested_at,
+                COALESCE(ct.has_fee, false) AS has_fee
+             FROM requests r
+             LEFT JOIN certificate_templates ct
+               ON ct.name = r.cert_type
+             WHERE r.resident_id = $1
+             ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC
+             LIMIT 1`,
+            [parsedResidentId],
+        );
+
+        const latestRow = requestResult.rows[0];
+        const latestRequest = latestRow
+            ? {
+                  request_id: `REQ-${String(latestRow.request_id).padStart(4, "0")}`,
+                  cert_type: latestRow.cert_type,
+                  status:
+                      latestRow.status === "approved" || latestRow.status === "ready"
+                          ? "processing"
+                          : latestRow.status,
+                  purpose: latestRow.purpose || "Not specified",
+                  requested_at: latestRow.requested_at,
+                  has_fee: Boolean(latestRow.has_fee),
+              }
+            : null;
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "qrscan",
+            targetTable: "residents",
+            targetId: parsedResidentId,
+            description: `Scanned resident QR for RES-${String(parsedResidentId).padStart(4, "0")}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({
+            resident: {
+                resident_id: `RES-${String(residentRow.resident_id).padStart(4, "0")}`,
+                full_name: residentRow.full_name,
+                address: residentAddress || "Address not available",
+            },
+            latestRequest,
+        });
+    } catch (err) {
+        console.error("scanResidentQr error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 async function getResidentRequests(req, res) {
     const residentId = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(residentId) || residentId <= 0) {
@@ -639,6 +788,110 @@ async function getResidentRequests(req, res) {
         return res.json({ data: result.rows });
     } catch (err) {
         console.error("getResidentRequests error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+async function resetResidentPassword(req, res) {
+    if (!ensureAdminOrSuperadmin(req, res)) return;
+
+    const residentId = Number.parseInt(req.params.id, 10);
+    const newPassword = String(req.body?.new_password || "");
+
+    if (!Number.isFinite(residentId) || residentId <= 0) {
+        return res.status(400).json({ message: "Invalid resident ID" });
+    }
+    if (!newPassword || newPassword.length < 8) {
+        return res
+            .status(400)
+            .json({ message: "New password must be at least 8 characters" });
+    }
+
+    try {
+        const hash = await bcrypt.hash(newPassword, 10);
+        const result = await pool.query(
+            `UPDATE residents
+             SET password_hash = $2
+             WHERE resident_id = $1
+             RETURNING resident_id, full_name`,
+            [residentId, hash],
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Resident not found" });
+        }
+
+        const updated = result.rows[0];
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "resident_password_reset",
+            targetTable: "residents",
+            targetId: updated.resident_id,
+            description: `Reset password for resident ${updated.full_name}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({ message: "Resident password reset successfully" });
+    } catch (err) {
+        console.error("resetResidentPassword error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+async function updateResidentStatus(req, res) {
+    if (!ensureAdminOrSuperadmin(req, res)) return;
+
+    const residentId = Number.parseInt(req.params.id, 10);
+    const nextStatus = String(req.body?.status || "")
+        .trim()
+        .toLowerCase();
+
+    if (!Number.isFinite(residentId) || residentId <= 0) {
+        return res.status(400).json({ message: "Invalid resident ID" });
+    }
+    if (nextStatus !== "active" && nextStatus !== "inactive") {
+        return res
+            .status(400)
+            .json({ message: "Status must be either active or inactive" });
+    }
+
+    try {
+        const result = await pool.query(
+            `UPDATE residents
+             SET status = $2
+             WHERE resident_id = $1
+             RETURNING resident_id, full_name, status`,
+            [residentId, nextStatus],
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "Resident not found" });
+        }
+
+        const updated = result.rows[0];
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "resident_status_update",
+            targetTable: "residents",
+            targetId: updated.resident_id,
+            description: `Updated resident status to ${updated.status} for ${updated.full_name}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({
+            message: "Resident status updated successfully",
+            resident: {
+                resident_id: updated.resident_id,
+                full_name: updated.full_name,
+                status: updated.status,
+            },
+        });
+    } catch (err) {
+        console.error("updateResidentStatus error:", err);
         return res.status(500).json({ message: "Server error" });
     }
 }
@@ -1421,10 +1674,14 @@ module.exports = {
     getCertificateTemplates,
     issueWalkIn,
     getTodayWalkIn,
+    getWalkInReprint,
     getResidentStats,
     getResidents,
     getResidentById,
+    scanResidentQr,
     getResidentRequests,
+    resetResidentPassword,
+    updateResidentStatus,
     getReportsOverview,
     getAuditStats,
     getAuditLogs,

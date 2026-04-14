@@ -2,8 +2,14 @@
 const express = require("express");
 const router = express.Router();
 const { adminAuth } = require("../middleware/authMiddleware");
-const { getOverview } = require("../controllers/reportsController");
+const {
+	getOverview,
+	getRecentExports,
+	logExport,
+} = require("../controllers/reportsController");
 
 router.get("/overview", adminAuth, getOverview);
+router.get("/exports", adminAuth, getRecentExports);
+router.post("/exports", adminAuth, logExport);
 
 module.exports = router;

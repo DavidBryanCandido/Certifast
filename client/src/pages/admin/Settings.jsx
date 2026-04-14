@@ -527,42 +527,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         .trim()
         .toLowerCase();
     const isSuperAdmin = role === "admin" || role === "superadmin";
-    if (!isSuperAdmin) {
-        return (
-            <div
-                style={{
-                    minHeight: "100vh",
-                    background: "#f8f6f1",
-                    padding: "32px",
-                }}
-            >
-                <div
-                    style={{
-                        background: "#fff",
-                        border: "1px solid #e4dfd4",
-                        borderRadius: 6,
-                        padding: 20,
-                        maxWidth: 720,
-                        margin: "0 auto",
-                    }}
-                >
-                    <h2
-                        style={{
-                            margin: 0,
-                            fontFamily: "'Playfair Display',serif",
-                            fontSize: 20,
-                            color: "#0e2554",
-                        }}
-                    >
-                        Restricted Access
-                    </h2>
-                    <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
-                        This section is restricted to Superadmin accounts only.
-                    </p>
-                </div>
-            </div>
-        );
-    }
 
     // layout
     const [width, setWidth] = useState(window.innerWidth);
@@ -635,6 +599,43 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     };
 
     // cert template editor
+
+    if (!isSuperAdmin) {
+        return (
+            <div
+                style={{
+                    minHeight: "100vh",
+                    background: "#f8f6f1",
+                    padding: "32px",
+                }}
+            >
+                <div
+                    style={{
+                        background: "#fff",
+                        border: "1px solid #e4dfd4",
+                        borderRadius: 6,
+                        padding: 20,
+                        maxWidth: 720,
+                        margin: "0 auto",
+                    }}
+                >
+                    <h2
+                        style={{
+                            margin: 0,
+                            fontFamily: "'Playfair Display',serif",
+                            fontSize: 20,
+                            color: "#0e2554",
+                        }}
+                    >
+                        Restricted Access
+                    </h2>
+                    <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
+                        This section is restricted to Superadmin accounts only.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div

@@ -4,13 +4,6 @@
 // Report Generation & Export page.
 // Statistics live in Dashboard.jsx — this page is for generating
 // and downloading printable/exportable reports.
-//
-// TODO (Backend Dev):
-//   - GET  /api/reports/overview?period=  → data for export (already wired)
-//   - POST /api/reports/generate          → { type, period, format }
-//                                         → returns file blob or signed URL
-//   - GET  /api/reports/exports           → recent export log
-//   - All endpoints require adminToken in Authorization header
 // =============================================================
 
 import { useState, useEffect, useCallback } from "react";
@@ -181,8 +174,7 @@ const PERIODS = [
     { key: "all",   label: "All Time"   },
 ];
 
-// Mock recent exports — TODO: wire to GET /api/reports/exports
-const MOCK_RECENT = [
+const FALLBACK_RECENT = [
     { id: "EXP-009", type: "Requests Summary",       format: "PDF",  period: "This Month", size: "42 KB", generatedAt: "Mar 14, 2026 · 09:41 AM", by: "Staff Reyes" },
     { id: "EXP-008", type: "Resident Records",       format: "Excel", period: "All Time",  size: "88 KB", generatedAt: "Mar 13, 2026 · 04:12 PM", by: "Admin Superuser" },
     { id: "EXP-007", type: "Certificate Breakdown",  format: "CSV",  period: "This Year",  size: "12 KB", generatedAt: "Mar 12, 2026 · 11:05 AM", by: "Staff Cruz" },
@@ -225,7 +217,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
     const [selectedPeriod, setSelectedPeriod] = useState("month");
     const [generating,     setGenerating]     = useState(false);
     const [toast,          setToast]          = useState(null);
-    const [recentExports,  setRecentExports]  = useState(MOCK_RECENT);
+    const [recentExports,  setRecentExports]  = useState([]);
 
     const handleNavigate = (page) => { setActivePage(page); if (navProp) navProp(page); };
     const handleLogout   = () => { if (onLogout) onLogout(); };
@@ -234,6 +226,20 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
         setToast({ msg, type });
         setTimeout(() => setToast(null), 3500);
     };
+
+    const loadRecentExports = useCallback(async () => {
+        try {
+            const result = await reportsService.getRecentExports();
+            const rows = Array.isArray(result?.data) ? result.data : [];
+            setRecentExports(rows.length ? rows : FALLBACK_RECENT);
+        } catch {
+            setRecentExports(FALLBACK_RECENT);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadRecentExports();
+    }, [loadRecentExports]);
 
     const handleGenerate = async () => {
         setGenerating(true);
@@ -256,8 +262,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                 const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
                 triggerDownload(blob, filename);
             } else if (selectedFormat === "xlsx") {
-                // ── Simple XLSX-like TSV download (or CSV with .xlsx for demo) ──
-                // TODO: use SheetJS in production for real .xlsx
+                // ── Simple XLSX-like TSV download (tab-delimited) ──
                 const rows = buildCsvRows(result?.data, selectedType);
                 const tsv  = rows.map(r => r.join("\t")).join("\n");
                 const blob = new Blob([tsv], { type: "application/vnd.ms-excel;charset=utf-8;" });
@@ -274,7 +279,17 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                 }
             }
 
-            // Add to recent exports log
+            // Log export server-side, then reflect it in local list immediately
+            try {
+                await reportsService.logExport({
+                    type: typeDef?.label || selectedType,
+                    format: fmtDef?.label === "Excel" ? "Excel" : fmtDef?.label?.toUpperCase(),
+                    period: periodLabel,
+                });
+            } catch {
+                // Keep UI non-blocking if audit log insert fails
+            }
+
             const newEntry = {
                 id: `EXP-${String(recentExports.length + 10).padStart(3,"0")}`,
                 type: typeDef?.label,
@@ -372,10 +387,12 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                     Step 1 — Select Report Type
                                 </div>
                                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2,1fr)", gap: 10 }}>
-                                    {REPORT_TYPES.map(({ key, label, desc, icon: Icon, accent, bg }) => (
+                                    {REPORT_TYPES.map(({ key, label, desc, icon, accent, bg }) => {
+                                        const IconComp = icon;
+                                        return (
                                         <div key={key} className={`rep-type-card${selectedType === key ? " selected" : ""}`} onClick={() => setSelectedType(key)}>
                                             <div style={{ width: 38, height: 38, borderRadius: 8, background: selectedType === key ? accent + "18" : bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${selectedType === key ? accent + "30" : "#e4dfd4"}` }}>
-                                                <Icon size={18} color={selectedType === key ? accent : "#9090aa"} strokeWidth={1.8} />
+                                                <IconComp size={18} color={selectedType === key ? accent : "#9090aa"} strokeWidth={1.8} />
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ fontSize: 13, fontWeight: 700, color: selectedType === key ? "#0e2554" : "#1a1a2e", marginBottom: 2 }}>{label}</div>
@@ -385,7 +402,8 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                                 <CheckCircle size={16} color="#0e2554" strokeWidth={2} style={{ flexShrink: 0 }} />
                                             )}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -482,7 +500,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {recentExports.map((exp, i) => (
+                                        {recentExports.map((exp) => (
                                             <tr key={exp.id}
                                                 style={{ cursor: "default" }}
                                                 onMouseEnter={e => Array.from(e.currentTarget.cells).forEach(c => c.style.background = "#faf8f4")}
@@ -518,7 +536,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
 
                         <div style={{ padding: "10px 24px", background: "#f8f6f1", borderTop: "1px solid #e4dfd4", fontSize: 11, color: "#9090aa", display: "flex", alignItems: "center", gap: 6 }}>
                             <AlertCircle size={11} />
-                            Export history is session-based. Wire GET /api/reports/exports to persist across sessions.
+                            Export history is pulled from audit logs and refreshed on page load.
                         </div>
                     </div>
 

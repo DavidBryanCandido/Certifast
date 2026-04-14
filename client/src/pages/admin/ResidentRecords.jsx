@@ -1,17 +1,8 @@
 // =============================================================
 // FILE: client/src/pages/admin/ResidentRecords.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/residents?search=&status=&sort=&page=&limit=
-//     → { residents: [...], total, page, totalPages }
-//   - GET /api/residents/:id → full resident profile for drawer
-//   - GET /api/residents/:id/requests → request history
-//   - GET /api/residents/stats → { total, active, newThisMonth, totalRequests }
-//   - All endpoints require adminToken in Authorization header
-// =============================================================
 
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     FilePlus,
@@ -35,9 +26,6 @@ import {
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
 import residentRecordsService from "../../services/residentRecordsService";
-
-// TODO: import { useAdminAuth } from "../../context/AdminAuthContext";
-// TODO: import { getResidents, getResidentById } from "../../services/residentService";
 
 // =============================================================
 // useWindowSize
@@ -191,177 +179,6 @@ if (!document.head.querySelector("[data-cf-rr]")) {
     document.head.appendChild(s);
 }
 
-
-
-// =============================================================
-// Mock data
-// TODO: Replace with GET /api/residents and GET /api/residents/stats
-// =============================================================
-const MOCK_RESIDENTS = [
-    {
-        id: "#RES-0042",
-        name: "Maria Reyes Santos",
-        addr: "12 Rizal Street, East Tapinac",
-        contact: "09171234567",
-        date: "Jan 5, 2025",
-        requests: 7,
-        status: "Active",
-        dob: "June 14, 1985",
-        civil: "Married",
-        nationality: "Filipino",
-        email: "maria.santos@email.com",
-        qr: "QR-ET-2025-0042",
-    },
-    {
-        id: "#RES-0081",
-        name: "Jose Dela Cruz Jr.",
-        addr: "45 Magsaysay Ave, East Tapinac",
-        contact: "09281234567",
-        date: "Feb 12, 2025",
-        requests: 4,
-        status: "Active",
-        dob: "March 3, 1990",
-        civil: "Single",
-        nationality: "Filipino",
-        email: "jdc.jr@email.com",
-        qr: "QR-ET-2025-0081",
-    },
-    {
-        id: "#RES-0113",
-        name: "Ana Liza Mendoza",
-        addr: "8 Aguinaldo St., East Tapinac",
-        contact: "09351234567",
-        date: "Mar 1, 2025",
-        requests: 2,
-        status: "Active",
-        dob: "Sept 22, 1998",
-        civil: "Single",
-        nationality: "Filipino",
-        email: "ana.mendoza@email.com",
-        qr: "QR-ET-2025-0113",
-    },
-    {
-        id: "#RES-0055",
-        name: "Roberto Villanueva",
-        addr: "99 Burgos Ext., East Tapinac",
-        contact: "09191234567",
-        date: "Jan 18, 2025",
-        requests: 9,
-        status: "Active",
-        dob: "July 7, 1978",
-        civil: "Married",
-        nationality: "Filipino",
-        email: "rob.villa@email.com",
-        qr: "QR-ET-2025-0055",
-    },
-    {
-        id: "#RES-0204",
-        name: "Carla Mae Bautista",
-        addr: "3 Luna Street, East Tapinac",
-        contact: "09451234567",
-        date: "Apr 20, 2025",
-        requests: 1,
-        status: "Active",
-        dob: "Nov 30, 2001",
-        civil: "Single",
-        nationality: "Filipino",
-        email: "carla.mb@email.com",
-        qr: "QR-ET-2025-0204",
-    },
-    {
-        id: "#RES-0017",
-        name: "Fernando Ocampo III",
-        addr: "22 Mabini Street, East Tapinac",
-        contact: "09261234567",
-        date: "Dec 10, 2024",
-        requests: 12,
-        status: "Active",
-        dob: "Feb 14, 1972",
-        civil: "Widowed",
-        nationality: "Filipino",
-        email: "fern.ocampo@email.com",
-        qr: "QR-ET-2024-0017",
-    },
-    {
-        id: "#RES-0330",
-        name: "Liza Gomez Aquino",
-        addr: "67 Del Pilar St., East Tapinac",
-        contact: "09111234567",
-        date: "Jun 5, 2025",
-        requests: 3,
-        status: "Active",
-        dob: "Aug 19, 1995",
-        civil: "Married",
-        nationality: "Filipino",
-        email: "liza.aquino@email.com",
-        qr: "QR-ET-2025-0330",
-    },
-    {
-        id: "#RES-0009",
-        name: "Danilo Ramos Pascual",
-        addr: "101 Rizal Ave., East Tapinac",
-        contact: "09321234567",
-        date: "Nov 3, 2024",
-        requests: 5,
-        status: "Inactive",
-        dob: "Jan 1, 1968",
-        civil: "Separated",
-        nationality: "Filipino",
-        email: "danilo.rp@email.com",
-        qr: "QR-ET-2024-0009",
-    },
-    {
-        id: "#RES-0412",
-        name: "Sheila Marie Torres",
-        addr: "15 Quezon Blvd., East Tapinac",
-        contact: "09211234567",
-        date: "Jul 14, 2025",
-        requests: 2,
-        status: "Active",
-        dob: "May 25, 2000",
-        civil: "Single",
-        nationality: "Filipino",
-        email: "sheila.torres@email.com",
-        qr: "QR-ET-2025-0412",
-    },
-    {
-        id: "#RES-0188",
-        name: "Benjamin Cruz Lopez",
-        addr: "54 Gallagher Street, East Tapinac",
-        contact: "09481234567",
-        date: "Mar 22, 2025",
-        requests: 6,
-        status: "Active",
-        dob: "Oct 10, 1983",
-        civil: "Married",
-        nationality: "Filipino",
-        email: "ben.cl@email.com",
-        qr: "QR-ET-2025-0188",
-    },
-];
-
-const MOCK_HISTORY = [
-    { cert: "Barangay Clearance", date: "Mar 10, 2026", status: "released" },
-    {
-        cert: "Certificate of Residency",
-        date: "Jan 22, 2026",
-        status: "released",
-    },
-    { cert: "Good Moral Certificate", date: "Nov 3, 2025", status: "released" },
-    {
-        cert: "Certificate of Indigency",
-        date: "Sep 14, 2025",
-        status: "released",
-    },
-    { cert: "Barangay Clearance", date: "Jul 8, 2025", status: "released" },
-    { cert: "Business Permit", date: "Apr 2, 2025", status: "rejected" },
-    {
-        cert: "Certificate of Residency",
-        date: "Jan 5, 2025",
-        status: "released",
-    },
-];
-
 const HIST_BADGE = {
     released: { bg: "#e8f5ee", color: "#1a7a4a", label: "Released" },
     rejected: { bg: "#fdecea", color: "#b02020", label: "Rejected" },
@@ -424,7 +241,6 @@ function ResidentDrawer({
     const [activeTab, setActiveTab] = useState("profile");
 
     useEffect(() => {
-        setActiveTab("profile");
         document.body.style.overflow = "hidden";
         const fn = (e) => {
             if (e.key === "Escape") onClose();
@@ -811,7 +627,6 @@ export default function ResidentRecords({
     onLogout,
     onNavigate: navProp,
 }) {
-    const navigate = useNavigate();
     const width = useWindowSize();
     const isMobile = width < 768;
     const isTablet = width >= 768 && width < 1024;
@@ -1086,6 +901,7 @@ export default function ResidentRecords({
             )}
             {selectedResident && (
                 <ResidentDrawer
+                    key={selectedResident?.id || "resident-drawer"}
                     resident={selectedResident}
                     onClose={() => setSelectedResident(null)}
                     isMobile={isMobile}
@@ -1784,7 +1600,7 @@ export default function ResidentRecords({
 // =============================================================
 // Styles
 // =============================================================
-const sd = {
+const _SD = {
     sidebar: {
         minHeight: "100vh",
         background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",

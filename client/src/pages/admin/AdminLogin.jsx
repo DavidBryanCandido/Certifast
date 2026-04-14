@@ -1,19 +1,6 @@
 // =============================================================
 // FILE: client/src/pages/admin/AdminLogin.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - Connect handleSubmit to POST /api/auth/admin/login
-//   - Expected request body: { username, password }
-//     (field is "Username" — not email)
-//   - Expected response: { token, admin: { id, name, role } }
-//   - Store JWT token in localStorage as "adminToken"
-//   - Store admin info in AdminAuthContext
-//   - On success: navigate to /admin/dashboard
-//   - On failure: show error message from response (e.g. "Invalid credentials")
-//   - Role check: if role === "superadmin" → full access
-//                 if role === "admin" → restricted (no ManageAccounts, Settings)
-//   - All login activity should be logged server-side (activity_logs table)
-// =============================================================
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -28,12 +15,7 @@ import {
     KeyRound,
 } from "lucide-react";
 import authService from "../../services/authService";
-
-// TODO: Import your auth context when ready
-// import { useAdminAuth } from "../../context/AdminAuthContext";
-
-// TODO: Import your auth service when ready
-// import { adminLogin } from "../../services/authService";
+import { useAdminAuth } from "../../context/AdminAuthContext";
 
 // =============================================================
 // useWindowSize hook
@@ -230,7 +212,6 @@ function ForgotPasswordModal({ onClose }) {
                 <div style={m.body}>
                     <p style={m.bodyText}>
                         To request a password reset, send an email to{" "}
-                        {/* TODO: Replace with the actual barangay IT/admin email address */}
                         <a
                             href="mailto:it-admin@easttapinac.gov.ph"
                             style={m.emailLink}
@@ -328,9 +309,7 @@ export default function AdminLogin() {
     const navigate = useNavigate();
     const width = useWindowSize();
     const isMobile = width < 520;
-
-    // TODO: Uncomment when AdminAuthContext is ready
-    // const { login } = useAdminAuth();
+    const { login } = useAdminAuth();
 
     const [formData, setFormData] = useState({ username: "", password: "" });
     const [showPassword, setShowPassword] = useState(false);
@@ -360,22 +339,19 @@ export default function AdminLogin() {
             });
 
             if (response?.token) {
+                const role = String(response?.admin?.role || "").toLowerCase();
+                if (role !== "admin" && role !== "superadmin") {
+                    throw new Error("This account does not have admin portal access.");
+                }
+
+                login({
+                    token: response.token,
+                    admin: response.admin || null,
+                });
                 localStorage.setItem("certifast_admin_token", response.token);
-                localStorage.setItem(
-                    "certifast_admin_auth",
-                    JSON.stringify({
-                        token: response.token,
-                        admin: response.admin || response.data || null,
-                    }),
-                );
-                console.log(
-                    "[AdminLogin] localStorage.certifast_admin_auth",
-                    localStorage.getItem("certifast_admin_auth"),
-                );
-                console.log(
-                    "[AdminLogin] localStorage.certifast_admin_token",
-                    localStorage.getItem("certifast_admin_token"),
-                );
+                localStorage.setItem("adminToken", response.token);
+            } else {
+                throw new Error("Login succeeded but token was not returned.");
             }
 
             navigate("/admin/dashboard");

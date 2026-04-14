@@ -3,7 +3,6 @@
 // =============================================================
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     User, Edit3, Check, X, AlertCircle,
 } from "lucide-react";
@@ -77,7 +76,6 @@ function calcAge(dob) {
 }
 
 export default function ResidentProfile({ resident, onLogout }) {
-    const navigate = useNavigate();
     const [width, setWidth]     = useState(window.innerWidth);
     const [profile, setProfile] = useState(null);
     const [editing, setEditing] = useState(false);

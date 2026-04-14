@@ -27,6 +27,14 @@ const walkInService = {
         const res = await axios.get(`${API}/admin/walkin/today`, getAdminHeaders());
         return res.data;
     },
+
+    getReprintData: async (walkInId) => {
+        const res = await axios.get(
+            `${API}/admin/walkin/${encodeURIComponent(String(walkInId))}/reprint`,
+            getAdminHeaders(),
+        );
+        return res.data;
+    },
 };
 
 export default walkInService;

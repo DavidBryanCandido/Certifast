@@ -1,13 +1,6 @@
 // =============================================================
 // FILE: client/src/pages/resident/SubmitRequest.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/certificates/templates → ALL_CERTS list
-//   - POST /api/resident/requests
-//     body: { certType, purpose, extraFields, notes, source: 'resident', status: 'pending' }
-//     response: { request_id, status, requested_at }
-//   - All endpoints require residentToken in Authorization header
-// =============================================================
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -419,12 +412,6 @@ export default function SubmitRequest({ resident, onLogout }) {
     }, [onLogout]);
 
     const isMobile = width < 768;
-    const name =
-        profile?.full_name ||
-        resident?.full_name ||
-        resident?.name ||
-        "Resident";
-    const firstName = name.split(" ")[0];
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra = selectedCert
         ? CERT_EXTRA_FIELDS[selectedCert.name] || []

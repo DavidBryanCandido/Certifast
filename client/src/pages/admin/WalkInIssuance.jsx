@@ -1,17 +1,8 @@
 // =============================================================
 // FILE: client/src/pages/admin/WalkInIssuance.jsx
 // =============================================================
-// TODO (Backend Dev):
-//   - GET /api/certificates/templates → ALL_CERTS list (from certificate_templates table)
-//   - POST /api/walkin/issue → body: { certType, residentName, address, purpose, issuedBy }
-//     Response: { id, docId, issuedAt }
-//   - GET /api/walkin/today → today's walk-in log entries
-//   - GET /api/walkin/:id/reprint → returns cert data for reprinting
-//   - All endpoints require adminToken in Authorization header
-// =============================================================
 
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     FilePlus,
@@ -37,9 +28,6 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
-
-// TODO: import { useAdminAuth } from "../../context/AdminAuthContext";
-// TODO: import { getCertTemplates, issueWalkIn, getTodayLog } from "../../services/walkInService";
 
 // =============================================================
 // useWindowSize
@@ -167,8 +155,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
 }
 
 // =============================================================
-// Certificate registry
-// TODO: Replace with GET /api/certificates/templates
+// Certificate registry fallback
 // =============================================================
 const ALL_CERTS = [
     {
@@ -265,35 +252,14 @@ const SHORT_NAMES = {
     "Certificate of Live Birth (Endorsement)": "Birth Endorsement",
 };
 const shortName = (name) => SHORT_NAMES[name] || name;
-
-// Mock today's log
-// TODO: Replace with GET /api/walkin/today
-const MOCK_LOG = [
-    {
-        id: "#WI-034",
-        name: "Felicidad Ramos",
-        type: "Barangay Clearance",
-        purpose: "Employment",
-        issuedBy: "Staff Reyes",
-        time: "10:14 AM",
-    },
-    {
-        id: "#WI-033",
-        name: "Ernesto Villanueva",
-        type: "Cert. of Indigency",
-        purpose: "Medical Assistance",
-        issuedBy: "Staff Cruz",
-        time: "9:02 AM",
-    },
-    {
-        id: "#WI-032",
-        name: "Natividad Santos",
-        type: "Cert. of Residency",
-        purpose: "Senior Citizen ID",
-        issuedBy: "Staff Reyes",
-        time: "8:30 AM",
-    },
-];
+const initials = (name = "") =>
+    name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0].toUpperCase())
+        .join("");
 
 // =============================================================
 // Sidebar
@@ -342,25 +308,25 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
             </div>
             <div style={sd.goldBar} />
             {!collapsed && <div style={sd.sectionLabel}>Main Menu</div>}
-            {navItems.map(({ key, label, Icon, badge }) =>
+            {navItems.map((item) =>
                 collapsed ? (
                     <button
-                        key={key}
-                        className={`wi-nav-item-icon${activePage === key ? " active" : ""}`}
-                        onClick={() => onNavigate(key)}
-                        title={label}
+                        key={item.key}
+                        className={`wi-nav-item-icon${activePage === item.key ? " active" : ""}`}
+                        onClick={() => onNavigate(item.key)}
+                        title={item.label}
                     >
-                        <Icon size={18} opacity={0.7} />
+                        <item.Icon size={18} opacity={0.7} />
                     </button>
                 ) : (
                     <button
-                        key={key}
-                        className={`wi-nav-item${activePage === key ? " active" : ""}`}
-                        onClick={() => onNavigate(key)}
+                        key={item.key}
+                        className={`wi-nav-item${activePage === item.key ? " active" : ""}`}
+                        onClick={() => onNavigate(item.key)}
                     >
-                        <Icon size={15} opacity={0.7} />
-                        {label}
-                        {badge && <span style={sd.navBadge}>{badge}</span>}
+                        <item.Icon size={15} opacity={0.7} />
+                        {item.label}
+                        {item.badge && <span style={sd.navBadge}>{item.badge}</span>}
                     </button>
                 ),
             )}
@@ -371,24 +337,24 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
                             Superadmin
                         </div>
                     )}
-                    {saItems.map(({ key, label, Icon }) =>
+                    {saItems.map((item) =>
                         collapsed ? (
                             <button
-                                key={key}
-                                className={`wi-nav-item-icon${activePage === key ? " active" : ""}`}
-                                onClick={() => onNavigate(key)}
-                                title={label}
+                                key={item.key}
+                                className={`wi-nav-item-icon${activePage === item.key ? " active" : ""}`}
+                                onClick={() => onNavigate(item.key)}
+                                title={item.label}
                             >
-                                <Icon size={18} opacity={0.7} />
+                                <item.Icon size={18} opacity={0.7} />
                             </button>
                         ) : (
                             <button
-                                key={key}
-                                className={`wi-nav-item${activePage === key ? " active" : ""}`}
-                                onClick={() => onNavigate(key)}
+                                key={item.key}
+                                className={`wi-nav-item${activePage === item.key ? " active" : ""}`}
+                                onClick={() => onNavigate(item.key)}
                             >
-                                <Icon size={15} opacity={0.7} />
-                                {label}
+                                <item.Icon size={15} opacity={0.7} />
+                                {item.label}
                                 <span style={sd.navBadgeSA}>SA</span>
                             </button>
                         ),
@@ -515,18 +481,18 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
                 </div>
                 <div style={sd.goldBar} />
                 <div style={sd.sectionLabel}>Main Menu</div>
-                {navItems.map(({ key, label, Icon, badge }) => (
+                {navItems.map((item) => (
                     <button
-                        key={key}
-                        className={`wi-nav-item${activePage === key ? " active" : ""}`}
+                        key={item.key}
+                        className={`wi-nav-item${activePage === item.key ? " active" : ""}`}
                         onClick={() => {
-                            onNavigate(key);
+                            onNavigate(item.key);
                             onClose();
                         }}
                     >
-                        <Icon size={15} opacity={0.7} />
-                        {label}
-                        {badge && <span style={sd.navBadge}>{badge}</span>}
+                        <item.Icon size={15} opacity={0.7} />
+                        {item.label}
+                        {item.badge && <span style={sd.navBadge}>{item.badge}</span>}
                     </button>
                 ))}
                 {isSuperAdmin && (
@@ -534,17 +500,17 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
                         <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
                             Superadmin
                         </div>
-                        {saItems.map(({ key, label, Icon }) => (
+                        {saItems.map((item) => (
                             <button
-                                key={key}
-                                className={`wi-nav-item${activePage === key ? " active" : ""}`}
+                                key={item.key}
+                                className={`wi-nav-item${activePage === item.key ? " active" : ""}`}
                                 onClick={() => {
-                                    onNavigate(key);
+                                    onNavigate(item.key);
                                     onClose();
                                 }}
                             >
-                                <Icon size={15} opacity={0.7} />
-                                {label}
+                                <item.Icon size={15} opacity={0.7} />
+                                {item.label}
                                 <span style={sd.navBadgeSA}>SA</span>
                             </button>
                         ))}
@@ -1133,7 +1099,6 @@ function PrintPreviewModal({ cert, formData, docId, onClose, onConfirm }) {
                     >
                         ← Back to Edit
                     </button>
-                    {/* TODO: POST /api/walkin/issue then trigger window.print() */}
                     <button className="wi-print-btn" onClick={onConfirm}>
                         <Printer size={14} /> Confirm &amp; Print
                     </button>
@@ -1151,7 +1116,6 @@ export default function WalkInIssuance({
     onLogout,
     onNavigate: navProp,
 }) {
-    const navigate = useNavigate();
     const width = useWindowSize();
     const isMobile = width < 768;
     const isTablet = width >= 768 && width < 1024;
@@ -1221,7 +1185,7 @@ export default function WalkInIssuance({
                 }
                 setLoadError(err?.response?.data?.message || "Failed to load walk-in data.");
                 setCerts(ALL_CERTS);
-                setLog(MOCK_LOG);
+                setLog([]);
             } finally {
                 if (mounted) setLoadingData(false);
             }
@@ -1236,12 +1200,9 @@ export default function WalkInIssuance({
     const handleNavigate = (page) => {
         setActivePage(page);
         if (navProp) navProp(page);
-        // TODO: navigate(`/admin/${page}`) when all pages are built
-        console.log("Navigate to:", page);
     };
 
     const handleLogout = () => {
-        // TODO: localStorage.removeItem("adminToken"); logout();
         if (onLogout) onLogout();
     };
 
@@ -1327,6 +1288,8 @@ export default function WalkInIssuance({
                 `${result?.id || "#WI"} — ${shortName(selectedCert.name)} issued and logged.`,
             );
 
+            window.print();
+
             setSelectedCert(null);
             setFormData({
                 residentName: "", dateOfBirth: "", civilStatus: "Single",
@@ -1358,6 +1321,66 @@ export default function WalkInIssuance({
     );
 
     const nextDocId = `#WI-PREVIEW-${Date.now().toString().slice(-5)}`;
+
+    const handleReprint = async (entry) => {
+        try {
+            const result = await walkInService.getReprintData(entry.id);
+            const data = result?.data;
+            if (!data) throw new Error("Missing reprint data");
+
+            const issuedAt = data.issuedAt
+                ? new Date(data.issuedAt).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                  })
+                : "—";
+
+            const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${data.docId || data.id} Reprint</title>
+<style>
+body { font-family: 'Times New Roman', serif; padding: 28px; color: #1a1a2e; }
+h1 { margin: 0 0 4px; font-size: 22px; }
+p { margin: 4px 0; font-size: 14px; }
+.meta { margin-top: 18px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 12px; color: #555; }
+</style>
+</head>
+<body>
+<h1>${data.type}</h1>
+<p><strong>Name:</strong> ${data.name}</p>
+<p><strong>Address:</strong> ${data.address || "—"}</p>
+<p><strong>Purpose:</strong> ${data.purpose || "—"}</p>
+<p><strong>Document ID:</strong> ${data.docId || data.id}</p>
+<div class="meta">
+<p><strong>Issued By:</strong> ${data.issuedBy || "Staff"}</p>
+<p><strong>Issued At:</strong> ${issuedAt}</p>
+</div>
+</body>
+</html>`;
+
+            const win = window.open("", "_blank");
+            if (!win) {
+                showToast("Unable to open print window. Please allow pop-ups.");
+                return;
+            }
+
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 400);
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            showToast(err?.response?.data?.message || "Failed to load reprint data.");
+        }
+    };
 
     return (
         <div className="wi-root">
@@ -2049,8 +2072,7 @@ export default function WalkInIssuance({
                                                         </span>
                                                     </td>
                                                     <td style={p.td}>
-                                                        {/* TODO: GET /api/walkin/:id/reprint */}
-                                                        <button className="wi-action-btn">
+                                                        <button className="wi-action-btn" onClick={() => handleReprint(entry)}>
                                                             Reprint
                                                         </button>
                                                     </td>
@@ -2115,7 +2137,7 @@ export default function WalkInIssuance({
                                                         {entry.purpose}
                                                     </div>
                                                 </div>
-                                                <button className="wi-action-btn">
+                                                <button className="wi-action-btn" onClick={() => handleReprint(entry)}>
                                                     Reprint
                                                 </button>
                                             </div>

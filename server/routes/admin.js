@@ -11,10 +11,14 @@ const {
     getCertificateTemplates,
     issueWalkIn,
     getTodayWalkIn,
+    getWalkInReprint,
     getResidentStats,
     getResidents,
     getResidentById,
+    scanResidentQr,
     getResidentRequests,
+    resetResidentPassword,
+    updateResidentStatus,
     getReportsOverview,
     getAuditStats,
     getAuditLogs,
@@ -35,6 +39,9 @@ router.get("/residents/stats", adminAuth, getResidentStats);
 router.get("/residents", adminAuth, getResidents);
 router.get("/residents/:id/requests", adminAuth, getResidentRequests);
 router.get("/residents/:id", adminAuth, getResidentById);
+router.put("/residents/:id/password", adminAuth, resetResidentPassword);
+router.put("/residents/:id/status", adminAuth, updateResidentStatus);
+router.post("/scan-resident-qr", adminAuth, scanResidentQr);
 router.get("/reports/overview", adminAuth, getReportsOverview);
 router.get("/logs/stats", adminAuth, getAuditStats);
 router.get("/logs/:id", adminAuth, getAuditLogById);
@@ -52,5 +59,6 @@ router.post("/requests/:id/release", adminAuth, releaseRequest);
 router.get("/certificates/templates", adminAuth, getCertificateTemplates);
 router.post("/walkin/issue", adminAuth, issueWalkIn);
 router.get("/walkin/today", adminAuth, getTodayWalkIn);
+router.get("/walkin/:id/reprint", adminAuth, getWalkInReprint);
 
 module.exports = router;
