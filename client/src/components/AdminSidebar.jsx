@@ -146,6 +146,47 @@ function useAdminSidebarStyles() {
             background: rgba(255, 255, 255, 0.22);
             color: rgba(255, 255, 255, 1);
         }
+        .admin-modal-overlay,
+        .admin-mobile-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .admin-modal,
+        .admin-mobile-modal {
+            background: #fff;
+            border-radius: 10px;
+            padding: 28px 28px 24px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: adminModalPop 0.18s ease both;
+        }
+        .admin-modal-btn,
+        .admin-mobile-modal-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: 'Source Serif 4', serif;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.15s;
+        }
+        .admin-modal-btn:hover,
+        .admin-mobile-modal-btn:hover {
+            opacity: 0.85;
+        }
+        @keyframes adminModalPop {
+            from { opacity: 0; transform: scale(0.94); }
+            to { opacity: 1; transform: scale(1); }
+        }
         `;
         document.head.appendChild(style);
     }, []);
@@ -317,6 +358,7 @@ export function AdminSidebar({
     badgeCounts = {},
 }) {
     useAdminSidebarStyles();
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const width = useWindowSize();
     const logoSize = collapsed
         ? 48
@@ -456,13 +498,107 @@ export function AdminSidebar({
                         </div>
                         <button
                             className="admin-logout-btn cf-logout-btn mr-logout-btn rep-logout-btn lg-logout-btn wi-logout-btn"
-                            onClick={onLogout}
+                            onClick={() => setShowLogoutModal(true)}
                         >
                             <LogOut size={14} />
                         </button>
                     </>
                 )}
             </div>
+            {showLogoutModal && (
+                <div
+                    className="admin-modal-overlay"
+                    onClick={() => setShowLogoutModal(false)}
+                >
+                    <div
+                        className="admin-modal"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                                marginBottom: 16,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: "50%",
+                                    background: "#fff3e0",
+                                    border: "1.5px solid #f0b84a",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <LogOut
+                                    size={18}
+                                    color="#b86800"
+                                    strokeWidth={2}
+                                />
+                            </div>
+                            <div>
+                                <div
+                                    style={{
+                                        fontFamily: "'Playfair Display', serif",
+                                        fontSize: 16,
+                                        fontWeight: 700,
+                                        color: "#0e2554",
+                                    }}
+                                >
+                                    Log Out
+                                </div>
+                                <div
+                                    style={{
+                                        fontSize: 12,
+                                        color: "#9090aa",
+                                        marginTop: 2,
+                                    }}
+                                >
+                                    CertiFast · Admin Portal
+                                </div>
+                            </div>
+                        </div>
+                        <p
+                            style={{
+                                fontSize: 13.5,
+                                color: "#4a4a6a",
+                                lineHeight: 1.6,
+                                marginBottom: 22,
+                            }}
+                        >
+                            Are you sure you want to log out of your account?
+                        </p>
+                        <div style={{ display: "flex", gap: 10 }}>
+                            <button
+                                className="admin-modal-btn"
+                                style={{
+                                    background: "#f8f6f1",
+                                    color: "#4a4a6a",
+                                    border: "1px solid #e4dfd4",
+                                }}
+                                onClick={() => setShowLogoutModal(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="admin-modal-btn"
+                                style={{ background: "#0e2554", color: "#fff" }}
+                                onClick={() => {
+                                    setShowLogoutModal(false);
+                                    onLogout?.();
+                                }}
+                            >
+                                Yes, Log Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 }
@@ -476,6 +612,7 @@ export function AdminMobileSidebar({
     badgeCounts = {},
 }) {
     useAdminSidebarStyles();
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
     const width = useWindowSize();
     const logoSize = Math.min(100, Math.max(60, Math.round(width * 0.08)));
 
@@ -643,14 +780,111 @@ export function AdminMobileSidebar({
                     </div>
                     <button
                         className="admin-logout-btn cf-logout-btn mr-logout-btn rep-logout-btn lg-logout-btn wi-logout-btn"
-                        onClick={() => {
-                            onLogout();
-                            onClose();
-                        }}
+                        onClick={() => setShowLogoutModal(true)}
                     >
                         <LogOut size={14} />
                     </button>
                 </div>
+                {showLogoutModal && (
+                    <div
+                        className="admin-mobile-modal-overlay"
+                        onClick={() => setShowLogoutModal(false)}
+                    >
+                        <div
+                            className="admin-mobile-modal"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    marginBottom: 16,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: "50%",
+                                        background: "#fff3e0",
+                                        border: "1.5px solid #f0b84a",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    <LogOut
+                                        size={18}
+                                        color="#b86800"
+                                        strokeWidth={2}
+                                    />
+                                </div>
+                                <div>
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display', serif",
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                        }}
+                                    >
+                                        Log Out
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 12,
+                                            color: "#9090aa",
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        CertiFast · Admin Portal
+                                    </div>
+                                </div>
+                            </div>
+                            <p
+                                style={{
+                                    fontSize: 13.5,
+                                    color: "#4a4a6a",
+                                    lineHeight: 1.6,
+                                    marginBottom: 22,
+                                }}
+                            >
+                                Are you sure you want to log out of your
+                                account?
+                            </p>
+                            <div style={{ display: "flex", gap: 10 }}>
+                                <button
+                                    className="admin-mobile-modal-btn"
+                                    style={{
+                                        background: "#f8f6f1",
+                                        color: "#4a4a6a",
+                                        border: "1px solid #e4dfd4",
+                                    }}
+                                    onClick={() => setShowLogoutModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className="admin-mobile-modal-btn"
+                                    style={{
+                                        background: "#0e2554",
+                                        color: "#fff",
+                                    }}
+                                    onClick={() => {
+                                        setShowLogoutModal(false);
+                                        onLogout?.();
+                                        onClose();
+                                    }}
+                                >
+                                    Yes, Log Out
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </aside>
         </div>
     );
