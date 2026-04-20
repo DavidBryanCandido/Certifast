@@ -2,7 +2,7 @@
 // FILE: client/src/pages/admin/Dashboard.jsx
 // =============================================================
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
@@ -1335,6 +1335,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const [qrReleaseData, setQrReleaseData] = useState(null);
     const [qrReleaseLoading, setQrReleaseLoading] = useState(false);
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+    const statsSectionRef = useRef(null);
 
     const [statsData, setStatsData] = useState({
         totalRequests: 0,
@@ -1696,6 +1697,14 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         setActivePage(page);
         if (navProp) navProp(page);
     };
+    const handleScrollToStats = () => {
+        if (!statsSectionRef.current) return;
+        const targetTop =
+            statsSectionRef.current.getBoundingClientRect().top +
+            window.pageYOffset -
+            84;
+        window.scrollTo({ top: Math.max(targetTop, 0), behavior: "smooth" });
+    };
     const handleLogout = () => {
         if (onLogout) onLogout();
     };
@@ -1958,18 +1967,71 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                             >
                                                                 <div
                                                                     style={{
-                                                                        textAlign:
+                                                                        display:
+                                                                            "flex",
+                                                                        flexDirection:
+                                                                            "column",
+                                                                        alignItems:
                                                                             "center",
-                                                                        color: "#9090aa",
-                                                                        fontStyle:
-                                                                            "italic",
+                                                                        gap: 12,
                                                                         padding:
-                                                                            "16px 0",
+                                                                            "24px 0",
+                                                                        color: "#9090aa",
                                                                     }}
                                                                 >
-                                                                    No recent
-                                                                    requests
-                                                                    found.
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: 13,
+                                                                            fontWeight: 600,
+                                                                            color: "#1a1a2e",
+                                                                        }}
+                                                                    >
+                                                                        No
+                                                                        recent
+                                                                        requests
+                                                                        found.
+                                                                    </div>
+                                                                    <div
+                                                                        style={{
+                                                                            maxWidth: 420,
+                                                                            textAlign:
+                                                                                "center",
+                                                                            fontSize: 12,
+                                                                            lineHeight: 1.6,
+                                                                        }}
+                                                                    >
+                                                                        Certificate
+                                                                        activity
+                                                                        is still
+                                                                        being
+                                                                        collected.
+                                                                        Use the
+                                                                        dashboard
+                                                                        below
+                                                                        for
+                                                                        statistics,
+                                                                        charts,
+                                                                        and
+                                                                        exports.
+                                                                    </div>
+                                                                    <button
+                                                                        className="cf-action-btn"
+                                                                        style={{
+                                                                            borderColor:
+                                                                                "#0e2554",
+                                                                            color: "#0e2554",
+                                                                            background:
+                                                                                "#fff",
+                                                                        }}
+                                                                        onClick={() =>
+                                                                            handleNavigate(
+                                                                                "manageRequests",
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Manage
+                                                                        Requests
+                                                                    </button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -2129,14 +2191,54 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                             recentRequests.length === 0 && (
                                                 <div
                                                     style={{
-                                                        padding: "20px 16px",
-                                                        textAlign: "center",
+                                                        padding: "24px 16px",
+                                                        display: "flex",
+                                                        flexDirection: "column",
+                                                        alignItems: "center",
+                                                        gap: 10,
                                                         color: "#9090aa",
-                                                        fontStyle: "italic",
-                                                        fontSize: 12.5,
                                                     }}
                                                 >
-                                                    No recent requests found.
+                                                    <div
+                                                        style={{
+                                                            fontSize: 13,
+                                                            fontWeight: 700,
+                                                            color: "#1a1a2e",
+                                                        }}
+                                                    >
+                                                        No recent requests
+                                                        found.
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            textAlign: "center",
+                                                            maxWidth: 380,
+                                                            fontSize: 12,
+                                                            lineHeight: 1.6,
+                                                        }}
+                                                    >
+                                                        There are no recent
+                                                        requests to display yet.
+                                                        Scroll down to view
+                                                        statistics, charts, and
+                                                        export options.
+                                                    </div>
+                                                    <button
+                                                        className="cf-action-btn"
+                                                        style={{
+                                                            borderColor:
+                                                                "#0e2554",
+                                                            color: "#0e2554",
+                                                            background: "#fff",
+                                                        }}
+                                                        onClick={() =>
+                                                            handleNavigate(
+                                                                "manageRequests",
+                                                            )
+                                                        }
+                                                    >
+                                                        Manage Requests
+                                                    </button>
                                                 </div>
                                             )}
                                         {recentRequests.map((req) => {
@@ -2406,6 +2508,56 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                 </div>
                                             </div>
                                         </button>
+
+                                        <button
+                                            className="cf-qa-btn"
+                                            style={{
+                                                background:
+                                                    "linear-gradient(135deg,#eff4ff,#e9e9ff)",
+                                                border: "1px solid #c8d1f0",
+                                                borderRadius: 6,
+                                            }}
+                                            onClick={handleScrollToStats}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: 8,
+                                                    background: "#1a4a8a",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <BarChart2
+                                                    size={17}
+                                                    color="#fff"
+                                                    strokeWidth={2}
+                                                />
+                                            </div>
+                                            <div>
+                                                <div
+                                                    style={{
+                                                        fontSize: 13,
+                                                        fontWeight: 700,
+                                                        color: "#1a4a8a",
+                                                    }}
+                                                >
+                                                    Statistics & Reports
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        fontSize: 11,
+                                                        color: "#4a5f9a",
+                                                        marginTop: 1,
+                                                    }}
+                                                >
+                                                    View charts and export data
+                                                </div>
+                                            </div>
+                                        </button>
                                     </div>
                                 </div>
 
@@ -2624,7 +2776,14 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         {/* ══════════════════════════════════════════════════
                         STATISTICS & REPORTS SECTION
                     ══════════════════════════════════════════════════ */}
-                        <div style={{ marginTop: 32 }}>
+                        <div
+                            ref={statsSectionRef}
+                            style={{
+                                marginTop: 32,
+                                paddingTop: 32,
+                                borderTop: "1px solid #e4dfd4",
+                            }}
+                        >
                             {/* Section heading + period filter */}
                             <div
                                 style={{
@@ -3471,6 +3630,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                     border: "1px solid #e4dfd4",
                                     borderRadius: 8,
                                     overflow: "hidden",
+                                    marginTop: 28,
                                 }}
                             >
                                 <div
