@@ -5,7 +5,6 @@ import Dashboard from "./pages/admin/Dashboard";
 import WalkInIssuance from "./pages/admin/WalkInIssuance";
 import ManageRequests from "./pages/admin/ManageRequests";
 import ResidentRecords from "./pages/admin/ResidentRecords";
-import Reports from "./pages/admin/Reports";
 import LogsAuditTrail from "./pages/admin/LogsAuditTrail";
 import ManageAccounts from "./pages/admin/ManageAccounts";
 import Settings from "./pages/admin/Settings";
@@ -17,14 +16,12 @@ import SubmitRequest from "./pages/resident/SubmitRequest";
 import MyRequests from "./pages/resident/MyRequests";
 import MyQRCode from "./pages/resident/MyQRCode";
 import ResidentProfile from "./pages/resident/ResidentProfile";
-import ResidentNotifications from "./pages/resident/ResidentNotifications";
 
 const ADMIN_KEY_TO_ROUTE = {
     dashboard: "/admin/dashboard",
     walkIn: "/admin/walkin-issuance",
     manageRequests: "/admin/manage-requests",
     residentRecords: "/admin/resident-records",
-    reports: "/admin/reports",
     logs: "/admin/logs-audit-trail",
     manageAccounts: "/admin/manage-accounts",
     settings: "/admin/settings",
@@ -40,15 +37,15 @@ function readStoredAuth(storageKey) {
 }
 
 function useSessionData() {
-    const adminState = readStoredAuth("certifast_admin_auth");
-    const residentState = readStoredAuth("certifast_resident_auth");
-    console.log("[useSessionData] certifast_admin_auth", adminState);
-    console.log("[useSessionData] certifast_resident_auth", residentState);
+    return useMemo(() => {
+        const adminState = readStoredAuth("certifast_admin_auth");
+        const residentState = readStoredAuth("certifast_resident_auth");
 
-    return {
-        admin: adminState?.admin || null,
-        resident: residentState?.resident || null,
-    };
+        return {
+            admin: adminState?.admin || null,
+            resident: residentState?.resident || null,
+        };
+    }, []);
 }
 
 const ADMIN_ONLY_ROUTES = [
@@ -61,13 +58,8 @@ function AdminPage({ PageComponent, adminOnly = false }) {
     const ResolvedPage = PageComponent;
     const navigate = useNavigate();
     const { admin } = useSessionData();
-    console.log("[AdminPage] session admin:", admin);
 
-    if (!admin) {
-        return <Navigate to="/admin/login" replace />;
-    }
-
-    const resolvedAdmin = admin; // Use actual logged-in admin object
+    const resolvedAdmin = admin || { name: "Administrator", role: "admin" };
 
     const handleAdminNavigate = (pageKey) => {
         const route = ADMIN_KEY_TO_ROUTE[pageKey];
@@ -80,15 +72,8 @@ function AdminPage({ PageComponent, adminOnly = false }) {
         navigate("/admin/login");
     };
 
-    // Redirect non-admin users away from admin-only pages
-    const resolvedRole = String(resolvedAdmin.role || "")
-        .trim()
-        .toLowerCase();
-    if (
-        adminOnly &&
-        resolvedRole !== "admin" &&
-        resolvedRole !== "superadmin"
-    ) {
+    // Redirect staff away from admin-only pages
+    if (adminOnly && resolvedAdmin.role !== "admin") {
         return <Navigate to="/admin/dashboard" replace />;
     }
 
@@ -142,19 +127,6 @@ function ResidentProfileRoute() {
     return <ResidentProfile resident={resident} onLogout={handleLogout} />;
 }
 
-function ResidentNotificationsRoute() {
-    const navigate = useNavigate();
-    const { resident } = useSessionData();
-    const handleLogout = () => {
-        localStorage.removeItem("certifast_resident_auth");
-        localStorage.removeItem("certifast_resident_token");
-        navigate("/resident/login");
-    };
-    return (
-        <ResidentNotifications resident={resident} onLogout={handleLogout} />
-    );
-}
-
 export default function App() {
     return (
         <Routes>
@@ -181,16 +153,12 @@ export default function App() {
                 element={<AdminPage PageComponent={ResidentRecords} />}
             />
             <Route
-                path="/admin/reports"
-                element={<AdminPage PageComponent={Reports} />}
-            />
-            <Route
                 path="/admin/logs-audit-trail"
                 element={<AdminPage PageComponent={LogsAuditTrail} adminOnly />}
             />
             <Route
                 path="/admin/manage-accounts"
-                element={<AdminPage PageComponent={ManageAccounts} />}
+                element={<AdminPage PageComponent={ManageAccounts} adminOnly />}
             />
             <Route
                 path="/admin/settings"
@@ -227,10 +195,6 @@ export default function App() {
             <Route
                 path="/resident/profile"
                 element={<ResidentProfileRoute />}
-            />
-            <Route
-                path="/resident/notifications"
-                element={<ResidentNotificationsRoute />}
             />
 
             <Route

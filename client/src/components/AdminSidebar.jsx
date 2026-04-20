@@ -344,7 +344,6 @@ export function AdminSidebar({
     // ── Admin-only section (bottom) — hidden from staff ──
     const saItems = [
         { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
         { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
         { key: "settings", label: "System Settings", Icon: Settings },
     ];
@@ -424,10 +423,7 @@ export function AdminSidebar({
                     {saItems
                         .filter((item) => {
                             if (role === "staff") {
-                                return (
-                                    item.key === "manageAccounts" ||
-                                    item.key === "reports"
-                                );
+                                return item.key === "manageAccounts";
                             }
                             return true;
                         })
@@ -512,7 +508,6 @@ export function AdminMobileSidebar({
     // ── Admin-only section (bottom) ──
     const saItems = [
         { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
         { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
         { key: "settings", label: "System Settings", Icon: Settings },
     ];
@@ -623,10 +618,7 @@ export function AdminMobileSidebar({
                         {saItems
                             .filter((item) => {
                                 if (role === "staff") {
-                                    return (
-                                        item.key === "manageAccounts" ||
-                                        item.key === "reports"
-                                    );
+                                    return item.key === "manageAccounts";
                                 }
                                 return true;
                             })
