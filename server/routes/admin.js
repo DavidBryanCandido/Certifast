@@ -31,6 +31,8 @@ const {
     getManageRequests,
     markRequestReady,
     releaseRequest,
+    getBarangaySettings,
+    updateBarangaySettings,
 } = require("../controllers/adminController");
 
 router.get("/dashboard/stats", adminAuth, getDashboardStats);
@@ -60,5 +62,7 @@ router.get("/certificates/templates", adminAuth, getCertificateTemplates);
 router.post("/walkin/issue", adminAuth, issueWalkIn);
 router.get("/walkin/today", adminAuth, getTodayWalkIn);
 router.get("/walkin/:id/reprint", adminAuth, getWalkInReprint);
+router.get("/settings", adminAuth, getBarangaySettings);
+router.put("/settings", adminAuth, updateBarangaySettings);
 
 module.exports = router;

@@ -439,6 +439,7 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                 <input
                                     className="ma-input"
                                     type="text"
+                                    autoComplete="off"
                                     value={form.full_name}
                                     onChange={(e) =>
                                         set("full_name", e.target.value)
@@ -476,6 +477,7 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                     <input
                                         className="ma-input"
                                         type="text"
+                                        autoComplete="off"
                                         value={form.username}
                                         onChange={(e) =>
                                             set("username", e.target.value)
@@ -550,6 +552,7 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                                 type={
                                                     showPw ? "text" : "password"
                                                 }
+                                                autoComplete="new-password"
                                                 value={form.password}
                                                 onChange={(e) =>
                                                     set(
@@ -590,6 +593,7 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                                         ? "text"
                                                         : "password"
                                                 }
+                                                autoComplete="new-password"
                                                 value={form.confirm_password}
                                                 onChange={(e) =>
                                                     set(

@@ -8,6 +8,7 @@ import {
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
 import { Menu, X } from "lucide-react";
+import * as settingsService from "../../services/settingsService";
 
 // ─── Injected styles (mirrors HTML stylesheet) ───────────────
 let stylesInjected = false;
@@ -598,6 +599,180 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         );
     };
 
+    // loading, errors, and messages
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState({
+        text: "",
+        type: "success",
+    });
+
+    // Load settings on mount
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const token = localStorage.getItem("adminToken");
+                const data = await settingsService.getBarangaySettings(token);
+
+                // Map DB settings to UI state
+                if (data.brgy_name)
+                    setBrgyInfo((prev) => ({ ...prev, name: data.brgy_name }));
+                if (data.brgy_city)
+                    setBrgyInfo((prev) => ({ ...prev, city: data.brgy_city }));
+                if (data.brgy_address)
+                    setBrgyInfo((prev) => ({
+                        ...prev,
+                        address: data.brgy_address,
+                    }));
+                if (data.brgy_contact)
+                    setBrgyInfo((prev) => ({
+                        ...prev,
+                        contact: data.brgy_contact,
+                    }));
+                if (data.brgy_email)
+                    setBrgyInfo((prev) => ({
+                        ...prev,
+                        email: data.brgy_email,
+                    }));
+
+                if (data.brgy_logo_url) setBrgyLogo(data.brgy_logo_url);
+                if (data.city_logo_url) setCityLogo(data.city_logo_url);
+
+                if (data.footer_tagline)
+                    setFooter((prev) => ({
+                        ...prev,
+                        tagline: data.footer_tagline,
+                    }));
+                if (data.footer_address)
+                    setFooter((prev) => ({
+                        ...prev,
+                        address: data.footer_address,
+                    }));
+                if (data.footer_contact)
+                    setFooter((prev) => ({
+                        ...prev,
+                        contact: data.footer_contact,
+                    }));
+
+                if (data.captain_name)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        captainName: data.captain_name,
+                    }));
+                if (data.captain_title)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        captainTitle: data.captain_title,
+                    }));
+                if (data.secondary_name)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        secondaryName: data.secondary_name,
+                    }));
+                if (data.secondary_title)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        secondaryTitle: data.secondary_title,
+                    }));
+
+                if (data.captain_sig_base64) setSig1(data.captain_sig_base64);
+                if (data.secondary_sig_base64)
+                    setSig2(data.secondary_sig_base64);
+            } catch (err) {
+                console.error("Failed to load settings:", err);
+            }
+        };
+
+        loadSettings();
+    }, []);
+
+    // Save branding settings
+    const handleSaveBranding = async () => {
+        setLoading(true);
+        setMessage({ text: "", type: "success" });
+        try {
+            const token = localStorage.getItem("adminToken");
+            const settings = {
+                brgy_name: brgyInfo.name,
+                brgy_city: brgyInfo.city,
+                brgy_address: brgyInfo.address,
+                brgy_contact: brgyInfo.contact,
+                brgy_email: brgyInfo.email,
+                brgy_logo_url: brgyLogo || "",
+                city_logo_url: cityLogo || "",
+            };
+
+            await settingsService.updateBarangaySettings(settings, token);
+            setMessage({
+                text: "Branding updated successfully!",
+                type: "success",
+            });
+        } catch (err) {
+            setMessage({
+                text: err.message || "Failed to save branding",
+                type: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Save footer settings
+    const handleSaveFooter = async () => {
+        setLoading(true);
+        setMessage({ text: "", type: "success" });
+        try {
+            const token = localStorage.getItem("adminToken");
+            const settings = {
+                footer_tagline: footer.tagline,
+                footer_address: footer.address,
+                footer_contact: footer.contact,
+            };
+
+            await settingsService.updateBarangaySettings(settings, token);
+            setMessage({
+                text: "Footer updated successfully!",
+                type: "success",
+            });
+        } catch (err) {
+            setMessage({
+                text: err.message || "Failed to save footer",
+                type: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Save officials settings
+    const handleSaveOfficials = async () => {
+        setLoading(true);
+        setMessage({ text: "", type: "success" });
+        try {
+            const token = localStorage.getItem("adminToken");
+            const settings = {
+                captain_name: officials.captainName,
+                captain_title: officials.captainTitle,
+                secondary_name: officials.secondaryName,
+                secondary_title: officials.secondaryTitle,
+                captain_sig_base64: sig1 || "",
+                secondary_sig_base64: sig2 || "",
+            };
+
+            await settingsService.updateBarangaySettings(settings, token);
+            setMessage({
+                text: "Officials updated successfully!",
+                type: "success",
+            });
+        } catch (err) {
+            setMessage({
+                text: err.message || "Failed to save officials",
+                type: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // cert template editor
 
     if (!isSuperAdmin) {
@@ -778,6 +953,33 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             Certificate Templates
                         </button>
                     </div>
+
+                    {/* Message Display */}
+                    {message.text && (
+                        <div
+                            style={{
+                                padding: "12px 16px",
+                                borderRadius: 4,
+                                marginBottom: 16,
+                                background:
+                                    message.type === "error"
+                                        ? "#fef2f2"
+                                        : "#f0fdf4",
+                                border:
+                                    message.type === "error"
+                                        ? "1px solid #fecaca"
+                                        : "1px solid #bbf7d0",
+                                color:
+                                    message.type === "error"
+                                        ? "#dc2626"
+                                        : "#16a34a",
+                                fontSize: 13,
+                                fontFamily: "'Source Serif 4',serif",
+                            }}
+                        >
+                            {message.text}
+                        </div>
+                    )}
 
                     {/* ══ TAB: BRANDING ══ */}
                     {activeTab === "branding" && (
@@ -1572,10 +1774,28 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         immediately.
                                     </p>
                                     <div>
-                                        <button className="st-btn-cancel">
+                                        <button
+                                            className="st-btn-cancel"
+                                            onClick={() => {
+                                                setBrgyInfo({
+                                                    name: "Barangay East Tapinac",
+                                                    city: "City of Olongapo",
+                                                    address:
+                                                        "54 - 14th Street corner Gallagher Street, Olongapo City",
+                                                    contact: "(047) 123-4567",
+                                                    email: "brgy.easttapinac@olongapo.gov.ph",
+                                                });
+                                                setBrgyLogo(null);
+                                                setCityLogo(null);
+                                            }}
+                                        >
                                             Cancel
                                         </button>
-                                        <button className="st-btn-save">
+                                        <button
+                                            className="st-btn-save"
+                                            onClick={handleSaveBranding}
+                                            disabled={loading}
+                                        >
                                             <svg
                                                 width="13"
                                                 height="13"
@@ -1588,7 +1808,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                 <polyline points="17 21 17 13 7 13 7 21" />
                                                 <polyline points="7 3 7 8 15 8" />
                                             </svg>
-                                            Save Branding
+                                            {loading
+                                                ? "Saving..."
+                                                : "Save Branding"}
                                         </button>
                                     </div>
                                 </div>
@@ -1679,10 +1901,26 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         only.
                                     </p>
                                     <div>
-                                        <button className="st-btn-cancel">
+                                        <button
+                                            className="st-btn-cancel"
+                                            onClick={() => {
+                                                setFooter({
+                                                    tagline:
+                                                        "Serbisyo Para sa Lahat ng Mamamayan",
+                                                    address:
+                                                        "54 - 14th Street corner Gallagher Street, Olongapo City",
+                                                    contact:
+                                                        "(047) 123-4567 | brgy.easttapinac@olongapo.gov.ph",
+                                                });
+                                            }}
+                                        >
                                             Cancel
                                         </button>
-                                        <button className="st-btn-save">
+                                        <button
+                                            className="st-btn-save"
+                                            onClick={handleSaveFooter}
+                                            disabled={loading}
+                                        >
                                             <svg
                                                 width="13"
                                                 height="13"
@@ -1695,7 +1933,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                 <polyline points="17 21 17 13 7 13 7 21" />
                                                 <polyline points="7 3 7 8 15 8" />
                                             </svg>
-                                            Save Footer
+                                            {loading
+                                                ? "Saving..."
+                                                : "Save Footer"}
                                         </button>
                                     </div>
                                 </div>
@@ -1827,10 +2067,28 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         block of all documents.
                                     </p>
                                     <div>
-                                        <button className="st-btn-cancel">
+                                        <button
+                                            className="st-btn-cancel"
+                                            onClick={() => {
+                                                setOfficials({
+                                                    captainName:
+                                                        "Hon. Dante L. Hondo",
+                                                    captainTitle:
+                                                        "Punong Barangay",
+                                                    secondaryName: "",
+                                                    secondaryTitle: "",
+                                                });
+                                                setSig1(null);
+                                                setSig2(null);
+                                            }}
+                                        >
                                             Cancel
                                         </button>
-                                        <button className="st-btn-save">
+                                        <button
+                                            className="st-btn-save"
+                                            onClick={handleSaveOfficials}
+                                            disabled={loading}
+                                        >
                                             <svg
                                                 width="13"
                                                 height="13"
@@ -1843,7 +2101,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                 <polyline points="17 21 17 13 7 13 7 21" />
                                                 <polyline points="7 3 7 8 15 8" />
                                             </svg>
-                                            Save Officials
+                                            {loading
+                                                ? "Saving..."
+                                                : "Save Officials"}
                                         </button>
                                     </div>
                                 </div>

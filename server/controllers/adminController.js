@@ -478,7 +478,9 @@ async function getWalkInReprint(req, res) {
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Walk-in record not found" });
+            return res
+                .status(404)
+                .json({ message: "Walk-in record not found" });
         }
 
         const row = result.rows[0];
@@ -704,7 +706,10 @@ async function scanResidentQr(req, res) {
         }
 
         const residentRow = residentResult.rows[0];
-        const residentAddress = [residentRow.address_house, residentRow.address_street]
+        const residentAddress = [
+            residentRow.address_house,
+            residentRow.address_street,
+        ]
             .filter(Boolean)
             .join(", ");
 
@@ -731,7 +736,8 @@ async function scanResidentQr(req, res) {
                   request_id: `REQ-${String(latestRow.request_id).padStart(4, "0")}`,
                   cert_type: latestRow.cert_type,
                   status:
-                      latestRow.status === "approved" || latestRow.status === "ready"
+                      latestRow.status === "approved" ||
+                      latestRow.status === "ready"
                           ? "processing"
                           : latestRow.status,
                   purpose: latestRow.purpose || "Not specified",
@@ -1666,6 +1672,73 @@ async function deactivateAccount(req, res) {
     }
 }
 
+// Get all barangay settings
+async function getBarangaySettings(req, res) {
+    try {
+        if (!ensureAdminOrSuperadmin(req, res)) return;
+
+        const result = await pool.query(
+            `SELECT setting_key, setting_value FROM barangay_settings ORDER BY setting_key`,
+        );
+
+        const settings = {};
+        result.rows.forEach((row) => {
+            settings[row.setting_key] = row.setting_value;
+        });
+
+        return res.json({ data: settings });
+    } catch (err) {
+        console.error("getBarangaySettings error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+// Update barangay settings
+async function updateBarangaySettings(req, res) {
+    try {
+        if (!ensureSuperadmin(req, res)) return;
+
+        const { settings } = req.body;
+        if (!settings || typeof settings !== "object") {
+            return res.status(400).json({ message: "Invalid settings object" });
+        }
+
+        const updates = [];
+        for (const [key, value] of Object.entries(settings)) {
+            updates.push({
+                key: String(key).toLowerCase(),
+                value: value === null ? null : String(value),
+            });
+        }
+
+        for (const { key, value } of updates) {
+            await pool.query(
+                `INSERT INTO barangay_settings (setting_key, setting_value, updated_by)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (setting_key) DO UPDATE
+                 SET setting_value = EXCLUDED.setting_value, updated_by = $3, updated_at = NOW()`,
+                [key, value, req.admin.id],
+            );
+        }
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "settings_update",
+            targetTable: "barangay_settings",
+            targetId: null,
+            description: `Updated ${updates.length} barangay settings`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({ message: "Settings updated successfully" });
+    } catch (err) {
+        console.error("updateBarangaySettings error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 module.exports = {
     getDashboardStats,
     getRecentRequests,
@@ -1694,4 +1767,6 @@ module.exports = {
     getManageRequests,
     markRequestReady,
     releaseRequest,
+    getBarangaySettings,
+    updateBarangaySettings,
 };
