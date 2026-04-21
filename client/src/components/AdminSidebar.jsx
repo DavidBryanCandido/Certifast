@@ -11,6 +11,28 @@ import {
     LogOut,
     X,
 } from "lucide-react";
+import authService from "../services/authService";
+
+const BUCKET_LOGO =
+    "https://fyihciqyaugzhqeezxci.supabase.co/storage/v1/object/public/certifast-uploads/branding/logo.png";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+function useBrgyLogo(token) {
+    const [logo, setLogo] = useState(BUCKET_LOGO);
+    useEffect(() => {
+        if (!token) return;
+        fetch(`${API_URL}/admin/settings`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                const url = data?.data?.brgy_logo_url;
+                if (url) setLogo(url);
+            })
+            .catch(() => {});
+    }, [token]);
+    return logo;
+}
 
 let injected = false;
 function useAdminSidebarStyles() {
@@ -363,6 +385,7 @@ export function AdminSidebar({
     const logoSize = collapsed
         ? 48
         : Math.min(100, Math.max(60, Math.round(width * 0.08)));
+    const logoSrc = useBrgyLogo(authService.getAdminToken());
 
     const role = String(admin?.role || "")
         .trim()
@@ -433,13 +456,16 @@ export function AdminSidebar({
                     }}
                 >
                     <img
-                        src="/logo.png"
+                        src={logoSrc}
                         alt="Barangay Seal"
                         style={{
                             width: logoSize,
                             height: logoSize,
                             borderRadius: "50%",
                             objectFit: "cover",
+                        }}
+                        onError={(e) => {
+                            e.currentTarget.src = BUCKET_LOGO;
                         }}
                     />
                 </div>
@@ -615,6 +641,7 @@ export function AdminMobileSidebar({
     const [showLogoutModal, setShowLogoutModal] = useState(false);
     const width = useWindowSize();
     const logoSize = Math.min(100, Math.max(60, Math.round(width * 0.08)));
+    const logoSrc = useBrgyLogo(authService.getAdminToken());
 
     const role = String(admin?.role || "")
         .trim()
@@ -714,13 +741,16 @@ export function AdminMobileSidebar({
                             }}
                         >
                             <img
-                                src="/logo.png"
+                                src={logoSrc}
                                 alt="Barangay Seal"
                                 style={{
                                     width: logoSize,
                                     height: logoSize,
                                     borderRadius: "50%",
                                     objectFit: "cover",
+                                }}
+                                onError={(e) => {
+                                    e.currentTarget.src = BUCKET_LOGO;
                                 }}
                             />
                         </div>

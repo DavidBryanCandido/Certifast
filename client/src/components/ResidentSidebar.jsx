@@ -14,6 +14,10 @@ import {
     AlertTriangle,
 } from "lucide-react";
 
+const BUCKET_LOGO =
+    "https://fyihciqyaugzhqeezxci.supabase.co/storage/v1/object/public/certifast-uploads/branding/logo.png";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 if (!document.head.querySelector("[data-resident-sidebar]")) {
     const s = document.createElement("style");
     s.setAttribute("data-resident-sidebar", "true");
@@ -242,12 +246,22 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
     const [collapsed, setCollapsed] = useState(
         window.innerWidth < 1100 && window.innerWidth >= 640,
     );
+    const [logoSrc, setLogoSrc] = useState(BUCKET_LOGO);
 
     useEffect(() => {
         const fn = () =>
             setCollapsed(window.innerWidth < 1100 && window.innerWidth >= 640);
         window.addEventListener("resize", fn);
         return () => window.removeEventListener("resize", fn);
+    }, []);
+
+    useEffect(() => {
+        fetch(`${API_URL}/auth/public-branding`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.logo_url) setLogoSrc(data.logo_url);
+            })
+            .catch(() => {});
     }, []);
     const navigate = useNavigate();
     const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -282,10 +296,10 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                         }}
                     >
                         <img
-                            src="https://fyihciqyaugzhqeezxci.supabase.co/storage/v1/object/public/certifast-uploads/branding/logo.png"
+                            src={logoSrc}
                             onError={(e) => {
                                 e.currentTarget.onerror = null;
-                                e.currentTarget.src = "/logo.png";
+                                e.currentTarget.src = BUCKET_LOGO;
                             }}
                             alt="Seal"
                             style={{
