@@ -50,7 +50,7 @@ function mapAuditType(actionType, targetTable) {
 }
 
 function ensureSuperadmin(req, res) {
-    if (req.admin?.role !== "superadmin") {
+    if (req.admin?.role !== "admin" && req.admin?.role !== "superadmin") {
         res.status(403).json({ message: "Superadmin access only" });
         return false;
     }
@@ -1696,7 +1696,7 @@ async function getBarangaySettings(req, res) {
 // Update barangay settings
 async function updateBarangaySettings(req, res) {
     try {
-        if (!ensureSuperadmin(req, res)) return;
+        if (!ensureAdminOrSuperadmin(req, res)) return;
 
         const { settings } = req.body;
         if (!settings || typeof settings !== "object") {
