@@ -22,7 +22,7 @@ app.use(
         origin: [
             "http://localhost:5173",
             "http://localhost:5174",
-            "certifast-two.vercel.app",
+            "https://certifast-two.vercel.app",
         ],
         credentials: true,
     }),
