@@ -1,7 +1,7 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 function getAdminHeaders() {
     const token = authService.getAdminToken();
@@ -19,7 +19,11 @@ const adminRequestService = {
     },
 
     approveRequest: async (requestId) => {
-        const res = await axios.post(`${API}/admin/requests/${requestId}/approve`, {}, getAdminHeaders());
+        const res = await axios.post(
+            `${API}/admin/requests/${requestId}/approve`,
+            {},
+            getAdminHeaders(),
+        );
         return res.data;
     },
 
@@ -33,12 +37,20 @@ const adminRequestService = {
     },
 
     markReady: async (requestId) => {
-        const res = await axios.post(`${API}/admin/requests/${requestId}/mark-ready`, {}, getAdminHeaders());
+        const res = await axios.post(
+            `${API}/admin/requests/${requestId}/mark-ready`,
+            {},
+            getAdminHeaders(),
+        );
         return res.data;
     },
 
     releaseRequest: async (requestId) => {
-        const res = await axios.post(`${API}/admin/requests/${requestId}/release`, {}, getAdminHeaders());
+        const res = await axios.post(
+            `${API}/admin/requests/${requestId}/release`,
+            {},
+            getAdminHeaders(),
+        );
         return res.data;
     },
 };

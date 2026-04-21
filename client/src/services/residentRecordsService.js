@@ -1,7 +1,7 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 function getAdminHeaders() {
     const token = authService.getAdminToken();
@@ -38,7 +38,10 @@ const residentRecordsService = {
     },
 
     getResidentStats: async () => {
-        const res = await axios.get(`${API}/admin/residents/stats`, getAdminHeaders());
+        const res = await axios.get(
+            `${API}/admin/residents/stats`,
+            getAdminHeaders(),
+        );
         return res.data;
     },
 };

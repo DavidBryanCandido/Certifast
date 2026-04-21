@@ -1,7 +1,7 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 const requestService = {
     // GET all requests for logged-in resident

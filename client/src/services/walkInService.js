@@ -1,7 +1,7 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 function getAdminHeaders() {
     const token = authService.getAdminToken();
@@ -14,17 +14,27 @@ function getAdminHeaders() {
 
 const walkInService = {
     getCertTemplates: async () => {
-        const res = await axios.get(`${API}/admin/certificates/templates`, getAdminHeaders());
+        const res = await axios.get(
+            `${API}/admin/certificates/templates`,
+            getAdminHeaders(),
+        );
         return res.data;
     },
 
     issueWalkIn: async (payload) => {
-        const res = await axios.post(`${API}/admin/walkin/issue`, payload, getAdminHeaders());
+        const res = await axios.post(
+            `${API}/admin/walkin/issue`,
+            payload,
+            getAdminHeaders(),
+        );
         return res.data;
     },
 
     getTodayLog: async () => {
-        const res = await axios.get(`${API}/admin/walkin/today`, getAdminHeaders());
+        const res = await axios.get(
+            `${API}/admin/walkin/today`,
+            getAdminHeaders(),
+        );
         return res.data;
     },
 

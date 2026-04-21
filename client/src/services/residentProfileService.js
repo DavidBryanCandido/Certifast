@@ -1,7 +1,7 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 function getResidentHeaders() {
     const token = authService.getResidentToken();
@@ -14,7 +14,10 @@ function getResidentHeaders() {
 
 const residentProfileService = {
     getProfile: async () => {
-        const res = await axios.get(`${API}/resident/profile`, getResidentHeaders());
+        const res = await axios.get(
+            `${API}/resident/profile`,
+            getResidentHeaders(),
+        );
         return res.data;
     },
 

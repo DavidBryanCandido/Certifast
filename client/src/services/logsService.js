@@ -1,7 +1,7 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 function getAdminHeaders() {
     const token = authService.getAdminToken();
@@ -14,7 +14,10 @@ function getAdminHeaders() {
 
 const logsService = {
     getStats: async () => {
-        const res = await axios.get(`${API}/admin/logs/stats`, getAdminHeaders());
+        const res = await axios.get(
+            `${API}/admin/logs/stats`,
+            getAdminHeaders(),
+        );
         return res.data;
     },
 
@@ -27,7 +30,10 @@ const logsService = {
     },
 
     getLogById: async (logId) => {
-        const res = await axios.get(`${API}/admin/logs/${logId}`, getAdminHeaders());
+        const res = await axios.get(
+            `${API}/admin/logs/${logId}`,
+            getAdminHeaders(),
+        );
         return res.data;
     },
 };
