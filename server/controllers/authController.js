@@ -5,11 +5,13 @@ const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
 
-// Supabase client — uses service role key so it can write to storage
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+// Supabase client — optional at startup so the server can still boot without it.
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase =
+    supabaseUrl && supabaseServiceRoleKey
+        ? createClient(supabaseUrl, supabaseServiceRoleKey)
+        : null;
 
 // POST /api/auth/resident/register
 // body: { first_name, middle_name, last_name, full_name, email, password,
@@ -65,6 +67,11 @@ async function residentRegister(req, res) {
         // ── Upload ID image to Supabase Storage if provided ──
         let id_image_url = null;
         if (req.file) {
+            if (!supabase) {
+                console.warn(
+                    "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing; skipping ID image upload.",
+                );
+            } else {
             const ext =
                 req.file.mimetype === "image/png"
                     ? "png"
@@ -88,6 +95,7 @@ async function residentRegister(req, res) {
                     .from("certifast-uploads")
                     .getPublicUrl(filename);
                 id_image_url = urlData.publicUrl;
+            }
             }
         }
 

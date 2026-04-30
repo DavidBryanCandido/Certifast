@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import authService from "../services/authService";
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 // ─── Helpers ──────────────────────────────────────────────────
 function fmtDate(str) {
     if (!str) return "—";
@@ -129,24 +131,47 @@ export default function AdminQRScannerModal({
         setCamReady(false);
         const video = videoRef.current;
         video.srcObject = stream;
-        video.play().then(() => {
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        let started = false;
+
+        const beginScanning = () => {
+            if (started || pausedRef.current) return;
+            started = true;
             setCamReady(true);
-            const canvas = canvasRef.current;
-            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
             function tick() {
                 if (pausedRef.current) return;
                 if (video.readyState >= video.HAVE_ENOUGH_DATA) {
-                    canvas.width  = video.videoWidth;
+                    canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
-                    if (code?.data) { pausedRef.current = true; handleDetected(code.data); return; }
+                    if (code?.data) {
+                        pausedRef.current = true;
+                        handleDetected(code.data);
+                        return;
+                    }
                 }
                 rafRef.current = requestAnimationFrame(tick);
             }
+
             rafRef.current = requestAnimationFrame(tick);
-        }).catch(() => setState("denied"));
+        };
+
+        video.onloadedmetadata = beginScanning;
+        video.oncanplay = beginScanning;
+
+        const playPromise = video.play();
+        if (playPromise?.catch) {
+            playPromise.catch(() => setState("denied"));
+        }
+
+        if (video.readyState >= video.HAVE_CURRENT_DATA) {
+            beginScanning();
+        }
     }
 
     async function handleDetected(rawValue) {
@@ -170,7 +195,7 @@ export default function AdminQRScannerModal({
         }
 
         try {
-            const res = await fetch("http://localhost:5000/api/admin/scan-resident-qr", {
+            const res = await fetch(`${API}/admin/scan-resident-qr`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
