@@ -6,7 +6,8 @@ const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
 
 // Supabase client — optional at startup so the server can still boot without it.
-const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase =
     supabaseUrl && supabaseServiceRoleKey
@@ -51,6 +52,13 @@ async function residentRegister(req, res) {
     }
 
     try {
+        if (!supabase) {
+            return res.status(500).json({
+                message:
+                    "Supabase is not configured on the server. Please set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY.",
+            });
+        }
+
         // Check if email already exists
         const existing = await pool.query(
             "SELECT resident_id FROM residents WHERE email = $1",
@@ -61,6 +69,35 @@ async function residentRegister(req, res) {
                 .status(409)
                 .json({ message: "Email already registered" });
         }
+
+        const { data: authData, error: authError } =
+            await supabase.auth.admin.createUser({
+                email,
+                password,
+                email_confirm: true,
+                user_metadata: {
+                    first_name,
+                    middle_name: middle_name || null,
+                    last_name,
+                    full_name,
+                    role: "resident",
+                },
+            });
+
+        if (authError) {
+            const isDuplicateEmail =
+                authError.status === 422 ||
+                /already\s+registered|already\s+exists/i.test(
+                    authError.message || "",
+                );
+            return res.status(isDuplicateEmail ? 409 : 500).json({
+                message: isDuplicateEmail
+                    ? "Email is already registered in authentication. Please use another email."
+                    : "Failed to create authentication account. Please try again.",
+            });
+        }
+
+        const supabaseAuthId = authData?.user?.id || null;
 
         const password_hash = await bcrypt.hash(password, 10);
 
@@ -99,42 +136,57 @@ async function residentRegister(req, res) {
             }
         }
 
-        const result = await pool.query(
-            `INSERT INTO residents (
-                full_name, first_name, middle_name, last_name,
-                email, password_hash, contact_number, date_of_birth,
-                house_number, purok_id, street_id, street_other,
-                address_house, address_street,
-                id_type, id_image_url, civil_status, nationality, status
-            ) VALUES (
-                $1,  $2,  $3,  $4,
-                $5,  $6,  $7,  $8,
-                $9,  $10, $11, $12,
-                $13, $14,
-                $15, $16, $17, $18, 'pending_verification'
-            )
-            RETURNING resident_id, full_name, first_name, last_name, email, status`,
-            [
-                full_name,
-                first_name,
-                middle_name || null,
-                last_name,
-                email,
-                password_hash,
-                contact_number || null,
-                date_of_birth || null,
-                house_number || null,
-                purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,
-                street_id && Number(street_id) > 0 ? Number(street_id) : null,
-                street_other || null,
-                address_house || null,
-                address_street || null,
-                id_type || null,
-                id_image_url,
-                civil_status || null,
-                nationality || "Filipino",
-            ],
-        );
+        let result;
+        try {
+            result = await pool.query(
+                `INSERT INTO residents (
+                    full_name, first_name, middle_name, last_name,
+                    email, password_hash, contact_number, date_of_birth,
+                    house_number, purok_id, street_id, street_other,
+                    address_house, address_street,
+                    id_type, id_image_url, civil_status, nationality, status
+                ) VALUES (
+                    $1,  $2,  $3,  $4,
+                    $5,  $6,  $7,  $8,
+                    $9,  $10, $11, $12,
+                    $13, $14,
+                    $15, $16, $17, $18, 'pending_verification'
+                )
+                RETURNING resident_id, full_name, first_name, last_name, email, status`,
+                [
+                    full_name,
+                    first_name,
+                    middle_name || null,
+                    last_name,
+                    email,
+                    password_hash,
+                    contact_number || null,
+                    date_of_birth || null,
+                    house_number || null,
+                    purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,
+                    street_id && Number(street_id) > 0 ? Number(street_id) : null,
+                    street_other || null,
+                    address_house || null,
+                    address_street || null,
+                    id_type || null,
+                    id_image_url,
+                    civil_status || null,
+                    nationality || "Filipino",
+                ],
+            );
+        } catch (dbError) {
+            if (supabaseAuthId) {
+                await supabase.auth.admin
+                    .deleteUser(supabaseAuthId)
+                    .catch((cleanupError) => {
+                        console.error(
+                            "Failed to rollback Supabase user after DB insert error:",
+                            cleanupError.message,
+                        );
+                    });
+            }
+            throw dbError;
+        }
 
         return res.status(201).json({
             message:

@@ -3,11 +3,13 @@ const fs = require("fs");
 const path = require("path");
 const dotenv = require("dotenv");
 
-const dotEnvPath = path.join(__dirname, ".env");
-const fallbackEnvPath = path.join(__dirname, "env");
-dotenv.config({
-    path: fs.existsSync(dotEnvPath) ? dotEnvPath : fallbackEnvPath,
-});
+const envCandidates = [
+    path.join(__dirname, ".env.local"),
+    path.join(__dirname, ".env"),
+    path.join(__dirname, "env"),
+];
+const activeEnvPath = envCandidates.find((candidate) => fs.existsSync(candidate));
+dotenv.config(activeEnvPath ? { path: activeEnvPath } : undefined);
 const express = require("express");
 const cors = require("cors");
 
