@@ -1419,6 +1419,7 @@ async function getAccounts(req, res) {
                 admin_id,
                 full_name,
                 username,
+                email,
                 role,
                 status,
                 created_at,
@@ -1439,16 +1440,20 @@ async function createAccount(req, res) {
 
     const fullName = String(req.body?.full_name || "").trim();
     const username = String(req.body?.username || "").trim();
+    const email = String(req.body?.email || "").trim();
     const password = String(req.body?.password || "");
     const roleRaw = String(req.body?.role || "staff")
         .trim()
         .toLowerCase();
-    const role = roleRaw === "admin" ? "admin" : "staff";
+    const role = roleRaw === "admin" ? "admin" : roleRaw === "superadmin" ? "superadmin" : "staff";
 
-    if (!fullName || !username || !password) {
+    if (!fullName || !username || !email || !password) {
         return res
             .status(400)
-            .json({ message: "full_name, username and password are required" });
+            .json({ message: "full_name, username, email and password are required" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: "Valid email is required" });
     }
     if (password.length < 8) {
         return res
@@ -1457,12 +1462,43 @@ async function createAccount(req, res) {
     }
 
     try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const supabase = supabaseUrl && supabaseServiceRoleKey
+            ? createClient(supabaseUrl, supabaseServiceRoleKey)
+            : null;
+
         const existing = await pool.query(
-            `SELECT admin_id FROM admin_accounts WHERE LOWER(username) = LOWER($1) LIMIT 1`,
-            [username],
+            `SELECT admin_id FROM admin_accounts WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2) LIMIT 1`,
+            [username, email],
         );
         if (existing.rows.length > 0) {
-            return res.status(409).json({ message: "Username already exists" });
+            return res.status(409).json({ message: "Username or email already exists" });
+        }
+
+        let supabaseAuthId = null;
+        if (supabase) {
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                email,
+                password,
+                email_confirm: true,
+                user_metadata: {
+                    username,
+                    full_name: fullName,
+                    role,
+                },
+            });
+
+            if (authError) {
+                const isDuplicateEmail = authError.status === 422 || /already\s+registered|already\s+exists/i.test(authError.message || "");
+                return res.status(isDuplicateEmail ? 409 : 500).json({
+                    message: isDuplicateEmail
+                        ? "Email is already registered in authentication."
+                        : "Failed to create authentication account. Please try again.",
+                });
+            }
+            supabaseAuthId = authData?.user?.id || null;
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -1470,13 +1506,14 @@ async function createAccount(req, res) {
             `INSERT INTO admin_accounts (
                 full_name,
                 username,
+                email,
                 password_hash,
                 role,
                 status,
                 created_at
-            ) VALUES ($1, $2, $3, $4, 'active', NOW())
-            RETURNING admin_id, full_name, username, role, status, created_at, last_login`,
-            [fullName, username, passwordHash, role],
+            ) VALUES ($1, $2, $3, $4, $5, 'active', NOW())
+            RETURNING admin_id, full_name, username, email, role, status, created_at, last_login`,
+            [fullName, username, email, passwordHash, role],
         );
 
         const created = result.rows[0];
@@ -1533,12 +1570,28 @@ async function updateAccount(req, res) {
     const status = statusRaw === "inactive" ? "inactive" : "active";
 
     try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const supabase = supabaseUrl && supabaseServiceRoleKey
+            ? createClient(supabaseUrl, supabaseServiceRoleKey)
+            : null;
+
         const existing = await pool.query(
             `SELECT admin_id FROM admin_accounts WHERE LOWER(username) = LOWER($1) AND admin_id <> $2 LIMIT 1`,
             [username, accountId],
         );
         if (existing.rows.length > 0) {
             return res.status(409).json({ message: "Username already exists" });
+        }
+
+        const accountBefore = await pool.query(
+            `SELECT status FROM admin_accounts WHERE admin_id = $1`,
+            [accountId],
+        );
+
+        if (accountBefore.rows.length === 0) {
+            return res.status(404).json({ message: "Account not found" });
         }
 
         const result = await pool.query(
@@ -1548,15 +1601,20 @@ async function updateAccount(req, res) {
                  role = $4,
                  status = $5
              WHERE admin_id = $1
-             RETURNING admin_id, full_name, username, role, status, created_at, last_login`,
+             RETURNING admin_id, full_name, username, email, role, status, created_at, last_login`,
             [accountId, fullName, username, role, status],
         );
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Account not found" });
+        const updated = result.rows[0];
+
+        if (supabase && updated.email && accountBefore.rows[0].status !== status) {
+            await supabase.auth.admin.updateUserById(updated.email, {
+                ban_duration: status === "inactive" ? "none" : "24h",
+            }).catch((err) => {
+                console.error("Supabase status sync error:", err.message);
+            });
         }
 
-        const updated = result.rows[0];
         await createAuditLog({
             actorId: req.admin.id,
             actorName: req.admin.username,
@@ -1594,6 +1652,34 @@ async function resetAccountPassword(req, res) {
     }
 
     try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const supabase = supabaseUrl && supabaseServiceRoleKey
+            ? createClient(supabaseUrl, supabaseServiceRoleKey)
+            : null;
+
+        const accountRes = await pool.query(
+            `SELECT email FROM admin_accounts WHERE admin_id = $1`,
+            [accountId],
+        );
+
+        if (accountRes.rows.length === 0) {
+            return res.status(404).json({ message: "Account not found" });
+        }
+
+        const account = accountRes.rows[0];
+
+        if (supabase && account.email) {
+            const { error: updateError } = await supabase.auth.admin.updateUserById(
+                account.email,
+                { password: newPassword },
+            );
+            if (updateError) {
+                console.error("Supabase password update error:", updateError.message);
+            }
+        }
+
         const passwordHash = await bcrypt.hash(newPassword, 10);
         const result = await pool.query(
             `UPDATE admin_accounts
@@ -1602,10 +1688,6 @@ async function resetAccountPassword(req, res) {
              RETURNING admin_id, username`,
             [accountId, passwordHash],
         );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Account not found" });
-        }
 
         const updated = result.rows[0];
         await createAuditLog({
@@ -1641,6 +1723,34 @@ async function deactivateAccount(req, res) {
     }
 
     try {
+        const { createClient } = require("@supabase/supabase-js");
+        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const supabase = supabaseUrl && supabaseServiceRoleKey
+            ? createClient(supabaseUrl, supabaseServiceRoleKey)
+            : null;
+
+        const accountRes = await pool.query(
+            `SELECT email FROM admin_accounts WHERE admin_id = $1`,
+            [accountId],
+        );
+
+        if (accountRes.rows.length === 0) {
+            return res.status(404).json({ message: "Account not found" });
+        }
+
+        const account = accountRes.rows[0];
+
+        if (supabase && account.email) {
+            const { error: disableError } = await supabase.auth.admin.updateUserById(
+                account.email,
+                { ban_duration: "none" },
+            );
+            if (disableError) {
+                console.error("Supabase user disable error:", disableError.message);
+            }
+        }
+
         const result = await pool.query(
             `UPDATE admin_accounts
              SET status = 'inactive'
@@ -1648,10 +1758,6 @@ async function deactivateAccount(req, res) {
              RETURNING admin_id, username`,
             [accountId],
         );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Account not found" });
-        }
 
         const updated = result.rows[0];
         await createAuditLog({

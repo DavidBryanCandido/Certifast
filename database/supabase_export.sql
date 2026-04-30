@@ -41,6 +41,7 @@ CREATE TABLE admin_accounts (
   admin_id integer DEFAULT nextval('admin_accounts_admin_id_seq'::regclass) NOT NULL,
   full_name character varying NOT NULL,
   username character varying NOT NULL,
+  email character varying,
   password_hash character varying NOT NULL,
   role character varying NOT NULL,
   status character varying DEFAULT 'active'::character varying,
