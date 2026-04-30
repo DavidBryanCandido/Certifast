@@ -123,16 +123,22 @@ export default function AdminQRScannerModal({
         }
         streamRef.current = stream;
         setState("scanning");
-        startScanLoop(stream);
+        rafRef.current = requestAnimationFrame(() => startScanLoop(stream));
     }
 
     function startScanLoop(stream) {
         pausedRef.current = false;
         setCamReady(false);
         const video = videoRef.current;
+        const canvas = canvasRef.current;
+
+        if (!video || !canvas) {
+            rafRef.current = requestAnimationFrame(() => startScanLoop(stream));
+            return;
+        }
+
         video.srcObject = stream;
 
-        const canvas = canvasRef.current;
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         let started = false;
 
@@ -227,7 +233,7 @@ export default function AdminQRScannerModal({
         setScanData(null);
         setErrorMsg("");
         setReleaseLoading(false);
-        if (streamRef.current) { setState("scanning"); startScanLoop(streamRef.current); }
+        if (streamRef.current) { setState("scanning"); rafRef.current = requestAnimationFrame(() => startScanLoop(streamRef.current)); }
         else { setState("idle"); }
     }
 
