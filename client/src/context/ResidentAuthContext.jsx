@@ -8,7 +8,13 @@ const ResidentAuthContext = createContext(null);
 export function ResidentAuthProvider({ children }) {
 	const [authState, setAuthState] = useState(() => {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		return raw ? JSON.parse(raw) : { token: null, resident: null };
+		if (!raw) return { token: null, resident: null };
+		try {
+			return JSON.parse(raw);
+		} catch {
+			localStorage.removeItem(STORAGE_KEY);
+			return { token: null, resident: null };
+		}
 	});
 
 	const login = ({ token, resident }) => {

@@ -8,7 +8,13 @@ const AdminAuthContext = createContext(null);
 export function AdminAuthProvider({ children }) {
 	const [authState, setAuthState] = useState(() => {
 		const raw = localStorage.getItem(STORAGE_KEY);
-		return raw ? JSON.parse(raw) : { token: null, admin: null };
+		if (!raw) return { token: null, admin: null };
+		try {
+			return JSON.parse(raw);
+		} catch {
+			localStorage.removeItem(STORAGE_KEY);
+			return { token: null, admin: null };
+		}
 	});
 
 	const login = ({ token, admin }) => {

@@ -1156,7 +1156,7 @@ function RowMenu({
 }
 
 // ─── Resident Row Dropdown ────────────────────────────────────
-function ResidentRowMenu({ resident, onPassword, onToggle }) {
+function ResidentRowMenu({ resident, onPassword, onApprove, onDeny, onToggle }) {
     const [open, setOpen] = useState(false);
     const ref = useRef();
     useEffect(() => {
@@ -1167,6 +1167,8 @@ function ResidentRowMenu({ resident, onPassword, onToggle }) {
         return () => document.removeEventListener("mousedown", handler);
     }, []);
     const isActive = String(resident.status || "").toLowerCase() === "active";
+    const isPending =
+        String(resident.status || "").toLowerCase() === "pending_verification";
     return (
         <div ref={ref} style={{ position: "relative" }}>
             <button className="ma-menu-btn" onClick={() => setOpen(!open)}>
@@ -1189,24 +1191,48 @@ function ResidentRowMenu({ resident, onPassword, onToggle }) {
                             margin: "4px 0",
                         }}
                     />
-                    <button
-                        className="ma-dropdown-item"
-                        onClick={() => {
-                            onToggle();
-                            setOpen(false);
-                        }}
-                        style={{ color: isActive ? "#b86800" : "#1a7a4a" }}
-                    >
-                        {isActive ? (
-                            <>
-                                <XCircle size={13} /> Deactivate
-                            </>
-                        ) : (
-                            <>
-                                <CheckCircle size={13} /> Activate
-                            </>
-                        )}
-                    </button>
+                    {isPending ? (
+                        <>
+                            <button
+                                className="ma-dropdown-item"
+                                onClick={() => {
+                                    onApprove();
+                                    setOpen(false);
+                                }}
+                                style={{ color: "#1a7a4a" }}
+                            >
+                                <CheckCircle size={13} /> Approve Account
+                            </button>
+                            <button
+                                className="ma-dropdown-item danger"
+                                onClick={() => {
+                                    onDeny();
+                                    setOpen(false);
+                                }}
+                            >
+                                <XCircle size={13} /> Deny Account
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            className="ma-dropdown-item"
+                            onClick={() => {
+                                onToggle();
+                                setOpen(false);
+                            }}
+                            style={{ color: isActive ? "#b86800" : "#1a7a4a" }}
+                        >
+                            {isActive ? (
+                                <>
+                                    <XCircle size={13} /> Deactivate
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle size={13} /> Activate
+                                </>
+                            )}
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -1265,6 +1291,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     // ── Modals ──
     const [modal, setModal] = useState(null); // { mode, account }
     const [resModal, setResModal] = useState(null); // { mode: 'password'|'deactivate', resident }
+    const [idPreviewModalUrl, setIdPreviewModalUrl] = useState("");
 
     // ── Toast ──
     const [toast, setToast] = useState(null);
@@ -1470,6 +1497,47 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                 adminHeaders(),
             );
             showToast(`${resident.full_name} is now ${next}.`);
+            await loadResidents();
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed.", "error");
+        }
+    };
+
+    const handleResidentApprove = async (resident) => {
+        try {
+            await axios.put(
+                `${API}/admin/residents/${resident.resident_id}/status`,
+                { status: "active" },
+                adminHeaders(),
+            );
+            showToast(`${resident.full_name} has been approved.`);
+            await loadResidents();
+        } catch (err) {
+            showToast(err?.response?.data?.message || "Failed.", "error");
+        }
+    };
+
+    const handleResidentDeny = async (resident) => {
+        const reason = window.prompt(
+            "Enter reason for denial (this will be sent to the resident):",
+            "",
+        );
+        if (reason === null) return;
+        if (!reason.trim()) {
+            showToast("Denial reason is required.", "error");
+            return;
+        }
+
+        try {
+            await axios.put(
+                `${API}/admin/residents/${resident.resident_id}/status`,
+                {
+                    status: "inactive",
+                    reason: reason.trim(),
+                },
+                adminHeaders(),
+            );
+            showToast(`${resident.full_name} has been denied.`);
             await loadResidents();
         } catch (err) {
             showToast(err?.response?.data?.message || "Failed.", "error");
@@ -2354,6 +2422,34 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                                     >
                                                         {resId}
                                                     </div>
+                                                    {res.id_image_url && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setIdPreviewModalUrl(
+                                                                    res.id_image_url,
+                                                                )
+                                                            }
+                                                            style={{
+                                                                fontSize: 10.5,
+                                                                color: "#0e2554",
+                                                                textDecoration:
+                                                                    "underline",
+                                                                marginTop: 3,
+                                                                display:
+                                                                    "inline-block",
+                                                                background:
+                                                                    "none",
+                                                                border: "none",
+                                                                padding: 0,
+                                                                cursor: "pointer",
+                                                                fontFamily:
+                                                                    "'Source Serif 4', serif",
+                                                            }}
+                                                        >
+                                                            View submitted ID
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                             {/* Contact / Email */}
@@ -2395,6 +2491,12 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                                         mode: "password",
                                                         resident: res,
                                                     })
+                                                }
+                                                onApprove={() =>
+                                                    handleResidentApprove(res)
+                                                }
+                                                onDeny={() =>
+                                                    handleResidentDeny(res)
                                                 }
                                                 onToggle={() =>
                                                     handleResidentToggle(res)
@@ -2464,6 +2566,47 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                     onClose={() => setResModal(null)}
                     onSave={handleResidentPassword}
                 />
+            )}
+            {Boolean(idPreviewModalUrl) && (
+                <div
+                    className="ma-modal-overlay"
+                    onClick={() => setIdPreviewModalUrl("")}
+                >
+                    <div
+                        className="ma-modal"
+                        style={{ maxWidth: 720 }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="ma-modal-header">
+                            <div className="ma-modal-title">
+                                Resident Submitted ID
+                            </div>
+                            <button
+                                className="ma-modal-close"
+                                onClick={() => setIdPreviewModalUrl("")}
+                            >
+                                <X size={15} />
+                            </button>
+                        </div>
+                        <div
+                            className="ma-modal-body"
+                            style={{ display: "flex", justifyContent: "center" }}
+                        >
+                            <img
+                                src={idPreviewModalUrl}
+                                alt="Resident submitted ID"
+                                style={{
+                                    width: "100%",
+                                    maxHeight: "70vh",
+                                    objectFit: "contain",
+                                    borderRadius: 6,
+                                    border: "1px solid #e4dfd4",
+                                    background: "#f8f6f1",
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Toast */}

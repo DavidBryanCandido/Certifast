@@ -588,32 +588,70 @@ async function getResidents(req, res) {
         const totalPages = Math.max(1, Math.ceil(total / limit));
 
         const pageArgs = [...args, limit, offset];
-        const result = await pool.query(
-            `SELECT
-                res.resident_id,
-                res.full_name,
-                res.email,
-                res.contact_number,
-                res.address_house,
-                res.address_street,
-                res.date_of_birth,
-                res.civil_status,
-                res.status,
-                res.created_at,
-                COALESCE(req.request_count, 0)::int AS request_count
-             FROM residents res
-             LEFT JOIN (
-                SELECT resident_id, COUNT(*)::int AS request_count
-                FROM requests
-                GROUP BY resident_id
-             ) req
-               ON req.resident_id = res.resident_id
-             ${whereSql}
-             ORDER BY ${orderBy}
-             LIMIT $${args.length + 1}
-             OFFSET $${args.length + 2}`,
-            pageArgs,
-        );
+        let result;
+        try {
+            result = await pool.query(
+                `SELECT
+                    res.resident_id,
+                    res.full_name,
+                    res.email,
+                    res.contact_number,
+                    res.id_type,
+                    res.id_image_url,
+                    res.address_house,
+                    res.address_street,
+                    res.date_of_birth,
+                    res.civil_status,
+                    res.verified_at,
+                    res.status,
+                    res.created_at,
+                    COALESCE(req.request_count, 0)::int AS request_count
+                 FROM residents res
+                 LEFT JOIN (
+                    SELECT resident_id, COUNT(*)::int AS request_count
+                    FROM requests
+                    GROUP BY resident_id
+                 ) req
+                   ON req.resident_id = res.resident_id
+                 ${whereSql}
+                 ORDER BY ${orderBy}
+                 LIMIT $${args.length + 1}
+                 OFFSET $${args.length + 2}`,
+                pageArgs,
+            );
+        } catch (queryErr) {
+            // Backward-compatible fallback for older schemas missing ID verification columns
+            if (queryErr?.code !== "42703") throw queryErr;
+            result = await pool.query(
+                `SELECT
+                    res.resident_id,
+                    res.full_name,
+                    res.email,
+                    res.contact_number,
+                    NULL::text AS id_type,
+                    NULL::text AS id_image_url,
+                    res.address_house,
+                    res.address_street,
+                    res.date_of_birth,
+                    res.civil_status,
+                    NULL::timestamp AS verified_at,
+                    res.status,
+                    res.created_at,
+                    COALESCE(req.request_count, 0)::int AS request_count
+                 FROM residents res
+                 LEFT JOIN (
+                    SELECT resident_id, COUNT(*)::int AS request_count
+                    FROM requests
+                    GROUP BY resident_id
+                 ) req
+                   ON req.resident_id = res.resident_id
+                 ${whereSql}
+                 ORDER BY ${orderBy}
+                 LIMIT $${args.length + 1}
+                 OFFSET $${args.length + 2}`,
+                pageArgs,
+            );
+        }
 
         return res.json({
             data: result.rows,
@@ -853,6 +891,7 @@ async function updateResidentStatus(req, res) {
     const nextStatus = String(req.body?.status || "")
         .trim()
         .toLowerCase();
+    const reason = String(req.body?.reason || "").trim();
 
     if (!Number.isFinite(residentId) || residentId <= 0) {
         return res.status(400).json({ message: "Invalid resident ID" });
@@ -864,12 +903,47 @@ async function updateResidentStatus(req, res) {
     }
 
     try {
+        const existingResult = await pool.query(
+            `SELECT resident_id, full_name, status
+             FROM residents
+             WHERE resident_id = $1
+             LIMIT 1`,
+            [residentId],
+        );
+        if (existingResult.rows.length === 0) {
+            return res.status(404).json({ message: "Resident not found" });
+        }
+
+        const existingResident = existingResult.rows[0];
+        const prevStatus = String(existingResident.status || "").toLowerCase();
+        const denyingPending =
+            prevStatus === "pending_verification" && nextStatus === "inactive";
+        const approvingPending =
+            prevStatus === "pending_verification" && nextStatus === "active";
+
+        if (denyingPending && !reason) {
+            return res.status(400).json({
+                message:
+                    "A reason is required when denying a pending resident account",
+            });
+        }
+
         const result = await pool.query(
             `UPDATE residents
-             SET status = $2
+             SET status = $2,
+                 verified_by = CASE
+                     WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
+                         THEN $3
+                     ELSE verified_by
+                 END,
+                 verified_at = CASE
+                     WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
+                         THEN NOW()
+                     ELSE verified_at
+                 END
              WHERE resident_id = $1
-             RETURNING resident_id, full_name, status`,
-            [residentId, nextStatus],
+             RETURNING resident_id, full_name, status, verified_at`,
+            [residentId, nextStatus, req.admin.id],
         );
 
         if (result.rows.length === 0) {
@@ -877,6 +951,31 @@ async function updateResidentStatus(req, res) {
         }
 
         const updated = result.rows[0];
+
+        if (approvingPending) {
+            await createNotification({
+                residentId: updated.resident_id,
+                type: "account_update",
+                title: "Account Approved",
+                message:
+                    "Your resident account has been approved. You may now sign in to CertiFast.",
+            });
+        } else if (denyingPending) {
+            await createNotification({
+                residentId: updated.resident_id,
+                type: "account_update",
+                title: "Account Denied",
+                message: `Your resident account registration was denied. Reason: ${reason}`,
+            });
+        }
+
+        const auditDescription =
+            denyingPending && reason
+                ? `Denied pending resident account for ${updated.full_name}. Reason: ${reason}`
+                : approvingPending
+                  ? `Approved pending resident account for ${updated.full_name}`
+                  : `Updated resident status to ${updated.status} for ${updated.full_name}`;
+
         await createAuditLog({
             actorId: req.admin.id,
             actorName: req.admin.username,
@@ -884,7 +983,7 @@ async function updateResidentStatus(req, res) {
             actionType: "resident_status_update",
             targetTable: "residents",
             targetId: updated.resident_id,
-            description: `Updated resident status to ${updated.status} for ${updated.full_name}`,
+            description: auditDescription,
             ipAddress: req.ip,
         });
 
@@ -1414,18 +1513,30 @@ async function getAccounts(req, res) {
     if (!ensureAdminOrSuperadmin(req, res)) return;
 
     try {
+        const columnsResult = await pool.query(
+            `SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'admin_accounts'`,
+        );
+        const columns = new Set(columnsResult.rows.map((row) => row.column_name));
+        const colOrNull = (columnName, castType = "text") =>
+            columns.has(columnName)
+                ? columnName
+                : `NULL::${castType} AS ${columnName}`;
+
         const result = await pool.query(
             `SELECT
-                admin_id,
-                full_name,
-                username,
-                email,
-                role,
-                status,
-                created_at,
-                last_login
+                ${colOrNull("admin_id", "integer")},
+                ${colOrNull("full_name", "text")},
+                ${colOrNull("username", "text")},
+                ${colOrNull("email", "text")},
+                ${colOrNull("role", "text")},
+                ${colOrNull("status", "text")},
+                ${colOrNull("created_at", "timestamp")},
+                ${colOrNull("last_login", "timestamp")}
              FROM admin_accounts
-             ORDER BY created_at DESC, admin_id DESC`,
+             ORDER BY created_at DESC NULLS LAST, admin_id DESC NULLS LAST`,
         );
 
         return res.json({ data: result.rows });

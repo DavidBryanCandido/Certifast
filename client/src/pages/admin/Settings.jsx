@@ -177,6 +177,79 @@ function useSettingsStyles() {
     }, []);
 }
 
+const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+function dataUrlByteSize(dataUrl) {
+    const base64 = String(dataUrl || "").split(",")[1] || "";
+    return Math.floor((base64.length * 3) / 4);
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result || "");
+        reader.onerror = () => reject(new Error("Failed to read image file"));
+        reader.readAsDataURL(file);
+    });
+}
+
+function loadImage(dataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Failed to load image for optimization"));
+        img.src = dataUrl;
+    });
+}
+
+async function optimizeImageForSettings(file) {
+    const originalDataUrl = await readFileAsDataUrl(file);
+    if (dataUrlByteSize(originalDataUrl) <= MAX_IMAGE_UPLOAD_BYTES) {
+        return originalDataUrl;
+    }
+
+    const img = await loadImage(originalDataUrl);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return originalDataUrl;
+
+    const maxDimension = 1800;
+    const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+    let width = Math.max(1, Math.round(img.width * scale));
+    let height = Math.max(1, Math.round(img.height * scale));
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const isPng = String(file.type || "").toLowerCase() === "image/png";
+    const exportType = isPng ? "image/png" : "image/jpeg";
+    let quality = 0.96;
+    let bestDataUrl = originalDataUrl;
+
+    for (let i = 0; i < 8; i += 1) {
+        canvas.width = width;
+        canvas.height = height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const candidate = canvas.toDataURL(
+            exportType,
+            exportType === "image/jpeg" ? quality : undefined,
+        );
+        bestDataUrl = candidate;
+
+        if (dataUrlByteSize(candidate) <= MAX_IMAGE_UPLOAD_BYTES) {
+            return candidate;
+        }
+
+        quality = Math.max(0.84, quality - 0.04);
+        width = Math.max(1, Math.round(width * 0.92));
+        height = Math.max(1, Math.round(height * 0.92));
+    }
+
+    return bestDataUrl;
+}
+
 // ─── Cert types initial data ──────────────────────────────────
 const INITIAL_CERT_TYPES = [
     {
@@ -556,12 +629,29 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const brgyFileRef = useRef();
     const cityFileRef = useRef();
 
-    const handleLogoUpload = (e, setter) => {
+    const handleLogoUpload = async (e, setter) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => setter(ev.target.result);
-        reader.readAsDataURL(file);
+        try {
+            const optimizedDataUrl = await optimizeImageForSettings(file);
+            if (dataUrlByteSize(optimizedDataUrl) > MAX_IMAGE_UPLOAD_BYTES) {
+                setMessage({
+                    text: "Image is still too large after optimization. Please use a smaller image.",
+                    type: "error",
+                });
+                return;
+            }
+            setter(optimizedDataUrl);
+            setMessage({
+                text: "Image optimized for upload.",
+                type: "success",
+            });
+        } catch {
+            setMessage({
+                text: "Failed to process image. Please try another file.",
+                type: "error",
+            });
+        }
     };
 
     // branding – barangay info

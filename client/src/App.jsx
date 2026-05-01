@@ -63,7 +63,11 @@ function AdminPage({ PageComponent, adminOnly = false }) {
     const resolvedAdmin = admin || { name: "Administrator", role: "admin" };
 
     const handleAdminNavigate = (pageKey) => {
-        const route = ADMIN_KEY_TO_ROUTE[pageKey];
+        if (typeof pageKey !== "string" || !pageKey.trim()) return;
+        const normalizedKey = pageKey.trim();
+        const route =
+            ADMIN_KEY_TO_ROUTE[normalizedKey] ||
+            (normalizedKey.startsWith("/") ? normalizedKey : null);
         if (route) navigate(route);
     };
 

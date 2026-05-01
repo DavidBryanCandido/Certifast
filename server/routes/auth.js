@@ -9,10 +9,10 @@ const {
     getAddressOptions,
 } = require("../controllers/authController");
 
-// multer — memory storage, 5 MB limit, images only
+// multer — memory storage, 2 MB limit, images only
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
         const allowed = ["image/jpeg", "image/png", "image/webp"];
         cb(null, allowed.includes(file.mimetype));

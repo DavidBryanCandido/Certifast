@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import authService from "../../services/authService";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // ─── Address data ─────────────────────────────────────────────
 // Fallback lists — used while API loads or on fetch failure.
@@ -77,6 +77,72 @@ const ID_TYPES = [
     "Postal ID",
     "Other valid ID",
 ];
+const MAX_ID_IMAGE_BYTES = 2 * 1024 * 1024;
+
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result || "");
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+    });
+}
+
+function loadImageFromDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = dataUrl;
+    });
+}
+
+async function optimizeResidentIdImage(file) {
+    if (file.size <= MAX_ID_IMAGE_BYTES) return file;
+
+    const dataUrl = await fileToDataUrl(file);
+    const img = await loadImageFromDataUrl(dataUrl);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+
+    let width = img.width;
+    let height = img.height;
+    const maxDimension = 2000;
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+
+    let quality = 0.96;
+    let bestBlob = null;
+
+    for (let i = 0; i < 8; i += 1) {
+        canvas.width = width;
+        canvas.height = height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const blob = await new Promise((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", quality),
+        );
+        if (!blob) continue;
+        bestBlob = blob;
+        if (blob.size <= MAX_ID_IMAGE_BYTES) {
+            return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), {
+                type: "image/jpeg",
+            });
+        }
+
+        quality = Math.max(0.84, quality - 0.04);
+        width = Math.max(1, Math.round(width * 0.92));
+        height = Math.max(1, Math.round(height * 0.92));
+    }
+
+    if (!bestBlob) return file;
+    return new File([bestBlob], file.name.replace(/\.\w+$/, ".jpg"), {
+        type: "image/jpeg",
+    });
+}
 
 // ─── Styles ───────────────────────────────────────────────────
 if (!document.head.querySelector("[data-certifast-reg-v4]")) {
@@ -394,20 +460,28 @@ export default function ResidentRegister({ onSuccess }) {
         (p) => String(p.purok_id) === String(form.purok_id),
     );
 
-    const handleFilePick = (e) => {
-        const file = e.target.files?.[0];
+    const handleFilePick = async (e) => {
+        const rawFile = e.target.files?.[0];
+        const file = rawFile || null;
         if (!file) return;
         if (!file.type.startsWith("image/")) {
             setError("Please upload a JPG or PNG image.");
             return;
         }
-        if (file.size > 5 * 1024 * 1024) {
-            setError("Image must be under 5 MB.");
-            return;
+        try {
+            const optimizedFile = await optimizeResidentIdImage(file);
+            if (optimizedFile.size > MAX_ID_IMAGE_BYTES) {
+                setError(
+                    "Image is still too large after optimization. Please use a smaller or lower-resolution photo.",
+                );
+                return;
+            }
+            setError("");
+            setIdFile(optimizedFile);
+            setIdPreview(URL.createObjectURL(optimizedFile));
+        } catch {
+            setError("Failed to process image. Please try another file.");
         }
-        setError("");
-        setIdFile(file);
-        setIdPreview(URL.createObjectURL(file));
     };
     const removeFile = () => {
         setIdFile(null);
@@ -1007,7 +1081,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 Tap to upload
                             </div>
                             <div style={{ fontSize: 11.5, color: "#9090aa" }}>
-                                JPG or PNG · Max 5 MB
+                                JPG or PNG · Max 2 MB
                             </div>
                         </div>
                     ) : (
