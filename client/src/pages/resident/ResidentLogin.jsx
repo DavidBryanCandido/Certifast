@@ -5,7 +5,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import authService from "../../services/authService";
+import axios from "axios";
+import { supabase } from "../../supabaseClient";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // ─── Inject styles (shared with admin login theme) ────────────
 if (!document.head.querySelector("[data-certifast-resident]")) {
@@ -111,25 +114,47 @@ export default function ResidentLogin({ onLogin }) {
         }
         setIsLoading(true);
         try {
-            const result = await authService.residentLogin({
-                email: form.email,
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: form.email.trim(),
                 password: form.password,
             });
-            if (result?.token) {
-                localStorage.setItem("certifast_resident_token", result.token);
-                localStorage.setItem(
-                    "certifast_resident_auth",
-                    JSON.stringify({
-                        token: result.token,
-                        resident: result.resident || result.data,
-                    }),
-                );
+
+            if (error) {
+                if ((error.message || "").includes("Email not confirmed")) {
+                    setError("Please verify your email first. Check your inbox.");
+                } else {
+                    setError("Invalid email or password. Please try again.");
+                }
+                return;
             }
-            if (onLogin) onLogin(result);
+
+            const res = await axios.post(
+                `${API}/auth/resident/login`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${data.session.access_token}`,
+                    },
+                },
+            );
+
+            localStorage.setItem(
+                "certifast_resident_token",
+                data.session.access_token,
+            );
+            localStorage.setItem(
+                "certifast_resident_auth",
+                JSON.stringify({
+                    token: data.session.access_token,
+                    resident: res.data.resident,
+                }),
+            );
+
+            if (onLogin) onLogin(res.data);
         } catch (err) {
             setError(
                 err?.response?.data?.message ||
-                    "Invalid email or password. Please try again.",
+                    "Login failed. Please try again.",
             );
         } finally {
             setIsLoading(false);

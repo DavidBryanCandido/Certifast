@@ -19,241 +19,162 @@ const supabase =
 //         contact_number, date_of_birth, house_number, purok_id, street_id,
 //         street_other, address_house, address_street, id_type }
 async function residentRegister(req, res) {
+    return res.status(410).json({
+        message:
+            "Direct resident registration endpoint is disabled. Please register through Supabase email verification.",
+    });
+}
+
+// POST /api/auth/resident/login
+// Called after Supabase email verification
+async function completeResidentRegistration(req, res) {
     const {
+        supabase_uid,
+        email,
         first_name,
         middle_name,
         last_name,
-        email,
-        password,
         contact_number,
-        date_of_birth,
-        house_number,
+        house_no,
         purok_id,
         street_id,
         street_other,
-        address_house,
-        address_street,
-        id_type,
+        date_of_birth,
         civil_status,
         nationality,
+        id_type,
     } = req.body;
 
-    // Compose full_name from parts
-    const full_name =
-        [first_name, middle_name, last_name]
-            .map((s) => (s || "").trim())
-            .filter(Boolean)
-            .join(" ") || req.body.full_name;
-
-    if (!first_name || !last_name || !email || !password) {
-        return res.status(400).json({
-            message: "first_name, last_name, email and password are required",
+    if (!supabase_uid || !email || !first_name || !last_name) {
+        return res.status(400).json({ message: "Missing required fields" });
+    }
+    if (!supabase) {
+        return res.status(500).json({
+            message:
+                "Supabase is not configured on the server. Please set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY.",
         });
     }
 
     try {
-        if (!supabase) {
-            return res.status(500).json({
-                message:
-                    "Supabase is not configured on the server. Please set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY.",
-            });
-        }
-
-        // Check if email already exists
         const existing = await pool.query(
             "SELECT resident_id FROM residents WHERE email = $1",
             [email],
         );
         if (existing.rows.length > 0) {
-            return res
-                .status(409)
-                .json({ message: "Email already registered" });
+            return res.status(409).json({ message: "Already registered" });
         }
 
-        const { data: authData, error: authError } =
-            await supabase.auth.admin.createUser({
+        const full_name = [first_name, middle_name, last_name]
+            .map((s) => (s || "").trim())
+            .filter(Boolean)
+            .join(" ");
+
+        const jpgPath = `resident-ids/${supabase_uid}.jpg`;
+        const pngPath = `resident-ids/${supabase_uid}.png`;
+        const webpPath = `resident-ids/${supabase_uid}.webp`;
+
+        const { data: jpgUrlData } = supabase.storage
+            .from("certifast-uploads")
+            .getPublicUrl(jpgPath);
+        const { data: pngUrlData } = supabase.storage
+            .from("certifast-uploads")
+            .getPublicUrl(pngPath);
+        const { data: webpUrlData } = supabase.storage
+            .from("certifast-uploads")
+            .getPublicUrl(webpPath);
+
+        const id_image_url =
+            jpgUrlData?.publicUrl ||
+            pngUrlData?.publicUrl ||
+            webpUrlData?.publicUrl ||
+            null;
+
+        const result = await pool.query(
+            `INSERT INTO residents (
+                full_name, first_name, middle_name, last_name,
+                email, password_hash,
+                contact_number, date_of_birth, house_number,
+                purok_id, street_id, street_other,
+                id_type, id_image_url, civil_status, nationality, status
+            ) VALUES (
+                $1, $2, $3, $4,
+                $5, $6,
+                $7, $8, $9,
+                $10, $11, $12,
+                $13, $14, $15, $16, 'pending_verification'
+            ) RETURNING resident_id, full_name, email, status`,
+            [
+                full_name,
+                first_name,
+                middle_name || null,
+                last_name,
                 email,
-                password,
-                email_confirm: true,
-                user_metadata: {
-                    first_name,
-                    middle_name: middle_name || null,
-                    last_name,
-                    full_name,
-                    role: "resident",
-                },
-            });
-
-        if (authError) {
-            const isDuplicateEmail =
-                authError.status === 422 ||
-                /already\s+registered|already\s+exists/i.test(
-                    authError.message || "",
-                );
-            return res.status(isDuplicateEmail ? 409 : 500).json({
-                message: isDuplicateEmail
-                    ? "Email is already registered in authentication. Please use another email."
-                    : "Failed to create authentication account. Please try again.",
-            });
-        }
-
-        const supabaseAuthId = authData?.user?.id || null;
-
-        const password_hash = await bcrypt.hash(password, 10);
-
-        // ── Upload ID image to Supabase Storage if provided ──
-        let id_image_url = null;
-        if (req.file) {
-            if (!supabase) {
-                console.warn(
-                    "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing; skipping ID image upload.",
-                );
-            } else {
-            const ext =
-                req.file.mimetype === "image/png"
-                    ? "png"
-                    : req.file.mimetype === "image/webp"
-                      ? "webp"
-                      : "jpg";
-            const filename = `resident-ids/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from("certifast-uploads")
-                .upload(filename, req.file.buffer, {
-                    contentType: req.file.mimetype,
-                    upsert: false,
-                });
-
-            if (uploadError) {
-                console.error("Supabase upload error:", uploadError.message);
-                // Don't fail registration — just proceed without the image URL
-            } else {
-                const { data: urlData } = supabase.storage
-                    .from("certifast-uploads")
-                    .getPublicUrl(filename);
-                id_image_url = urlData.publicUrl;
-            }
-            }
-        }
-
-        let result;
-        try {
-            result = await pool.query(
-                `INSERT INTO residents (
-                    full_name, first_name, middle_name, last_name,
-                    email, password_hash, contact_number, date_of_birth,
-                    house_number, purok_id, street_id, street_other,
-                    address_house, address_street,
-                    id_type, id_image_url, civil_status, nationality, status
-                ) VALUES (
-                    $1,  $2,  $3,  $4,
-                    $5,  $6,  $7,  $8,
-                    $9,  $10, $11, $12,
-                    $13, $14,
-                    $15, $16, $17, $18, 'pending_verification'
-                )
-                RETURNING resident_id, full_name, first_name, last_name, email, status`,
-                [
-                    full_name,
-                    first_name,
-                    middle_name || null,
-                    last_name,
-                    email,
-                    password_hash,
-                    contact_number || null,
-                    date_of_birth || null,
-                    house_number || null,
-                    purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,
-                    street_id && Number(street_id) > 0 ? Number(street_id) : null,
-                    street_other || null,
-                    address_house || null,
-                    address_street || null,
-                    id_type || null,
-                    id_image_url,
-                    civil_status || null,
-                    nationality || "Filipino",
-                ],
-            );
-        } catch (dbError) {
-            if (supabaseAuthId) {
-                await supabase.auth.admin
-                    .deleteUser(supabaseAuthId)
-                    .catch((cleanupError) => {
-                        console.error(
-                            "Failed to rollback Supabase user after DB insert error:",
-                            cleanupError.message,
-                        );
-                    });
-            }
-            throw dbError;
-        }
+                supabase_uid,
+                contact_number || null,
+                date_of_birth || null,
+                house_no || null,
+                purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,
+                street_id && Number(street_id) > 0 ? Number(street_id) : null,
+                street_other || null,
+                id_type || null,
+                id_image_url,
+                civil_status || null,
+                nationality || "Filipino",
+            ],
+        );
 
         return res.status(201).json({
-            message:
-                "Account created successfully. Your registration is under review. Please come back in 1–3 business days.",
+            message: "Registration complete",
             resident: result.rows[0],
         });
     } catch (err) {
-        console.error("residentRegister error:", err);
+        console.error("completeResidentRegistration error:", err);
         return res.status(500).json({ message: "Server error" });
     }
 }
 
-// POST /api/auth/resident/login
-// body: { email, password }
-async function residentLogin(req, res) {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        return res
-            .status(400)
-            .json({ message: "Email and password are required" });
+// Verifies Supabase token and checks resident status
+async function residentLoginWithSupabase(req, res) {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "No token provided" });
+    if (!supabase) {
+        return res.status(500).json({
+            message:
+                "Supabase is not configured on the server. Please set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY.",
+        });
     }
 
     try {
-        // Check if account exists at all (any status)
-        const result = await pool.query(
-            "SELECT * FROM residents WHERE email = $1",
-            [email],
-        );
+        const {
+            data: { user },
+            error,
+        } = await supabase.auth.getUser(token);
+        if (error || !user) {
+            return res.status(401).json({ message: "Invalid or expired token" });
+        }
+
+        const result = await pool.query("SELECT * FROM residents WHERE email = $1", [
+            user.email,
+        ]);
 
         if (result.rows.length === 0) {
-            return res
-                .status(401)
-                .json({ message: "Invalid email or password" });
+            return res.status(404).json({
+                message: "Account not found. Please complete registration.",
+            });
         }
 
         const resident = result.rows[0];
-
-        // Block pending_verification accounts with a clear message
         if (resident.status === "pending_verification") {
             return res.status(403).json({
                 message:
-                    "Your account is still under review. Please come back in 1–3 business days once the barangay has verified your ID.",
+                    "Your account is under review. Please come back in 1-3 business days.",
             });
         }
-
-        // Block inactive accounts
-        if (resident.status === "inactive") {
-            return res.status(403).json({
-                message:
-                    "Your account has been deactivated. Please contact the barangay office.",
-            });
-        }
-
         if (resident.status !== "active") {
             return res.status(403).json({
                 message:
                     "Your account is not active. Please contact the barangay office.",
             });
-        }
-
-        const match = await bcrypt.compare(password, resident.password_hash);
-
-        if (!match) {
-            return res
-                .status(401)
-                .json({ message: "Invalid email or password" });
         }
 
         await createAuditLog({
@@ -267,16 +188,6 @@ async function residentLogin(req, res) {
             ipAddress: req.ip,
         });
 
-        const token = jwt.sign(
-            {
-                id: resident.resident_id,
-                email: resident.email,
-                type: "resident",
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_RESIDENT_EXPIRES },
-        );
-
         return res.json({
             token,
             resident: {
@@ -286,7 +197,7 @@ async function residentLogin(req, res) {
             },
         });
     } catch (err) {
-        console.error("residentLogin error:", err);
+        console.error("residentLoginWithSupabase error:", err);
         return res.status(500).json({ message: "Server error" });
     }
 }
@@ -448,7 +359,8 @@ async function getAddressOptions(req, res) {
 
 module.exports = {
     residentRegister,
-    residentLogin,
+    residentLoginWithSupabase,
+    completeResidentRegistration,
     residentChangePassword,
     adminLogin,
     getAddressOptions,

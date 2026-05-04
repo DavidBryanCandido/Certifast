@@ -12,6 +12,7 @@ import Settings from "./pages/admin/Settings";
 
 import ResidentLogin from "./pages/resident/ResidentLogin";
 import ResidentRegister from "./pages/resident/ResidentRegister";
+import CompleteRegistration from "./pages/resident/CompleteRegistration";
 import ResidentHome from "./pages/resident/ResidentHome";
 import SubmitRequest from "./pages/resident/SubmitRequest";
 import MyRequests from "./pages/resident/MyRequests";
@@ -173,6 +174,10 @@ export default function App() {
             <Route
                 path="/resident/register"
                 element={<ResidentRegisterRoute />}
+            />
+            <Route
+                path="/resident/complete-registration"
+                element={<CompleteRegistration />}
             />
             <Route
                 path="/login"

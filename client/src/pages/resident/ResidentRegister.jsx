@@ -22,7 +22,7 @@ import {
     CalendarClock,
     CalendarDays,
 } from "lucide-react";
-import authService from "../../services/authService";
+import { supabase } from "../../supabaseClient";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -549,48 +549,66 @@ export default function ResidentRegister({ onSuccess }) {
         setIsLoading(true);
         setError("");
         try {
-            const purokName = selectedPurok?.name ?? "";
-            const address_house = `${form.house_no}, ${purokName}`.trim();
-            const address_street =
-                `${resolvedStreet}, Barangay East Tapinac, Olongapo City`.trim();
-            // Build FormData so the ID image can be sent as multipart
-            const payload = new FormData();
-            payload.append("first_name", form.first_name.trim());
-            payload.append("last_name", form.last_name.trim());
-            if (form.middle_name.trim())
-                payload.append("middle_name", form.middle_name.trim());
-            payload.append("full_name", fullName);
-            payload.append("email", form.email.trim());
-            payload.append("password", password);
-            payload.append("contact_number", form.contact_number.trim());
-            payload.append("house_number", form.house_no.trim());
-            payload.append("address_house", address_house);
-            payload.append("address_street", address_street);
-            payload.append("address", address_street);
-            if (form.date_of_birth)
-                payload.append("date_of_birth", form.date_of_birth);
-            if (form.civil_status)
-                payload.append("civil_status", form.civil_status);
-            if (form.nationality)
-                payload.append("nationality", form.nationality);
-            if (form.purok_id) payload.append("purok_id", form.purok_id);
-            if (form.street_id && form.street_id !== "other") {
-                payload.append("street_id", form.street_id);
-            }
-            if (form.street_id === "other" && form.street_other.trim()) {
-                payload.append("street_other", form.street_other.trim());
-            }
-            if (idType) payload.append("id_type", idType);
-            if (idFile) payload.append("id_image", idFile); // ← image file
+            const { data: authData, error: authError } =
+                await supabase.auth.signUp({
+                    email: form.email.trim(),
+                    password,
+                    options: {
+                        emailRedirectTo: `${window.location.origin}/resident/complete-registration`,
+                        data: {
+                            first_name: form.first_name.trim(),
+                            last_name: form.last_name.trim(),
+                            middle_name: form.middle_name.trim() || null,
+                            contact_number: form.contact_number.trim(),
+                            house_no: form.house_no.trim(),
+                            purok_id: form.purok_id || null,
+                            street_id:
+                                form.street_id && form.street_id !== "other"
+                                    ? form.street_id
+                                    : null,
+                            street_other:
+                                form.street_id === "other"
+                                    ? form.street_other.trim() || null
+                                    : null,
+                            date_of_birth: form.date_of_birth || null,
+                            civil_status: form.civil_status || null,
+                            nationality: form.nationality || "Filipino",
+                            id_type: idType || null,
+                        },
+                    },
+                });
 
-            await authService.residentRegister(payload);
+            if (authError) {
+                if (
+                    /already registered|already been registered/i.test(
+                        authError.message || "",
+                    )
+                ) {
+                    throw new Error("Email already registered.");
+                }
+                throw new Error(authError.message);
+            }
+
+            if (idFile && authData?.user) {
+                const ext = idFile.type === "image/png" ? "png" : "jpg";
+                const filename = `resident-ids/${authData.user.id}.${ext}`;
+                const { error: uploadError } = await supabase.storage
+                    .from("certifast-uploads")
+                    .upload(filename, idFile, {
+                        contentType: idFile.type,
+                        upsert: true,
+                    });
+                if (uploadError) {
+                    throw new Error(
+                        uploadError.message || "Failed to upload ID image.",
+                    );
+                }
+            }
+
             setSuccess(true);
             if (onSuccess) setTimeout(onSuccess, 3000);
         } catch (err) {
-            setError(
-                err?.response?.data?.message ||
-                    "Registration failed. Please try again.",
-            );
+            setError(err?.message || "Registration failed. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -650,7 +668,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 margin: "0 0 10px",
                             }}
                         >
-                            Account Submitted!
+                            Check Your Email!
                         </p>
                         <p
                             style={{
@@ -660,8 +678,10 @@ export default function ResidentRegister({ onSuccess }) {
                                 margin: "0 0 20px",
                             }}
                         >
-                            Your registration has been received. Barangay staff
-                            will review your submitted ID photo.
+                            We sent a verification link to{" "}
+                            <strong>{form.email}</strong>. Click it to confirm
+                            your email, then come back in 1-3 business days
+                            once the barangay has reviewed your ID.
                         </p>
                         <div
                             style={{
@@ -687,11 +707,29 @@ export default function ResidentRegister({ onSuccess }) {
                                     lineHeight: 1.7,
                                 }}
                             >
-                                <strong>
-                                    Please come back in 1–3 business days
-                                </strong>{" "}
-                                to log in once your account has been verified
-                                and approved by the barangay.
+                                <strong>What happens next:</strong>
+                                <ol
+                                    style={{
+                                        fontSize: 13,
+                                        color: "#7a4800",
+                                        lineHeight: 1.8,
+                                        margin: "8px 0 0",
+                                        paddingLeft: 20,
+                                    }}
+                                >
+                                    <li>
+                                        Click the link in your email to verify
+                                        your address
+                                    </li>
+                                    <li>
+                                        Barangay staff will review your
+                                        submitted ID
+                                    </li>
+                                    <li>
+                                        Come back in 1-3 business days to log
+                                        in
+                                    </li>
+                                </ol>
                             </div>
                         </div>
                         <button

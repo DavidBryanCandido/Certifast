@@ -4,7 +4,8 @@ const router = express.Router();
 const multer = require("multer");
 const {
     residentRegister,
-    residentLogin,
+    residentLoginWithSupabase,
+    completeResidentRegistration,
     adminLogin,
     getAddressOptions,
 } = require("../controllers/authController");
@@ -20,7 +21,8 @@ const upload = multer({
 });
 
 router.post("/resident/register", upload.single("id_image"), residentRegister);
-router.post("/resident/login", residentLogin);
+router.post("/resident/complete-registration", completeResidentRegistration);
+router.post("/resident/login", residentLoginWithSupabase);
 router.post("/admin/login", adminLogin);
 router.get("/address-options", getAddressOptions);
 

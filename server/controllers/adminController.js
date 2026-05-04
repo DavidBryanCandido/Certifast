@@ -1,7 +1,14 @@
 // certifast/controllers/adminController.js
 const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
+const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
+
+const supabase = (() => {
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    return url && key ? createClient(url, key) : null;
+})();
 
 function makeWalkInDocId(certificateId) {
     const now = new Date();
@@ -1573,13 +1580,6 @@ async function createAccount(req, res) {
     }
 
     try {
-        const { createClient } = require("@supabase/supabase-js");
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const supabase = supabaseUrl && supabaseServiceRoleKey
-            ? createClient(supabaseUrl, supabaseServiceRoleKey)
-            : null;
-
         const existing = await pool.query(
             `SELECT admin_id FROM admin_accounts WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2) LIMIT 1`,
             [username, email],
