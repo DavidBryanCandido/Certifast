@@ -972,21 +972,53 @@ async function updateResidentStatus(req, res) {
             });
         }
 
+        const adminId = Number.parseInt(req.admin?.id, 10);
+        const adminUsername = String(req.admin?.username || "").trim();
+        let verifierResult = { rows: [] };
+
+        if (Number.isFinite(adminId) && adminId > 0) {
+            verifierResult = await pool.query(
+                `SELECT admin_id, username
+                 FROM admin_accounts
+                 WHERE admin_id = $1
+                 LIMIT 1`,
+                [adminId],
+            );
+        }
+
+        if (verifierResult.rows.length === 0 && adminUsername) {
+            verifierResult = await pool.query(
+                `SELECT admin_id, username
+                 FROM admin_accounts
+                 WHERE LOWER(username) = LOWER($1)
+                 LIMIT 1`,
+                [adminUsername],
+            );
+        }
+
+        if (verifierResult.rows.length === 0) {
+            return res.status(409).json({
+                code: "admin_session_stale",
+                message:
+                    "Your admin session is stale. Please log out and log in again before reviewing resident accounts.",
+            });
+        }
+
+        const verifier = verifierResult.rows[0];
+
         const result = await pool.query(
             `UPDATE residents
-             SET status = $2,
+             SET status = $2::varchar,
                  rejection_comment = CASE
-                     WHEN $2 = 'inactive' AND $3 <> '' THEN $3
-                     WHEN $2 = 'active' THEN NULL
+                     WHEN $2::text = 'inactive' AND $3::text <> '' THEN $3::text
+                     WHEN $2::text = 'active' THEN NULL
                      ELSE rejection_comment
                  END,
-                 verified_at = CASE
-                     WHEN $2 = 'active' THEN NOW()
-                     ELSE verified_at
-                 END
+                 verified_by = $4::integer,
+                 verified_at = NOW()
              WHERE resident_id = $1
-             RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
-            [residentId, nextStatus, reason],
+             RETURNING resident_id, full_name, status, verified_by, verified_at, rejection_comment`,
+            [residentId, nextStatus, reason, verifier.admin_id],
         );
 
         if (result.rows.length === 0) {
@@ -995,23 +1027,6 @@ async function updateResidentStatus(req, res) {
 
         const updated = result.rows[0];
 
-        if (approvingPending) {
-            await createNotification({
-                residentId: updated.resident_id,
-                type: "account_update",
-                title: "Account Approved",
-                message:
-                    "Your resident account has been approved. You may now sign in to CertiFast.",
-            });
-        } else if (denyingPending) {
-            await createNotification({
-                residentId: updated.resident_id,
-                type: "account_update",
-                title: "Account Denied",
-                message: `Your resident account registration was denied. Reason: ${reason}`,
-            });
-        }
-
         const auditDescription =
             denyingPending && reason
                 ? `Denied pending resident account for ${updated.full_name}. Reason: ${reason}`
@@ -1019,16 +1034,42 @@ async function updateResidentStatus(req, res) {
                   ? `Approved pending resident account for ${updated.full_name}`
                   : `Updated resident status to ${updated.status} for ${updated.full_name}`;
 
-        await createAuditLog({
-            actorId: req.admin.id,
-            actorName: req.admin.username,
-            actorRole: req.admin.role,
-            actionType: "resident_status_update",
-            targetTable: "residents",
-            targetId: updated.resident_id,
-            description: auditDescription,
-            ipAddress: req.ip,
-        });
+        void (async () => {
+            try {
+                if (approvingPending) {
+                    await createNotification({
+                        residentId: updated.resident_id,
+                        type: "account_update",
+                        title: "Account Approved",
+                        message:
+                            "Your resident account has been approved. You may now sign in to CertiFast.",
+                    });
+                } else if (denyingPending) {
+                    await createNotification({
+                        residentId: updated.resident_id,
+                        type: "account_update",
+                        title: "Account Denied",
+                        message: `Your resident account registration was denied. Reason: ${reason}`,
+                    });
+                }
+
+                await createAuditLog({
+                    actorId: verifier.admin_id,
+                    actorName: verifier.username || req.admin.username,
+                    actorRole: req.admin.role,
+                    actionType: "resident_status_update",
+                    targetTable: "residents",
+                    targetId: updated.resident_id,
+                    description: auditDescription,
+                    ipAddress: req.ip,
+                });
+            } catch (sideEffectErr) {
+                console.error(
+                    "updateResidentStatus side-effect error:",
+                    sideEffectErr,
+                );
+            }
+        })();
 
         return res.json({
             message: "Resident status updated successfully",
@@ -1036,12 +1077,19 @@ async function updateResidentStatus(req, res) {
                 resident_id: updated.resident_id,
                 full_name: updated.full_name,
                 status: updated.status,
+                verified_by: updated.verified_by,
+                verified_at: updated.verified_at,
                 rejection_comment: updated.rejection_comment,
             },
         });
     } catch (err) {
         console.error("updateResidentStatus error:", err);
-        return res.status(500).json({ message: "Server error" });
+        return res.status(500).json({
+            message: `Resident status update failed: ${err.message}`,
+            code: err.code || null,
+            detail: err.detail || null,
+            constraint: err.constraint || null,
+        });
     }
 }
 
