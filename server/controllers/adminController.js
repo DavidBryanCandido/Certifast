@@ -982,30 +982,59 @@ async function updateResidentStatus(req, res) {
             });
         }
 
-        await ensureResidentRejectionColumn();
-
-        const result = await pool.query(
-            `UPDATE residents
-             SET status = $2,
-                 rejection_comment = CASE
-                     WHEN $2 = 'inactive' AND $4 <> '' THEN $4
-                     WHEN $2 = 'active' THEN NULL
-                     ELSE rejection_comment
-                 END,
-                 verified_by = CASE
-                     WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
-                         THEN $3
-                     ELSE verified_by
-                 END,
-                 verified_at = CASE
-                     WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
-                         THEN NOW()
-                     ELSE verified_at
-                 END
-             WHERE resident_id = $1
-             RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
-            [residentId, nextStatus, req.admin.id, reason],
-        );
+        let usedRejectionCommentColumn = true;
+        let result;
+        try {
+            await ensureResidentRejectionColumn();
+            result = await pool.query(
+                `UPDATE residents
+                 SET status = $2,
+                     rejection_comment = CASE
+                         WHEN $2 = 'inactive' AND $4 <> '' THEN $4
+                         WHEN $2 = 'active' THEN NULL
+                         ELSE rejection_comment
+                     END,
+                     verified_by = CASE
+                         WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
+                             THEN $3
+                         ELSE verified_by
+                     END,
+                     verified_at = CASE
+                         WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
+                             THEN NOW()
+                         ELSE verified_at
+                     END
+                 WHERE resident_id = $1
+                 RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
+                [residentId, nextStatus, req.admin.id, reason],
+            );
+        } catch (statusErr) {
+            if (statusErr?.code !== "42703" && statusErr?.code !== "42501") {
+                throw statusErr;
+            }
+            usedRejectionCommentColumn = false;
+            console.error(
+                "resident rejection_comment column unavailable:",
+                statusErr,
+            );
+            result = await pool.query(
+                `UPDATE residents
+                 SET status = $2,
+                     verified_by = CASE
+                         WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
+                             THEN $3
+                         ELSE verified_by
+                     END,
+                     verified_at = CASE
+                         WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
+                             THEN NOW()
+                         ELSE verified_at
+                     END
+                 WHERE resident_id = $1
+                 RETURNING resident_id, full_name, status, verified_at, NULL::text AS rejection_comment`,
+                [residentId, nextStatus, req.admin.id],
+            );
+        }
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Resident not found" });
@@ -1059,6 +1088,9 @@ async function updateResidentStatus(req, res) {
 
         return res.json({
             message: "Resident status updated successfully",
+            warning: usedRejectionCommentColumn
+                ? null
+                : "Resident status changed, but rejection_comment could not be saved because the database column is missing or unavailable.",
             resident: {
                 resident_id: updated.resident_id,
                 full_name: updated.full_name,
