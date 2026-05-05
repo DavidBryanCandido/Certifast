@@ -165,23 +165,8 @@ export default function ResidentLogin({ onLogin }) {
             if (error) {
                 if ((error.message || "").includes("Email not confirmed")) {
                     setError("Please verify your email first. Check your inbox.");
-                    return;
-                }
-
-                try {
-                    const legacyRes = await axios.post(
-                        `${API}/auth/resident/login`,
-                        {
-                            email: form.email.trim(),
-                            password: form.password,
-                        },
-                    );
-                    finishLogin(
-                        legacyRes.data.token,
-                        legacyRes.data.resident,
-                    );
-                } catch (legacyErr) {
-                    showBackendLoginError(legacyErr);
+                } else {
+                    setError("Invalid email or password. Please try again.");
                 }
                 return;
             }

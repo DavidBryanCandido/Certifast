@@ -17,41 +17,6 @@ async function residentAuth(req, res, next) {
     if (!token) return res.status(401).json({ message: "No token provided" });
 
     try {
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            if (decoded.type === "resident") {
-                const result = await pool.query(
-                    `SELECT resident_id, full_name, email, status
-                     FROM residents
-                     WHERE resident_id = $1
-                     LIMIT 1`,
-                    [decoded.id],
-                );
-
-                if (result.rows.length === 0) {
-                    return res
-                        .status(403)
-                        .json({ message: "Resident not found" });
-                }
-
-                const resident = result.rows[0];
-                if (resident.status !== "active") {
-                    return res
-                        .status(403)
-                        .json({ message: "Resident account is not active" });
-                }
-
-                req.resident = {
-                    id: resident.resident_id,
-                    email: resident.email,
-                    full_name: resident.full_name,
-                };
-                return next();
-            }
-        } catch {
-            // Not a CertiFast resident JWT; continue with Supabase token verification.
-        }
-
         if (!supabase) {
             return res.status(500).json({
                 message: "Supabase is not configured on the server",
