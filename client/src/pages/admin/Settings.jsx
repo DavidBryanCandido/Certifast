@@ -9,6 +9,7 @@ import {
 } from "../../components/AdminSidebar";
 import { Menu, X } from "lucide-react";
 import * as settingsService from "../../services/settingsService";
+import { DOC1_CERTIFICATE_OPTIONS } from "../../utils/certificateTemplateEngine";
 
 // ─── Injected styles (mirrors HTML stylesheet) ───────────────
 let stylesInjected = false;
@@ -251,50 +252,13 @@ async function optimizeImageForSettings(file) {
 }
 
 // ─── Cert types initial data ──────────────────────────────────
-const INITIAL_CERT_TYPES = [
-    {
-        id: 1,
-        name: "Barangay Clearance",
-        desc: "Certifies good standing for general purposes",
-        fee: true,
-        active: true,
-    },
-    {
-        id: 2,
-        name: "Certificate of Residency",
-        desc: "Certifies bona fide residency in the barangay",
-        fee: false,
-        active: true,
-    },
-    {
-        id: 3,
-        name: "Certificate of Indigency",
-        desc: "For indigent families in the barangay",
-        fee: false,
-        active: true,
-    },
-    {
-        id: 4,
-        name: "Business Permit",
-        desc: "Authorizes business operation in the barangay",
-        fee: true,
-        active: true,
-    },
-    {
-        id: 5,
-        name: "Good Moral Certificate",
-        desc: "Certifies good moral character in the community",
-        fee: false,
-        active: true,
-    },
-    {
-        id: 6,
-        name: "Cert. of Live Birth (Endorsement)",
-        desc: "Endorsement for late birth registration",
-        fee: false,
-        active: true,
-    },
-];
+const INITIAL_CERT_TYPES = DOC1_CERTIFICATE_OPTIONS.map((cert, index) => ({
+    id: index + 1,
+    name: cert.name,
+    desc: cert.desc,
+    fee: cert.hasFee,
+    active: true,
+}));
 
 // ─── Signature Block Sub-component ───────────────────────────
 function SigBlock({ id, label, sublabel, sig, onSet, onClear, onDraw }) {
@@ -674,6 +638,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [officials, setOfficials] = useState({
         captainName: "Hon. Dante L. Hondo",
         captainTitle: "Punong Barangay",
+        kagawadName: "Hon. Jojo D. De Leon",
+        kagawadTitle: "Barangay Kagawad",
+        kagawad1Name: "Hon. Crisanta D. Daniel",
+        kagawad1Title: "Barangay Kagawad",
+        kagawad2Name: "Hon. Florencia S. Abad",
+        kagawad2Title: "Barangay Kagawad",
         secondaryName: "",
         secondaryTitle: "",
     });
@@ -752,6 +722,36 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                     setOfficials((prev) => ({
                         ...prev,
                         captainTitle: data.captain_title,
+                    }));
+                if (data.kagawad_name)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawadName: data.kagawad_name,
+                    }));
+                if (data.kagawad_title)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawadTitle: data.kagawad_title,
+                    }));
+                if (data.kagawad_1_name)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawad1Name: data.kagawad_1_name,
+                    }));
+                if (data.kagawad_1_title)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawad1Title: data.kagawad_1_title,
+                    }));
+                if (data.kagawad_2_name)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawad2Name: data.kagawad_2_name,
+                    }));
+                if (data.kagawad_2_title)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawad2Title: data.kagawad_2_title,
                     }));
                 if (data.secondary_name)
                     setOfficials((prev) => ({
@@ -842,6 +842,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             const settings = {
                 captain_name: officials.captainName,
                 captain_title: officials.captainTitle,
+                kagawad_name: officials.kagawadName,
+                kagawad_title: officials.kagawadTitle,
+                kagawad_1_name: officials.kagawad1Name,
+                kagawad_1_title: officials.kagawad1Title,
+                kagawad_2_name: officials.kagawad2Name,
+                kagawad_2_title: officials.kagawad2Title,
                 secondary_name: officials.secondaryName,
                 secondary_title: officials.secondaryTitle,
                 captain_sig_base64: sig1 || "",
@@ -1750,8 +1756,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             textAlign: "center",
                                         }}
                                     >
-                                        This header and footer appear on every
-                                        generated certificate and permit.
+                                        This header appears on every generated
+                                        certificate and permit.
                                     </div>
                                 </div>
                             </div>
@@ -1907,7 +1913,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             </div>
 
                             {/* CERTIFICATE FOOTER */}
-                            <div className="st-panel">
+                            <div className="st-panel" style={{ display: "none" }}>
                                 <div className="st-panel-header">
                                     <div>
                                         <div className="st-panel-title">
@@ -2081,6 +2087,67 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             />
                                         </div>
                                     </div>
+                                    <div
+                                        className="st-form-grid-2"
+                                        style={{ marginBottom: 18 }}
+                                    >
+                                        <div className="st-field">
+                                            <label>Barangay Kagawad</label>
+                                            <input
+                                                type="text"
+                                                value={officials.kagawadName}
+                                                onChange={(e) =>
+                                                    setOfficials({
+                                                        ...officials,
+                                                        kagawadName:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="st-field">
+                                            <label>Kagawad Title</label>
+                                            <input
+                                                type="text"
+                                                value={officials.kagawadTitle}
+                                                onChange={(e) =>
+                                                    setOfficials({
+                                                        ...officials,
+                                                        kagawadTitle:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="st-field">
+                                            <label>Witness Kagawad 1</label>
+                                            <input
+                                                type="text"
+                                                value={officials.kagawad1Name}
+                                                onChange={(e) =>
+                                                    setOfficials({
+                                                        ...officials,
+                                                        kagawad1Name:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="st-field">
+                                            <label>Witness Kagawad 2</label>
+                                            <input
+                                                type="text"
+                                                value={officials.kagawad2Name}
+                                                onChange={(e) =>
+                                                    setOfficials({
+                                                        ...officials,
+                                                        kagawad2Name:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                    </div>
                                     <div className="st-form-grid-2">
                                         <div className="st-field">
                                             <label>
@@ -2165,6 +2232,18 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                         "Hon. Dante L. Hondo",
                                                     captainTitle:
                                                         "Punong Barangay",
+                                                    kagawadName:
+                                                        "Hon. Jojo D. De Leon",
+                                                    kagawadTitle:
+                                                        "Barangay Kagawad",
+                                                    kagawad1Name:
+                                                        "Hon. Crisanta D. Daniel",
+                                                    kagawad1Title:
+                                                        "Barangay Kagawad",
+                                                    kagawad2Name:
+                                                        "Hon. Florencia S. Abad",
+                                                    kagawad2Title:
+                                                        "Barangay Kagawad",
                                                     secondaryName: "",
                                                     secondaryTitle: "",
                                                 });

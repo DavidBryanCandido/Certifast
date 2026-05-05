@@ -22,6 +22,8 @@ import {
 } from "../../components/AdminSidebar";
 import AdminQRScannerModal from "../../components/AdminQRScannerModal";
 import adminRequestService from "../../services/adminRequestService";
+import * as settingsService from "../../services/settingsService";
+import { buildCertificatePrintHtml } from "../../utils/certificateTemplateEngine";
 
 // =============================================================
 // useWindowSize
@@ -251,7 +253,15 @@ function formatDate() {
 // — Row click opens it, approve stays open, print unlocks mark-ready,
 //   scan QR & release uses AdminQRScannerModal via parent callback
 // =============================================================
-function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner, onLogout }) {
+function RequestDrawer({
+    request,
+    onClose,
+    isMobile,
+    onRefresh,
+    onOpenQRScanner,
+    onLogout,
+    certificateSettings,
+}) {
     const [step, setStep]               = useState("default"); // default | reject
     const [rejectReason, setRejectReason] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
@@ -345,108 +355,21 @@ function RequestDrawer({ request, onClose, isMobile, onRefresh, onOpenQRScanner,
         }
     };
 
-        const buildCertificateTemplateHtml = () => {
-                const now = new Date().toLocaleString("en-US", {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
+        const buildCertificateTemplateHtml = () =>
+                buildCertificatePrintHtml({
+                        certType: request.certType,
+                        templateKey: request.templateKey,
+                        data: {
+                                ...request,
+                                residentName: request.name,
+                                dateOfBirth: request.dateOfBirth,
+                                civilStatus: request.civil,
+                                nationality: request.nationality,
+                                extraFields: request.extraFields || {},
+                                issuedAt: new Date(),
+                        },
+                        settings: certificateSettings,
                 });
-
-                return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>${request.id} Certificate</title>
-<style>
-@page { size: A4; margin: 20mm; }
-body {
-    font-family: 'Times New Roman', serif;
-    color: #1a1a2e;
-    margin: 0;
-    padding: 0;
-}
-.sheet {
-    border: 1.5px solid #ddd;
-    padding: 28px 34px;
-}
-.header {
-    text-align: center;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 14px;
-    margin-bottom: 24px;
-}
-.header h1 { margin: 0; font-size: 24px; letter-spacing: .4px; }
-.header p { margin: 4px 0 0; font-size: 13px; color: #555; }
-.title {
-    text-align: center;
-    font-size: 20px;
-    margin: 22px 0 24px;
-    text-transform: uppercase;
-    letter-spacing: .6px;
-}
-.content {
-    font-size: 15px;
-    line-height: 1.9;
-    text-align: justify;
-}
-.content strong { color: #0e2554; }
-.meta {
-    margin-top: 28px;
-    padding-top: 12px;
-    border-top: 1px dashed #bbb;
-    font-size: 12px;
-    color: #666;
-}
-.signature {
-    margin-top: 48px;
-    text-align: right;
-}
-.signature .line {
-    width: 240px;
-    border-top: 1px solid #333;
-    margin-left: auto;
-    margin-bottom: 6px;
-}
-.signature .name { font-weight: 700; font-size: 13px; }
-.signature .role { font-size: 12px; color: #555; }
-</style>
-</head>
-<body>
-    <div class="sheet">
-        <div class="header">
-            <h1>Barangay East Tapinac</h1>
-            <p>City of Olongapo</p>
-        </div>
-
-        <div class="title">${request.certType}</div>
-
-        <div class="content">
-            <p>To whom it may concern:</p>
-            <p>
-                This is to certify that <strong>${request.name}</strong>, residing at
-                <strong>${request.address || "N/A"}</strong>, is requesting this document for
-                the purpose of <strong>${request.purpose || "N/A"}</strong>.
-            </p>
-            <p>
-                Issued this <strong>${now}</strong> at Barangay East Tapinac, Olongapo City,
-                upon request for whatever legal purpose it may serve.
-            </p>
-        </div>
-
-        <div class="meta">
-            <p><strong>Request ID:</strong> ${request.id}</p>
-            <p><strong>Status:</strong> ${String(status || "").toUpperCase()}</p>
-        </div>
-
-        <div class="signature">
-            <div class="line"></div>
-            <div class="name">Punong Barangay</div>
-            <div class="role">(e-signature placeholder)</div>
-        </div>
-    </div>
-</body>
-</html>`;
-        };
 
         const openCertificatePrintWindow = () => {
                 const win = window.open("", "_blank");
@@ -703,11 +626,11 @@ body {
                             <div style={{ background: "#edfdf5", border: "1.5px solid #6ee7b7", borderRadius: 5, padding: "12px 14px", display: "flex", gap: 10 }}>
                                 <Check size={16} color="#1a7a4a" strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
                                 <div>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a5c38", marginBottom: 4 }}>Captain's e-signature only — ready to print</div>
-                                    <div style={{ fontSize: 11.5, color: "#2a7a4a", lineHeight: 1.6 }}>The Punong Barangay's e-signature will be applied automatically.</div>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a5c38", marginBottom: 4 }}>Configured signatories — ready to print</div>
+                                    <div style={{ fontSize: 11.5, color: "#2a7a4a", lineHeight: 1.6 }}>The template will place the Punong Barangay or Kagawad according to the selected document layout.</div>
                                     <div style={{ marginTop: 8 }}>
                                         <span style={{ background: "#d1fae5", color: "#065f46", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 3 }}>
-                                            ✓ Punong Barangay — E-Signature (auto)
+                                            Signatory settings applied automatically
                                         </span>
                                     </div>
                                 </div>
@@ -793,6 +716,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     const [requests, setRequests]   = useState([]);
     const [loading, setLoading]     = useState(true);
     const [error, setError]         = useState("");
+    const [certificateSettings, setCertificateSettings] = useState({});
 
     // Drawer
     const [selectedRequest, setSelectedRequest] = useState(null);
@@ -807,7 +731,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
         const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
         const address = [row.resident_address_house, row.resident_address_street]
             .filter((v) => String(v || "").trim())
-            .join(" ");
+            .join(", ");
         return {
             rawId:    row.request_id,
             id:       `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
@@ -822,7 +746,15 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             contact:  row.resident_contact || "N/A",
             email:    row.resident_email || "N/A",
             civil:    row.resident_civil || "N/A",
-            nationality:      "Filipino",
+            nationality:      row.resident_nationality || "Filipino",
+            dateOfBirth:      row.resident_date_of_birth || null,
+            extraFields:      row.extra_fields || {},
+            templateId:       row.template_id || null,
+            templateKey:
+                row.template_key ||
+                row.extra_fields?.templateKey ||
+                row.extra_fields?.template_key ||
+                "",
             rejection_reason: row.rejection_reason || "",
             requestedAtIso:   row.requested_at || null,
             processedAtIso:   row.processed_at || null,
@@ -855,6 +787,23 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     }, [mapRequestRow, onLogout]);
 
     useEffect(() => { loadRequests(); }, [loadRequests]);
+
+    useEffect(() => {
+        let mounted = true;
+        async function loadCertificateSettings() {
+            try {
+                const token = localStorage.getItem("adminToken");
+                const data = await settingsService.getBarangaySettings(token);
+                if (mounted) setCertificateSettings(data || {});
+            } catch {
+                if (mounted) setCertificateSettings({});
+            }
+        }
+        loadCertificateSettings();
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     const handleNavigate = (page) => {
         setActivePage(page);
@@ -940,6 +889,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                     onRefresh={loadRequests}
                     onOpenQRScanner={(req) => setQrReleaseData(req)}
                     onLogout={onLogout}
+                    certificateSettings={certificateSettings}
                 />
             )}
 

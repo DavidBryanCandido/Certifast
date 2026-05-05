@@ -24,6 +24,11 @@ import {
     Menu,
 } from "lucide-react";
 import walkInService from "../../services/walkInService";
+import * as settingsService from "../../services/settingsService";
+import {
+    DOC1_CERTIFICATE_OPTIONS,
+    buildCertificatePrintHtml,
+} from "../../utils/certificateTemplateEngine";
 import {
     AdminSidebar,
     AdminMobileSidebar,
@@ -157,68 +162,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
 // =============================================================
 // Certificate registry fallback
 // =============================================================
-const ALL_CERTS = [
-    {
-        name: "Barangay Clearance",
-        hasFee: true,
-        desc: "For general official purposes. Certifies the holder is a resident in good standing.",
-    },
-    {
-        name: "Certificate of Residency",
-        hasFee: false,
-        desc: "Certifies that the individual is a bona fide resident of Barangay East Tapinac.",
-    },
-    {
-        name: "Certificate of Indigency",
-        hasFee: false,
-        desc: "Certifies that the individual belongs to an indigent family in the barangay.",
-    },
-    {
-        name: "Business Permit",
-        hasFee: true,
-        desc: "Authorizes the holder to operate a business within Barangay East Tapinac.",
-    },
-    {
-        name: "Good Moral Certificate",
-        hasFee: false,
-        desc: "Certifies that the individual is of good moral character in the community.",
-    },
-    {
-        name: "Certificate of Live Birth (Endorsement)",
-        hasFee: false,
-        desc: "Endorsement for late registration of live birth at the civil registry.",
-    },
-    {
-        name: "Certificate of Cohabitation",
-        hasFee: false,
-        desc: "Certifies that two individuals are cohabiting as a couple within the barangay.",
-    },
-    {
-        name: "Certificate of No Business",
-        hasFee: false,
-        desc: "Certifies that the individual has no registered business in the barangay.",
-    },
-    {
-        name: "Certificate of Guardianship",
-        hasFee: false,
-        desc: "Certifies guardianship relationship for use in official transactions.",
-    },
-    {
-        name: "Certificate of Late Registration",
-        hasFee: false,
-        desc: "For late registration of vital civil events with the local civil registry.",
-    },
-    {
-        name: "Barangay Business Clearance (Renewal)",
-        hasFee: true,
-        desc: "Annual renewal of barangay business clearance for existing permit holders.",
-    },
-    {
-        name: "Certificate of Ownership",
-        hasFee: false,
-        desc: "Certifies ownership of property or assets within the jurisdiction of the barangay.",
-    },
-];
+const ALL_CERTS = DOC1_CERTIFICATE_OPTIONS;
 
 // Quick cards shown without opening modal (first 6)
 const QUICK_CERTS = ALL_CERTS.slice(0, 6);
@@ -750,7 +694,14 @@ function CertPickerModal({ onClose, onPick, certs }) {
 // =============================================================
 // Print Preview Modal
 // =============================================================
-function PrintPreviewModal({ cert, formData, docId, onClose, onConfirm }) {
+function PrintPreviewModal({
+    cert,
+    formData,
+    docId,
+    settings,
+    onClose,
+    onConfirm,
+}) {
     useEffect(() => {
         document.body.style.overflow = "hidden";
         const fn = (e) => {
@@ -762,6 +713,22 @@ function PrintPreviewModal({ cert, formData, docId, onClose, onConfirm }) {
             window.removeEventListener("keydown", fn);
         };
     }, [onClose]);
+
+    const previewHtml = buildCertificatePrintHtml({
+        cert,
+        certType: cert?.name,
+        templateKey: cert?.templateKey,
+        data: {
+            ...formData,
+            docId,
+            issuedAt: new Date(),
+            extraFields: {
+                ...formData,
+                templateKey: cert?.templateKey,
+            },
+        },
+        settings,
+    });
 
     const now = new Date();
     const months = [
@@ -917,7 +884,22 @@ function PrintPreviewModal({ cert, formData, docId, onClose, onConfirm }) {
                         justifyContent: "center",
                     }}
                 >
-                    <div className="wi-cert-paper">
+                    <iframe
+                        title="Certificate preview"
+                        srcDoc={previewHtml}
+                        style={{
+                            width: "8.5in",
+                            minWidth: "8.5in",
+                            height: "11in",
+                            border: "none",
+                            background: "#fff",
+                            boxShadow: "0 4px 20px rgba(0,0,0,.14)",
+                            transform: "scale(.72)",
+                            transformOrigin: "top center",
+                            marginBottom: "-3.08in",
+                        }}
+                    />
+                    <div className="wi-cert-paper" style={{ display: "none" }}>
                         {/* Header */}
                         <div style={{ textAlign: "center", marginBottom: 18 }}>
                             <div
@@ -1137,6 +1119,7 @@ export default function WalkInIssuance({
     const [loadError, setLoadError] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [certs, setCerts] = useState(ALL_CERTS);
+    const [certificateSettings, setCertificateSettings] = useState({});
 
     // Log state
     const [log, setLog] = useState([]);
@@ -1156,9 +1139,11 @@ export default function WalkInIssuance({
             setLoadingData(true);
             setLoadError("");
             try {
-                const [templatesRes, todayRes] = await Promise.all([
+                const token = localStorage.getItem("adminToken");
+                const [templatesRes, todayRes, settingsRes] = await Promise.all([
                     walkInService.getCertTemplates(),
                     walkInService.getTodayLog(),
+                    settingsService.getBarangaySettings(token).catch(() => ({})),
                 ]);
 
                 if (!mounted) return;
@@ -1177,6 +1162,7 @@ export default function WalkInIssuance({
 
                 setCerts(templateRows.length > 0 ? templateRows : ALL_CERTS);
                 setLog(todayRows);
+                setCertificateSettings(settingsRes || {});
             } catch (err) {
                 if (!mounted) return;
                 if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -1271,6 +1257,10 @@ export default function WalkInIssuance({
                 residentName: formData.residentName,
                 address: formData.address,
                 purpose: formData.purpose,
+                extraFields: {
+                    ...formData,
+                    templateKey: selectedCert.templateKey || "",
+                },
             });
 
             const latestEntry = result?.entry || null;
@@ -1288,7 +1278,30 @@ export default function WalkInIssuance({
                 `${result?.id || "#WI"} — ${shortName(selectedCert.name)} issued and logged.`,
             );
 
-            window.print();
+            const html = buildCertificatePrintHtml({
+                cert: selectedCert,
+                certType: selectedCert.name,
+                templateKey: selectedCert.templateKey,
+                data: {
+                    ...formData,
+                    docId: result?.docId || result?.id || nextDocId,
+                    issuedAt: result?.issuedAt || new Date(),
+                    extraFields: {
+                        ...formData,
+                        templateKey: selectedCert.templateKey || "",
+                    },
+                },
+                settings: certificateSettings,
+            });
+            const win = window.open("", "_blank");
+            if (!win) {
+                showToast("Unable to open print window. Please allow pop-ups.");
+            } else {
+                win.document.write(html);
+                win.document.close();
+                win.focus();
+                setTimeout(() => win.print(), 350);
+            }
 
             setSelectedCert(null);
             setFormData({
@@ -1338,7 +1351,7 @@ export default function WalkInIssuance({
                   })
                 : "—";
 
-            const html = `<!DOCTYPE html>
+            const legacyHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
@@ -1362,6 +1375,22 @@ p { margin: 4px 0; font-size: 14px; }
 </div>
 </body>
 </html>`;
+            void legacyHtml;
+            const html = buildCertificatePrintHtml({
+                certType: data.type,
+                templateKey: data.templateKey || data.extraFields?.templateKey,
+                data: {
+                    ...(data.extraFields || {}),
+                    residentName: data.name,
+                    name: data.name,
+                    address: data.address,
+                    purpose: data.purpose,
+                    docId: data.docId || data.id,
+                    issuedAt: data.issuedAt || new Date(),
+                    extraFields: data.extraFields || {},
+                },
+                settings: certificateSettings,
+            });
 
             const win = window.open("", "_blank");
             if (!win) {
@@ -1431,6 +1460,7 @@ p { margin: 4px 0; font-size: 14px; }
                     cert={selectedCert}
                     formData={formData}
                     docId={nextDocId}
+                    settings={certificateSettings}
                     onClose={() => setShowPreview(false)}
                     onConfirm={handleConfirmPrint}
                 />

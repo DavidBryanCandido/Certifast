@@ -289,17 +289,22 @@ async function rejectRequest(req, res) {
 async function getCertificateTemplates(req, res) {
     try {
         const result = await pool.query(
-            `SELECT name, has_fee, description
+            `SELECT template_id, name, template_key, has_fee, description, required_fields
              FROM certificate_templates
              WHERE is_active = TRUE
-             ORDER BY name ASC`,
+             ORDER BY COALESCE(display_order, 0), name ASC`,
         );
 
         return res.json({
             data: result.rows.map((row) => ({
+                templateId: row.template_id,
                 name: row.name,
+                templateKey: row.template_key || "",
                 hasFee: Boolean(row.has_fee),
                 desc: row.description || "",
+                fields: Array.isArray(row.required_fields)
+                    ? row.required_fields
+                    : [],
             })),
         });
     } catch (err) {
@@ -309,7 +314,7 @@ async function getCertificateTemplates(req, res) {
 }
 
 async function issueWalkIn(req, res) {
-    const { certType, residentName, address, purpose } = req.body;
+    const { certType, residentName, address, purpose, extraFields } = req.body;
 
     if (!certType || !String(certType).trim()) {
         return res
@@ -338,6 +343,7 @@ async function issueWalkIn(req, res) {
                 resident_name,
                 address,
                 purpose,
+                extra_fields,
                 issued_by,
                 issued_at,
                 source,
@@ -350,10 +356,11 @@ async function issueWalkIn(req, res) {
                 $2,
                 $3,
                 $4,
-                $5,
+                $5::jsonb,
+                $6,
                 NOW(),
                 'walkin',
-                $6
+                $7
             )
             RETURNING certificate_id, issued_at`,
             [
@@ -361,6 +368,7 @@ async function issueWalkIn(req, res) {
                 String(residentName).trim(),
                 String(address).trim(),
                 String(purpose).trim(),
+                JSON.stringify(extraFields || {}),
                 req.admin.id,
                 `walkin:${String(certType).trim()}:${String(residentName).trim()}`,
             ],
@@ -473,6 +481,7 @@ async function getWalkInReprint(req, res) {
                 ic.resident_name,
                 ic.address,
                 ic.purpose,
+                ic.extra_fields,
                 ic.issued_at,
                 COALESCE(a.full_name, a.username, 'Staff') AS issued_by_name
              FROM issued_certificates ic
@@ -499,6 +508,11 @@ async function getWalkInReprint(req, res) {
                 name: row.resident_name,
                 address: row.address || "",
                 purpose: row.purpose || "",
+                extraFields: row.extra_fields || {},
+                templateKey:
+                    row.extra_fields?.templateKey ||
+                    row.extra_fields?.template_key ||
+                    "",
                 issuedBy: row.issued_by_name,
                 issuedAt: row.issued_at,
             },
@@ -1256,6 +1270,8 @@ async function getManageRequests(req, res) {
                 r.purpose,
                 r.status,
                 r.rejection_reason,
+                r.template_id,
+                r.extra_fields,
                 r.requested_at,
                 r.processed_at,
                 r.released_at,
@@ -1263,14 +1279,25 @@ async function getManageRequests(req, res) {
                 res.email AS resident_email,
                 res.contact_number AS resident_contact,
                 res.civil_status AS resident_civil,
+                res.date_of_birth AS resident_date_of_birth,
+                res.nationality AS resident_nationality,
                 res.address_house AS resident_address_house,
                 res.address_street AS resident_address_street,
+                ct.template_key,
                 COALESCE(ct.has_fee, false) AS has_fee
              FROM requests r
              LEFT JOIN residents res
                ON res.resident_id = r.resident_id
-             LEFT JOIN certificate_templates ct
-               ON ct.name = r.cert_type
+             LEFT JOIN LATERAL (
+                SELECT template_key, has_fee
+                FROM certificate_templates ct
+                WHERE ct.template_id = r.template_id
+                   OR (r.template_id IS NULL AND ct.name = r.cert_type)
+                ORDER BY CASE WHEN ct.template_id = r.template_id THEN 0 ELSE 1 END,
+                         COALESCE(ct.display_order, 0),
+                         ct.template_id
+                LIMIT 1
+             ) ct ON TRUE
              ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC`,
         );
 

@@ -22,6 +22,11 @@ const requestService = {
         });
         return res.data;
     },
+
+    getCertificateTemplates: async () => {
+        const res = await axios.get(`${API}/certificates/templates`);
+        return res.data;
+    },
 };
 
 export default requestService;

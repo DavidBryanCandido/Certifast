@@ -155,7 +155,7 @@ async function updateProfile(req, res) {
 // body: { certType, purpose, extraFields, notes, source }
 async function createRequest(req, res) {
     const resident_id = req.resident.id;
-    const { certType, purpose, extraFields, notes, source } = req.body;
+    const { certType, purpose, extraFields, notes, source, templateId } = req.body;
 
     if (!certType || !purpose) {
         return res
@@ -164,13 +164,20 @@ async function createRequest(req, res) {
     }
 
     try {
+        const parsedTemplateId = Number.parseInt(templateId, 10);
+        const resolvedTemplateId =
+            Number.isFinite(parsedTemplateId) && parsedTemplateId > 0
+                ? parsedTemplateId
+                : null;
+
         const result = await pool.query(
             `INSERT INTO requests
-        (resident_id, cert_type, purpose, extra_fields, notes, source, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+        (resident_id, template_id, cert_type, purpose, extra_fields, notes, source, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
        RETURNING request_id, cert_type, status, requested_at`,
             [
                 resident_id,
+                resolvedTemplateId,
                 certType,
                 purpose,
                 JSON.stringify(extraFields || {}),

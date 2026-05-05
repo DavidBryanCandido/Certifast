@@ -31,6 +31,10 @@ import requestService from "../../services/requestService";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
+import {
+    DOC1_CERTIFICATE_OPTIONS,
+    getTemplateFieldLabels,
+} from "../../utils/certificateTemplateEngine";
 
 // ─── Styles ───────────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-sr]")) {
@@ -74,68 +78,83 @@ if (!document.head.querySelector("[data-resident-sr]")) {
 }
 
 // ─── Certificate list ─────────────────────────────────────────
-const ALL_CERTS = [
-    {
-        name: "Barangay Clearance",
-        hasFee: true,
-        icon: Shield,
-        desc: "General official purposes. Certifies holder is a resident in good standing.",
-    },
-    {
-        name: "Certificate of Residency",
-        hasFee: false,
-        icon: Home,
-        desc: "Certifies that the individual is a bona fide resident of Barangay East Tapinac.",
-    },
-    {
-        name: "Certificate of Indigency",
-        hasFee: false,
-        icon: Heart,
-        desc: "Certifies that the individual belongs to an indigent family in the barangay.",
-    },
-    {
-        name: "Business Permit",
-        hasFee: true,
-        icon: Briefcase,
-        desc: "Authorizes the holder to operate a business within Barangay East Tapinac.",
-    },
-    {
-        name: "Good Moral Certificate",
-        hasFee: false,
-        icon: BadgeCheck,
-        desc: "Certifies that the individual is of good moral character in the community.",
-    },
-    {
-        name: "Certificate of Live Birth (Endorsement)",
-        hasFee: false,
-        icon: Baby,
-        desc: "Endorsement for late registration of live birth at the civil registry.",
-    },
-    {
-        name: "Certificate of Cohabitation",
-        hasFee: false,
-        icon: Users,
-        desc: "Certifies that two individuals are cohabiting as a couple within the barangay.",
-    },
-    {
-        name: "Certificate of No Business",
-        hasFee: false,
-        icon: Building2,
-        desc: "Certifies that the individual has no registered business in the barangay.",
-    },
-    {
-        name: "Certificate of Guardianship",
-        hasFee: false,
-        icon: ClipboardList,
-        desc: "Certifies guardianship relationship for use in official transactions.",
-    },
-    {
-        name: "Barangay Business Clearance (Renewal)",
-        hasFee: true,
-        icon: FileCheck,
-        desc: "Renewal of existing barangay business clearance for the current year.",
-    },
-];
+const CERT_ICONS = {
+    "Barangay Clearance": Shield,
+    "Certificate of Residency": Home,
+    "Certificate of Indigency": Heart,
+    "Business Permit": Briefcase,
+    "Good Moral Certificate": BadgeCheck,
+    "Certificate of Live Birth (Endorsement)": Baby,
+    "Certificate of Cohabitation": Users,
+    "Certificate of No Business": Building2,
+    "Certificate of Guardianship": ClipboardList,
+    "Barangay Business Clearance (Renewal)": FileCheck,
+};
+
+function withIcon(cert) {
+    return {
+        ...cert,
+        icon: CERT_ICONS[cert.name] || FileText,
+    };
+}
+
+const ALL_CERTS = DOC1_CERTIFICATE_OPTIONS.map(withIcon);
+
+function certIdentity(cert) {
+    return cert?.templateKey || cert?.templateId || cert?.name || "";
+}
+
+function normalizeTemplateField(field, templateKey, name) {
+    const fieldConfig =
+        typeof field === "object" && field !== null ? field : {};
+    const key =
+        typeof field === "string" ? field : fieldConfig.key || fieldConfig.name || "";
+
+    if (!key) return null;
+
+    const meta = getTemplateFieldLabels(templateKey, name).find(
+        (item) => item.key === key,
+    );
+    const override = getTemplateFieldOverride(templateKey, name, key);
+
+    return {
+        key,
+        label: fieldConfig.label || override?.label || meta?.label || humanizeFieldKey(key),
+        placeholder: fieldConfig.placeholder ?? override?.placeholder ?? "",
+        required: fieldConfig.required ?? override?.required ?? true,
+        type:
+            fieldConfig.type ||
+            override?.type ||
+            (key.toLowerCase().includes("date") ||
+            key.toLowerCase().includes("dob")
+                ? "date"
+                : "text"),
+    };
+}
+
+function normalizeTemplateRows(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return ALL_CERTS;
+
+    return rows.map((row) => {
+        const name = row.name || "Certificate Request";
+        const templateKey = row.templateKey || row.template_key || "";
+        const rawFields = row.fields || row.required_fields || [];
+        const fieldConfigs = Array.isArray(rawFields)
+            ? rawFields
+                  .map((field) => normalizeTemplateField(field, templateKey, name))
+                  .filter(Boolean)
+            : [];
+
+        return withIcon({
+            name,
+            templateId: row.templateId || row.template_id || null,
+            templateKey,
+            hasFee: Boolean(row.hasFee ?? row.has_fee),
+            desc: row.desc || row.description || "",
+            fields: fieldConfigs,
+        });
+    });
+}
 
 const COMMON_PURPOSES = [
     "Employment",
@@ -179,7 +198,33 @@ const CERT_EXTRA_FIELDS = {
             required: false,
         },
     ],
+    "Certificate of Indigency": [
+        {
+            key: "requesterName",
+            label: "Requester Name",
+            placeholder: "Full name of requester, if different from resident",
+            required: false,
+        },
+        {
+            key: "requesterRelationship",
+            label: "Relationship to Resident",
+            placeholder: "e.g. Parent, spouse, sibling",
+            required: false,
+        },
+        {
+            key: "assistanceType",
+            label: "Assistance Type",
+            placeholder: "e.g. Medical, educational, financial",
+            required: true,
+        },
+    ],
     "Barangay Business Clearance (Renewal)": [
+        {
+            key: "businessPermitNo",
+            label: "Barangay Permit No.",
+            placeholder: "e.g. ET-BPI-2024-5984",
+            required: true,
+        },
         {
             key: "businessName",
             label: "Registered Business Name",
@@ -189,6 +234,18 @@ const CERT_EXTRA_FIELDS = {
         {
             key: "businessAddress",
             label: "Business Address",
+            placeholder: "Street, Barangay, City",
+            required: true,
+        },
+        {
+            key: "operatorName",
+            label: "Operator / Manager",
+            placeholder: "Full name of operator or manager",
+            required: true,
+        },
+        {
+            key: "businessOwnerAddress",
+            label: "Operator Address",
             placeholder: "Street, Barangay, City",
             required: true,
         },
@@ -217,6 +274,12 @@ const CERT_EXTRA_FIELDS = {
     ],
     "Certificate of Live Birth (Endorsement)": [
         {
+            key: "partnerName",
+            label: "Spouse / Partner's Full Name",
+            placeholder: "Full legal name of spouse or partner",
+            required: true,
+        },
+        {
             key: "childName",
             label: "Child's Full Name",
             placeholder: "Full name of the child",
@@ -228,6 +291,12 @@ const CERT_EXTRA_FIELDS = {
             placeholder: "",
             required: true,
             type: "date",
+        },
+        {
+            key: "childBirthPlace",
+            label: "Child's Place of Birth",
+            placeholder: "e.g. Olongapo City",
+            required: true,
         },
         {
             key: "fatherName",
@@ -242,6 +311,32 @@ const CERT_EXTRA_FIELDS = {
             required: false,
         },
     ],
+    "Certificate of No Business": [
+        {
+            key: "businessName",
+            label: "Business / Trade Name",
+            placeholder: "Name of closed or non-existing business",
+            required: true,
+        },
+        {
+            key: "businessAddress",
+            label: "Business Address",
+            placeholder: "Street, Barangay, City",
+            required: true,
+        },
+        {
+            key: "requesterName",
+            label: "Requester Name",
+            placeholder: "Full name of requesting person",
+            required: true,
+        },
+        {
+            key: "requestingInstitution",
+            label: "Requesting Office / Institution",
+            placeholder: "Office or institution requesting the certificate",
+            required: true,
+        },
+    ],
     "Good Moral Certificate": [
         {
             key: "requestingInstitution",
@@ -250,9 +345,92 @@ const CERT_EXTRA_FIELDS = {
             required: false,
         },
     ],
+    "Certificate of Ownership": [
+        {
+            key: "propertyLocation",
+            label: "Property Location",
+            placeholder: "Lot location or address",
+            required: true,
+        },
+        {
+            key: "taxDeclarationNo",
+            label: "Tax Declaration No.",
+            placeholder: "Land TD number",
+            required: true,
+        },
+        {
+            key: "propertyArea",
+            label: "Property Area",
+            placeholder: "e.g. 120 sqm",
+            required: true,
+        },
+    ],
+    "Certificate of Appearance": [
+        {
+            key: "requestingInstitution",
+            label: "Office / Institution",
+            placeholder: "Office, school, or organization",
+            required: true,
+        },
+        {
+            key: "appearanceDate",
+            label: "Appearance Date",
+            placeholder: "",
+            required: true,
+            type: "date",
+        },
+    ],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
+function fieldOverrideMap(fields = []) {
+    return Object.fromEntries(fields.map((field) => [field.key, field]));
+}
+
+const FIELD_OVERRIDES_BY_NAME = Object.fromEntries(
+    Object.entries(CERT_EXTRA_FIELDS).map(([name, fields]) => [
+        name,
+        fieldOverrideMap(fields),
+    ]),
+);
+
+const FIELD_OVERRIDES_BY_TEMPLATE = {
+    "doc1-indigency-medical": FIELD_OVERRIDES_BY_NAME["Certificate of Indigency"],
+    "doc1-work-permit-certification": FIELD_OVERRIDES_BY_NAME["Business Permit"],
+    "doc1-good-moral": FIELD_OVERRIDES_BY_NAME["Good Moral Certificate"],
+    "doc1-live-birth-endorsement":
+        FIELD_OVERRIDES_BY_NAME["Certificate of Live Birth (Endorsement)"],
+    "doc1-cohabitation": FIELD_OVERRIDES_BY_NAME["Certificate of Cohabitation"],
+    "doc1-no-business": FIELD_OVERRIDES_BY_NAME["Certificate of No Business"],
+    "doc1-guardianship": FIELD_OVERRIDES_BY_NAME["Certificate of Guardianship"],
+    "doc1-business-renewal-endorsement":
+        FIELD_OVERRIDES_BY_NAME["Barangay Business Clearance (Renewal)"],
+    "doc1-property-ownership": FIELD_OVERRIDES_BY_NAME["Certificate of Ownership"],
+    "doc1-certificate-appearance":
+        FIELD_OVERRIDES_BY_NAME["Certificate of Appearance"],
+};
+
+function getTemplateFieldOverride(templateKey, name, key) {
+    return (
+        FIELD_OVERRIDES_BY_TEMPLATE[templateKey]?.[key] ||
+        FIELD_OVERRIDES_BY_NAME[name]?.[key]
+    );
+}
+
+function humanizeFieldKey(key) {
+    return String(key || "")
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getCertificateFields(cert) {
+    if (Array.isArray(cert?.fields) && cert.fields.length > 0) {
+        return cert.fields;
+    }
+    return CERT_EXTRA_FIELDS[cert?.name] || [];
+}
+
 function FieldGroup({ label, children, required }) {
     return (
         <div style={{ marginBottom: 18 }}>
@@ -348,6 +526,9 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [profile, setProfile] = useState(null);
     const [profileLoading, setProfileLoading] = useState(true);
     const [profileError, setProfileError] = useState("");
+    const [certs, setCerts] = useState(ALL_CERTS);
+    const [certsLoading, setCertsLoading] = useState(true);
+    const [certsError, setCertsError] = useState("");
 
     // Wizard state
     const [step, setStep] = useState(1);
@@ -366,6 +547,38 @@ export default function SubmitRequest({ resident, onLogout }) {
         const fn = () => setWidth(window.innerWidth);
         window.addEventListener("resize", fn);
         return () => window.removeEventListener("resize", fn);
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadCertificateTemplates() {
+            setCertsLoading(true);
+            setCertsError("");
+            try {
+                const result = await requestService.getCertificateTemplates();
+                const rows = Array.isArray(result?.data)
+                    ? result.data
+                    : Array.isArray(result)
+                        ? result
+                        : [];
+                if (mounted) setCerts(normalizeTemplateRows(rows));
+            } catch {
+                if (mounted) {
+                    setCerts(ALL_CERTS);
+                    setCertsError(
+                        "Using built-in certificate list while templates are unavailable.",
+                    );
+                }
+            } finally {
+                if (mounted) setCertsLoading(false);
+            }
+        }
+
+        loadCertificateTemplates();
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     // Load resident profile to pre-fill
@@ -413,9 +626,7 @@ export default function SubmitRequest({ resident, onLogout }) {
 
     const isMobile = width < 768;
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
-    const certExtra = selectedCert
-        ? CERT_EXTRA_FIELDS[selectedCert.name] || []
-        : [];
+    const certExtra = selectedCert ? getCertificateFields(selectedCert) : [];
     const fullAddress = profile
         ? [
               profile.address_house,
@@ -468,8 +679,12 @@ export default function SubmitRequest({ resident, onLogout }) {
         try {
             const data = await requestService.createRequest({
                 certType: selectedCert.name,
+                templateId: selectedCert.templateId || null,
                 purpose: finalPurpose,
-                extraFields,
+                extraFields: {
+                    ...extraFields,
+                    templateKey: selectedCert.templateKey || "",
+                },
                 notes,
                 source: "resident",
             });
@@ -727,13 +942,34 @@ export default function SubmitRequest({ resident, onLogout }) {
                     a time.
                 </p>
             </div>
+            {(certsLoading || certsError) && (
+                <div
+                    style={{
+                        background: certsError ? "#fff7e6" : "#edf1fa",
+                        border: `1px solid ${certsError ? "#f5d78e" : "rgba(14,37,84,0.15)"}`,
+                        borderRadius: 6,
+                        padding: "10px 12px",
+                        marginBottom: 12,
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        color: certsError ? "#b86800" : "#0e2554",
+                        fontSize: 11.5,
+                    }}
+                >
+                    <AlertCircle size={13} />
+                    {certsError || "Loading certificate templates..."}
+                </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {ALL_CERTS.map((cert) => {
+                {(certsLoading ? ALL_CERTS : certs).map((cert) => {
                     const Icon = cert.icon;
-                    const isSelected = selectedCert?.name === cert.name;
+                    const identity = certIdentity(cert);
+                    const isSelected =
+                        selectedCert && certIdentity(selectedCert) === identity;
                     return (
                         <div
-                            key={cert.name}
+                            key={identity}
                             className={`sr-cert-card${isSelected ? " selected" : ""}`}
                             onClick={() => setSelectedCert(cert)}
                         >
