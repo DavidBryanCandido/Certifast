@@ -4,63 +4,146 @@ import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+/** One shared attempt per full page load (dedupes React StrictMode double-mount + duplicate auth events). */
+let completeRegistrationInFlight = null;
+
 export default function CompleteRegistration() {
     const [status, setStatus] = useState("loading");
     const [errorMsg, setErrorMsg] = useState("");
 
     useEffect(() => {
-        async function complete() {
-            try {
-                const {
-                    data: { session },
-                    error: sessionError,
-                } = await supabase.auth.getSession();
+        let cancelled = false;
+        let failTimer = null;
 
-                if (sessionError || !session) {
-                    setErrorMsg("Invalid or expired verification link.");
-                    setStatus("error");
-                    return;
-                }
+        const clearFailTimer = () => {
+            if (failTimer != null) {
+                window.clearTimeout(failTimer);
+                failTimer = null;
+            }
+        };
 
-                const user = session.user;
-                const meta = user.user_metadata || {};
+        async function postCompleteRegistration(session) {
+            const {
+                data: { user: freshUser },
+                error: userErr,
+            } = await supabase.auth.getUser();
+            const user = !userErr && freshUser ? freshUser : session.user;
+            const meta = user.user_metadata || {};
 
-                await axios.post(
-                    `${API}/auth/resident/complete-registration`,
-                    {
-                        supabase_uid: user.id,
-                        email: user.email,
-                        first_name: meta.first_name,
-                        middle_name: meta.middle_name,
-                        last_name: meta.last_name,
-                        contact_number: meta.contact_number,
-                        house_no: meta.house_no,
-                        purok_id: meta.purok_id,
-                        street_id: meta.street_id,
-                        street_other: meta.street_other,
-                        date_of_birth: meta.date_of_birth,
-                        civil_status: meta.civil_status,
-                        nationality: meta.nationality,
-                        id_type: meta.id_type,
-                    },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${session.access_token}`,
-                        },
-                    },
+            if (!meta.first_name?.trim() || !meta.last_name?.trim()) {
+                throw new Error(
+                    "Profile data was not found on your account. Please register again or contact the barangay office.",
                 );
+            }
 
-                setStatus("success");
-                await supabase.auth.signOut();
-            } catch (err) {
-                setErrorMsg(
-                    err?.response?.data?.message || "Something went wrong.",
-                );
-                setStatus("error");
+            await axios.post(
+                `${API}/auth/resident/complete-registration`,
+                {
+                    supabase_uid: user.id,
+                    email: user.email,
+                    first_name: meta.first_name,
+                    middle_name: meta.middle_name,
+                    last_name: meta.last_name,
+                    contact_number: meta.contact_number,
+                    house_no: meta.house_no,
+                    purok_id: meta.purok_id,
+                    street_id: meta.street_id,
+                    street_other: meta.street_other,
+                    date_of_birth: meta.date_of_birth,
+                    civil_status: meta.civil_status,
+                    nationality: meta.nationality,
+                    id_type: meta.id_type,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                },
+            );
+        }
+
+        function runComplete(session) {
+            if (!session?.user) return Promise.resolve();
+            clearFailTimer();
+
+            if (!completeRegistrationInFlight) {
+                completeRegistrationInFlight = (async () => {
+                    try {
+                        await postCompleteRegistration(session);
+                    } catch (err) {
+                        // Duplicate POST (e.g. React StrictMode) — row already exists.
+                        if (err?.response?.status === 409) {
+                            if (!cancelled) {
+                                setStatus("success");
+                                await supabase.auth.signOut();
+                            }
+                            return;
+                        }
+                        if (!cancelled) {
+                            const msg =
+                                err?.response?.data?.message ||
+                                err?.message ||
+                                "Something went wrong.";
+                            setErrorMsg(msg);
+                            setStatus("error");
+                        }
+                        throw err;
+                    }
+
+                    if (!cancelled) {
+                        setStatus("success");
+                        await supabase.auth.signOut();
+                    }
+                })().finally(() => {
+                    completeRegistrationInFlight = null;
+                });
+            }
+
+            return completeRegistrationInFlight;
+        }
+
+        async function trySessionFromStorage() {
+            const {
+                data: { session },
+                error: sessionError,
+            } = await supabase.auth.getSession();
+            if (!cancelled && !sessionError && session?.user) {
+                await runComplete(session);
             }
         }
 
-        complete();
+        // PKCE / magic-link: session is often not ready on first tick; INITIAL_SESSION arrives after URL exchange.
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((event, session) => {
+            if (cancelled) return;
+            if (session?.user) clearFailTimer();
+            if (
+                session?.user &&
+                (event === "INITIAL_SESSION" || event === "SIGNED_IN")
+            ) {
+                void runComplete(session);
+            }
+        });
+
+        void trySessionFromStorage();
+
+        // If no session appears after the redirect exchange, the link is bad or expired.
+        failTimer = window.setTimeout(async () => {
+            if (cancelled) return;
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            if (session?.user || completeRegistrationInFlight) return;
+            setErrorMsg("Invalid or expired verification link.");
+            setStatus("error");
+        }, 20000);
+
+        return () => {
+            cancelled = true;
+            clearFailTimer();
+            subscription.unsubscribe();
+        };
     }, []);
 
     if (status === "loading") {
