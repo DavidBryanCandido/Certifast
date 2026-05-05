@@ -1066,6 +1066,8 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
         try {
             await onApprove(resident);
             onClose();
+        } catch {
+            // Parent handler shows the toast; keep this modal open for retry.
         } finally {
             setSubmitting("");
         }
@@ -1077,6 +1079,8 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
         try {
             await onReject(resident, comment.trim());
             onClose();
+        } catch {
+            // Parent handler shows the toast; keep this modal open for retry.
         } finally {
             setSubmitting("");
         }

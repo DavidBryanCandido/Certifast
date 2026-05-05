@@ -100,6 +100,7 @@ export default function ResidentLogin({ onLogin }) {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [noticeModal, setNoticeModal] = useState(null);
 
     const handleChange = (e) => {
         setError("");
@@ -153,9 +154,34 @@ export default function ResidentLogin({ onLogin }) {
 
             if (onLogin) onLogin(res.data);
         } catch (err) {
+            const data = err?.response?.data || {};
+            if (data.code === "rejected") {
+                setNoticeModal({
+                    title: "Registration Not Activated",
+                    tone: "danger",
+                    message:
+                        data.message ||
+                        "Your resident account registration was not activated.",
+                    detail:
+                        data.rejection_comment ||
+                        "No rejection comment was provided.",
+                });
+                return;
+            }
+            if (data.code === "pending_verification") {
+                setNoticeModal({
+                    title: "Verification In Progress",
+                    tone: "pending",
+                    message:
+                        data.message ||
+                        "Your account verification is still in progress.",
+                    detail:
+                        "Please wait while the barangay office reviews your registration.",
+                });
+                return;
+            }
             setError(
-                err?.response?.data?.message ||
-                    "Login failed. Please try again.",
+                data.message || "Login failed. Please try again.",
             );
         } finally {
             setIsLoading(false);
@@ -164,6 +190,113 @@ export default function ResidentLogin({ onLogin }) {
 
     return (
         <div className="r-root">
+            {noticeModal && (
+                <div
+                    onClick={() => setNoticeModal(null)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 50,
+                        background: "rgba(9,26,62,0.62)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 18,
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: "100%",
+                            maxWidth: 420,
+                            background: "#fff",
+                            borderRadius: 8,
+                            overflow: "hidden",
+                            boxShadow:
+                                "0 24px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(201,162,39,0.18)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                padding: "16px 22px",
+                                background:
+                                    noticeModal.tone === "danger"
+                                        ? "linear-gradient(135deg,#7a0a0a,#b02020)"
+                                        : "linear-gradient(135deg,#9a7515,#c28a10)",
+                                color: "#fff",
+                                fontFamily: "'Playfair Display', serif",
+                                fontSize: 16,
+                                fontWeight: 700,
+                            }}
+                        >
+                            {noticeModal.title}
+                        </div>
+                        <div style={{ padding: 22 }}>
+                            <p
+                                style={{
+                                    margin: "0 0 12px",
+                                    color: "#1a1a2e",
+                                    fontSize: 14,
+                                    lineHeight: 1.5,
+                                }}
+                            >
+                                {noticeModal.message}
+                            </p>
+                            <div
+                                style={{
+                                    padding: "11px 14px",
+                                    borderRadius: 4,
+                                    border:
+                                        noticeModal.tone === "danger"
+                                            ? "1px solid #f5c6c6"
+                                            : "1px solid #e0d4a8",
+                                    background:
+                                        noticeModal.tone === "danger"
+                                            ? "#fdecea"
+                                            : "#f5edce",
+                                    color:
+                                        noticeModal.tone === "danger"
+                                            ? "#7a0a0a"
+                                            : "#7a6530",
+                                    fontSize: 12.5,
+                                    lineHeight: 1.55,
+                                }}
+                            >
+                                {noticeModal.detail}
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                padding: "13px 22px",
+                                background: "#f8f6f1",
+                                borderTop: "1px solid #e4dfd4",
+                                display: "flex",
+                                justifyContent: "flex-end",
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setNoticeModal(null)}
+                                style={{
+                                    padding: "9px 18px",
+                                    border: "none",
+                                    borderRadius: 4,
+                                    background: "#0e2554",
+                                    color: "#fff",
+                                    fontFamily: "'Playfair Display', serif",
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    letterSpacing: 1,
+                                    textTransform: "uppercase",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {!isMobile && (
                 <>
                     <div className="r-bracket r-tl" />

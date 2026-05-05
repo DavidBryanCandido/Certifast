@@ -3,22 +3,12 @@ const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
-const { sendResidentRejectionEmail } = require("../utils/emailer");
 
 const supabase = (() => {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     return url && key ? createClient(url, key) : null;
 })();
-
-let residentRejectionColumnReady = false;
-async function ensureResidentRejectionColumn() {
-    if (residentRejectionColumnReady) return;
-    await pool.query(
-        "ALTER TABLE residents ADD COLUMN IF NOT EXISTS rejection_comment text",
-    );
-    residentRejectionColumnReady = true;
-}
 
 function makeWalkInDocId(certificateId) {
     const now = new Date();
@@ -984,59 +974,22 @@ async function updateResidentStatus(req, res) {
 
         const result = await pool.query(
             `UPDATE residents
-             SET status = $2
+             SET status = $2,
+                 rejection_comment = CASE
+                     WHEN $2 = 'inactive' AND $3 <> '' THEN $3
+                     WHEN $2 = 'active' THEN NULL
+                     ELSE rejection_comment
+                 END
              WHERE resident_id = $1
-             RETURNING resident_id, full_name, status, verified_at`,
-            [residentId, nextStatus],
+             RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
+            [residentId, nextStatus, reason],
         );
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Resident not found" });
         }
 
-        const updated = {
-            ...result.rows[0],
-            rejection_comment: existingResident.rejection_comment || null,
-        };
-        let rejectionCommentSaved = true;
-
-        try {
-            await ensureResidentRejectionColumn();
-            const commentResult = await pool.query(
-                `UPDATE residents
-                 SET rejection_comment = CASE
-                         WHEN $2 = 'inactive' AND $4 <> '' THEN $4
-                         WHEN $2 = 'active' THEN NULL
-                         ELSE rejection_comment
-                     END,
-                     verified_by = CASE
-                         WHEN $2 = 'active' AND LOWER(COALESCE($5, '')) = 'pending_verification'
-                             THEN $3
-                         ELSE verified_by
-                     END,
-                     verified_at = CASE
-                         WHEN $2 = 'active' AND LOWER(COALESCE($5, '')) = 'pending_verification'
-                             THEN NOW()
-                         ELSE verified_at
-                     END
-                 WHERE resident_id = $1
-                 RETURNING verified_at, rejection_comment`,
-                [
-                    residentId,
-                    nextStatus,
-                    req.admin.id,
-                    reason,
-                    prevStatus,
-                ],
-            );
-            updated.verified_at =
-                commentResult.rows[0]?.verified_at || updated.verified_at;
-            updated.rejection_comment =
-                commentResult.rows[0]?.rejection_comment || null;
-        } catch (detailErr) {
-            rejectionCommentSaved = false;
-            console.error("resident status detail update failed:", detailErr);
-        }
+        const updated = result.rows[0];
 
         if (approvingPending) {
             await createNotification({
@@ -1053,15 +1006,6 @@ async function updateResidentStatus(req, res) {
                 title: "Account Denied",
                 message: `Your resident account registration was denied. Reason: ${reason}`,
             });
-            try {
-                await sendResidentRejectionEmail({
-                    to: existingResident.email,
-                    residentName: updated.full_name,
-                    reason,
-                });
-            } catch (emailErr) {
-                console.error("resident rejection email failed:", emailErr);
-            }
         }
 
         const auditDescription =
@@ -1084,9 +1028,6 @@ async function updateResidentStatus(req, res) {
 
         return res.json({
             message: "Resident status updated successfully",
-            warning: rejectionCommentSaved
-                ? null
-                : "Resident status changed, but rejection details could not be saved.",
             resident: {
                 resident_id: updated.resident_id,
                 full_name: updated.full_name,

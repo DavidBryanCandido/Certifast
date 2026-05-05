@@ -230,14 +230,20 @@ async function residentLoginWithSupabase(req, res) {
         const resident = result.rows[0];
         if (resident.status === "pending_verification") {
             return res.status(403).json({
+                code: "pending_verification",
                 message:
-                    "Your account is under review. Please come back in 1-3 business days.",
+                    "Your account verification is still in progress. Please wait for the barangay office to finish reviewing your registration.",
             });
         }
         if (resident.status !== "active") {
+            const rejectionComment =
+                String(resident.rejection_comment || "").trim() || null;
             return res.status(403).json({
-                message:
-                    "Your account is not active. Please contact the barangay office.",
+                code: rejectionComment ? "rejected" : "inactive",
+                message: rejectionComment
+                    ? "Your resident account registration was not activated."
+                    : "Your account is not active. Please contact the barangay office.",
+                rejection_comment: rejectionComment,
             });
         }
 
