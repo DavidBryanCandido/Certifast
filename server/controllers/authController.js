@@ -14,6 +14,55 @@ const supabase =
         ? createClient(supabaseUrl, supabaseServiceRoleKey)
         : null;
 
+/** Legacy columns address_house / address_street — mirror structured fields for older reports/UI. */
+async function legacyAddressFields(pool, {
+    house_no,
+    purok_id,
+    street_id,
+    street_other,
+}) {
+    const address_house = (house_no || "").trim() || null;
+    let streetSegment = (street_other || "").trim() || null;
+
+    try {
+        const pid =
+            purok_id && Number(purok_id) > 0 ? Number(purok_id) : null;
+        const sid =
+            street_id && Number(street_id) > 0 ? Number(street_id) : null;
+
+        let purokName = null;
+        let streetName = null;
+        if (pid) {
+            const pr = await pool.query(
+                "SELECT name FROM puroks WHERE purok_id = $1",
+                [pid],
+            );
+            purokName = pr.rows[0]?.name || null;
+        }
+        if (sid) {
+            const sr = await pool.query(
+                "SELECT name FROM streets WHERE street_id = $1",
+                [sid],
+            );
+            streetName = sr.rows[0]?.name || null;
+        }
+
+        if (!streetSegment && streetName) streetSegment = streetName;
+
+        const parts = [];
+        if (purokName) parts.push(purokName);
+        if (streetSegment) parts.push(streetSegment);
+
+        const address_street = parts.length ? parts.join(", ") : null;
+        return { address_house, address_street };
+    } catch {
+        return {
+            address_house,
+            address_street: streetSegment || null,
+        };
+    }
+}
+
 // POST /api/auth/resident/register
 // body: { first_name, middle_name, last_name, full_name, email, password,
 //         contact_number, date_of_birth, house_number, purok_id, street_id,
@@ -43,6 +92,7 @@ async function completeResidentRegistration(req, res) {
         civil_status,
         nationality,
         id_type,
+        id_image_path,
     } = req.body;
 
     if (!supabase_uid || !email || !first_name || !last_name) {
@@ -69,48 +119,62 @@ async function completeResidentRegistration(req, res) {
             .filter(Boolean)
             .join(" ");
 
-        const jpgPath = `resident-ids/${supabase_uid}.jpg`;
-        const pngPath = `resident-ids/${supabase_uid}.png`;
-        const webpPath = `resident-ids/${supabase_uid}.webp`;
+        const expectedImagePath = new RegExp(
+            `^resident-ids/${supabase_uid}\\.(jpg|jpeg|png|webp)$`,
+        );
+        const normalizedIdImagePath =
+            typeof id_image_path === "string" &&
+            expectedImagePath.test(id_image_path)
+                ? id_image_path
+                : null;
+        const { data: idUrlData } = normalizedIdImagePath
+            ? supabase.storage
+                  .from("certifast-uploads")
+                  .getPublicUrl(normalizedIdImagePath)
+            : { data: null };
+        const id_image_url = idUrlData?.publicUrl || null;
 
-        const { data: jpgUrlData } = supabase.storage
-            .from("certifast-uploads")
-            .getPublicUrl(jpgPath);
-        const { data: pngUrlData } = supabase.storage
-            .from("certifast-uploads")
-            .getPublicUrl(pngPath);
-        const { data: webpUrlData } = supabase.storage
-            .from("certifast-uploads")
-            .getPublicUrl(webpPath);
+        const middleNorm =
+            middle_name != null && String(middle_name).trim() !== ""
+                ? String(middle_name).trim()
+                : null;
 
-        const id_image_url =
-            jpgUrlData?.publicUrl ||
-            pngUrlData?.publicUrl ||
-            webpUrlData?.publicUrl ||
-            null;
+        const { address_house, address_street } = await legacyAddressFields(
+            pool,
+            {
+                house_no,
+                purok_id,
+                street_id,
+                street_other,
+            },
+        );
 
         const result = await pool.query(
             `INSERT INTO residents (
                 full_name, first_name, middle_name, last_name,
                 email, password_hash,
-                contact_number, date_of_birth, house_number,
+                contact_number, address_house, address_street,
+                date_of_birth, house_number,
                 purok_id, street_id, street_other,
                 id_type, id_image_url, civil_status, nationality, status
             ) VALUES (
                 $1, $2, $3, $4,
                 $5, $6,
                 $7, $8, $9,
-                $10, $11, $12,
-                $13, $14, $15, $16, 'pending_verification'
+                $10, $11,
+                $12, $13, $14,
+                $15, $16, $17, $18, 'pending_verification'
             ) RETURNING resident_id, full_name, email, status`,
             [
                 full_name,
                 first_name,
-                middle_name || null,
+                middleNorm,
                 last_name,
                 email,
                 supabase_uid,
                 contact_number || null,
+                address_house,
+                address_street,
                 date_of_birth || null,
                 house_no || null,
                 purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,

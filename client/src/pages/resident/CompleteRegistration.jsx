@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import axios from "axios";
 import { getApiBase } from "../../apiBase";
+import {
+    deletePendingResidentIdUpload,
+    getPendingResidentIdUpload,
+} from "../../residentIdUploadStore";
 
 const API = getApiBase();
 
@@ -30,11 +34,45 @@ export default function CompleteRegistration() {
             } = await supabase.auth.getUser();
             const user = !userErr && freshUser ? freshUser : session.user;
             const meta = user.user_metadata || {};
+            const str = (v) =>
+                v != null && String(v).trim() !== ""
+                    ? String(v).trim()
+                    : null;
 
-            if (!meta.first_name?.trim() || !meta.last_name?.trim()) {
+            if (!str(meta.first_name) || !str(meta.last_name)) {
                 throw new Error(
                     "Profile data was not found on your account. Please register again or contact the barangay office.",
                 );
+            }
+
+            let idImagePath = null;
+            const pendingIdUpload = await getPendingResidentIdUpload(user.id);
+            if (pendingIdUpload?.file) {
+                const ext =
+                    pendingIdUpload.file.type === "image/png"
+                        ? "png"
+                        : pendingIdUpload.file.type === "image/webp"
+                          ? "webp"
+                          : "jpg";
+                const path = `resident-ids/${user.id}.${ext}`;
+                const { error: uploadError } = await supabase.storage
+                    .from("certifast-uploads")
+                    .upload(path, pendingIdUpload.file, {
+                        contentType: pendingIdUpload.file.type,
+                        upsert: false,
+                    });
+
+                if (!uploadError) {
+                    idImagePath = path;
+                    await deletePendingResidentIdUpload(user.id);
+                } else if (/already exists|duplicate/i.test(uploadError.message || "")) {
+                    idImagePath = path;
+                    await deletePendingResidentIdUpload(user.id);
+                } else {
+                    throw new Error(
+                        "Your ID photo could not be uploaded. Please contact the barangay office so they can check the Supabase Storage policy for resident ID uploads.",
+                    );
+                }
             }
 
             await axios.post(
@@ -42,18 +80,19 @@ export default function CompleteRegistration() {
                 {
                     supabase_uid: user.id,
                     email: user.email,
-                    first_name: meta.first_name,
-                    middle_name: meta.middle_name,
-                    last_name: meta.last_name,
-                    contact_number: meta.contact_number,
-                    house_no: meta.house_no,
-                    purok_id: meta.purok_id,
-                    street_id: meta.street_id,
-                    street_other: meta.street_other,
-                    date_of_birth: meta.date_of_birth,
-                    civil_status: meta.civil_status,
-                    nationality: meta.nationality,
-                    id_type: meta.id_type,
+                    first_name: str(meta.first_name),
+                    middle_name: str(meta.middle_name),
+                    last_name: str(meta.last_name),
+                    contact_number: str(meta.contact_number),
+                    house_no: str(meta.house_no),
+                    purok_id: meta.purok_id ?? null,
+                    street_id: meta.street_id ?? null,
+                    street_other: str(meta.street_other),
+                    date_of_birth: meta.date_of_birth || null,
+                    civil_status: str(meta.civil_status),
+                    nationality: str(meta.nationality) || "Filipino",
+                    id_type: str(meta.id_type),
+                    id_image_path: idImagePath,
                 },
                 {
                     headers: {

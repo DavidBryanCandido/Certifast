@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { getApiBase } from "../../apiBase";
+import { savePendingResidentIdUpload } from "../../residentIdUploadStore";
 
 const API = getApiBase();
 
@@ -619,17 +620,11 @@ export default function ResidentRegister({ onSuccess }) {
             }
 
             if (idFile && authData?.user) {
-                const ext = idFile.type === "image/png" ? "png" : "jpg";
-                const filename = `resident-ids/${authData.user.id}.${ext}`;
-                const { error: uploadError } = await supabase.storage
-                    .from("certifast-uploads")
-                    .upload(filename, idFile, {
-                        contentType: idFile.type,
-                        upsert: true,
-                    });
-                if (uploadError) {
+                try {
+                    await savePendingResidentIdUpload(authData.user.id, idFile);
+                } catch {
                     setIdUploadWarning(
-                        "Your ID photo could not be uploaded (usually Supabase Storage permissions). You can still verify your email—ask your admin to add Storage policies for bucket certifast-uploads, path resident-ids/. Staff may request your ID during review.",
+                        "Your ID photo could not be saved for upload after email verification. You can still verify your email, but staff may request your ID during review.",
                     );
                 }
             }
