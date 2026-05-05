@@ -69,7 +69,7 @@ function useMAStyles() {
         }
         .ma-res-row {
             display: grid;
-            grid-template-columns: 2fr 140px 1.6fr 120px 130px 48px;
+            grid-template-columns: minmax(230px, 1.25fr) 150px minmax(260px, 1.55fr) 120px 130px 48px;
             align-items: center;
             padding: 13px 24px;
             border-bottom: 1px solid #f0ece4;
@@ -80,7 +80,7 @@ function useMAStyles() {
         .ma-res-row:last-child { border-bottom: none; }
         .ma-res-header {
             display: grid;
-            grid-template-columns: 2fr 140px 1.6fr 120px 130px 48px;
+            grid-template-columns: minmax(230px, 1.25fr) 150px minmax(260px, 1.55fr) 120px 130px 48px;
             align-items: center;
             padding: 9px 24px;
             background: #f8f6f1;
@@ -99,8 +99,9 @@ function useMAStyles() {
         .ma-input::placeholder { color: #9090aa; font-size: 12.5px; }
         .ma-textarea { width: 100%; min-height: 88px; resize: vertical; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; transition: border-color 0.15s, background 0.15s; box-sizing: border-box; }
         .ma-textarea:focus { border-color: #0e2554; background: #f0f3ff; }
-        .ma-link-btn { font-size: 11px; color: #0e2554; text-decoration: underline; background: none; border: none; padding: 0; cursor: pointer; font-family: 'Source Serif 4', serif; text-align: left; }
-        .ma-link-btn:disabled { color: #9090aa; cursor: not-allowed; text-decoration: none; }
+        .ma-id-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid rgba(14,37,84,0.28); border-radius: 4px; background: #fff; color: #0e2554; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: 'Source Serif 4', serif; white-space: nowrap; }
+        .ma-id-btn:hover { background: #f0f3ff; border-color: #0e2554; }
+        .ma-id-empty { color: #9090aa; font-size: 11.5px; font-style: italic; white-space: nowrap; }
         .ma-select { width: 100%; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; cursor: pointer; appearance: none; transition: border-color 0.15s; }
         .ma-select:focus { border-color: #0e2554; }
         .ma-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 22px; background: linear-gradient(135deg, #163066, #091a3e); color: #fff; border: none; border-radius: 4px; font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
@@ -2619,21 +2620,25 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                             </div>
                                             {/* Submitted ID */}
                                             <div>
-                                                <button
-                                                    type="button"
-                                                    className="ma-link-btn"
-                                                    disabled={!res.id_image_url}
-                                                    onClick={() =>
-                                                        setResModal({
-                                                            mode: "review",
-                                                            resident: res,
-                                                        })
-                                                    }
-                                                >
-                                                    {res.id_image_url
-                                                        ? "View submitted ID"
-                                                        : "No ID submitted"}
-                                                </button>
+                                                {res.id_image_url ? (
+                                                    <button
+                                                        type="button"
+                                                        className="ma-id-btn"
+                                                        onClick={() =>
+                                                            setResModal({
+                                                                mode: "review",
+                                                                resident: res,
+                                                            })
+                                                        }
+                                                    >
+                                                        <Eye size={13} />
+                                                        View ID
+                                                    </button>
+                                                ) : (
+                                                    <span className="ma-id-empty">
+                                                        No ID submitted
+                                                    </span>
+                                                )}
                                             </div>
                                             {/* Contact / Email */}
                                             <div>

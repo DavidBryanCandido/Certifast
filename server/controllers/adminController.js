@@ -3,6 +3,7 @@ const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
+const { sendResidentRejectionEmail } = require("../utils/emailer");
 
 const supabase = (() => {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -918,7 +919,7 @@ async function updateResidentStatus(req, res) {
 
     try {
         const existingResult = await pool.query(
-            `SELECT resident_id, full_name, status
+            `SELECT resident_id, full_name, email, status
              FROM residents
              WHERE resident_id = $1
              LIMIT 1`,
@@ -986,6 +987,15 @@ async function updateResidentStatus(req, res) {
                 title: "Account Denied",
                 message: `Your resident account registration was denied. Reason: ${reason}`,
             });
+            try {
+                await sendResidentRejectionEmail({
+                    to: existingResident.email,
+                    residentName: updated.full_name,
+                    reason,
+                });
+            } catch (emailErr) {
+                console.error("resident rejection email failed:", emailErr);
+            }
         }
 
         const auditDescription =
