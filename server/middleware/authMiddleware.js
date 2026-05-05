@@ -3,10 +3,13 @@ const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 const pool = require("../db/pool");
 
-const supabase = createClient(
-    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-);
+const supabaseUrl =
+    process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase =
+    supabaseUrl && supabaseServiceRoleKey
+        ? createClient(supabaseUrl, supabaseServiceRoleKey)
+        : null;
 
 // For residents only
 async function residentAuth(req, res, next) {
@@ -14,6 +17,47 @@ async function residentAuth(req, res, next) {
     if (!token) return res.status(401).json({ message: "No token provided" });
 
     try {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (decoded.type === "resident") {
+                const result = await pool.query(
+                    `SELECT resident_id, full_name, email, status
+                     FROM residents
+                     WHERE resident_id = $1
+                     LIMIT 1`,
+                    [decoded.id],
+                );
+
+                if (result.rows.length === 0) {
+                    return res
+                        .status(403)
+                        .json({ message: "Resident not found" });
+                }
+
+                const resident = result.rows[0];
+                if (resident.status !== "active") {
+                    return res
+                        .status(403)
+                        .json({ message: "Resident account is not active" });
+                }
+
+                req.resident = {
+                    id: resident.resident_id,
+                    email: resident.email,
+                    full_name: resident.full_name,
+                };
+                return next();
+            }
+        } catch {
+            // Not a CertiFast resident JWT; continue with Supabase token verification.
+        }
+
+        if (!supabase) {
+            return res.status(500).json({
+                message: "Supabase is not configured on the server",
+            });
+        }
+
         const {
             data: { user },
             error,
@@ -24,7 +68,7 @@ async function residentAuth(req, res, next) {
         }
 
         const result = await pool.query(
-            "SELECT resident_id FROM residents WHERE email = $1",
+            "SELECT resident_id, full_name, email, status FROM residents WHERE email = $1",
             [user.email],
         );
 
@@ -32,7 +76,18 @@ async function residentAuth(req, res, next) {
             return res.status(403).json({ message: "Resident not found" });
         }
 
-        req.resident = { id: result.rows[0].resident_id, email: user.email };
+        const resident = result.rows[0];
+        if (resident.status !== "active") {
+            return res
+                .status(403)
+                .json({ message: "Resident account is not active" });
+        }
+
+        req.resident = {
+            id: resident.resident_id,
+            email: resident.email,
+            full_name: resident.full_name,
+        };
         next();
     } catch {
         return res.status(403).json({ message: "Invalid token" });

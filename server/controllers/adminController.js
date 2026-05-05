@@ -72,15 +72,6 @@ function ensureAdminOrSuperadmin(req, res) {
     return true;
 }
 
-async function ensureResidentReviewColumns() {
-    await pool.query(`
-        ALTER TABLE residents
-            ADD COLUMN IF NOT EXISTS rejection_comment text,
-            ADD COLUMN IF NOT EXISTS verified_by integer,
-            ADD COLUMN IF NOT EXISTS verified_at timestamp without time zone
-    `);
-}
-
 // Helper to create notifications for residents
 async function createNotification({
     residentId,
@@ -956,10 +947,22 @@ async function updateResidentStatus(req, res) {
     }
 
     try {
-        await ensureResidentReviewColumns();
+        const columnResult = await pool.query(
+            `SELECT column_name
+             FROM information_schema.columns
+             WHERE table_name = 'residents'
+               AND column_name IN ('rejection_comment', 'verified_by', 'verified_at')`,
+        );
+        const residentColumns = new Set(
+            columnResult.rows.map((row) => row.column_name),
+        );
+        const hasRejectionComment = residentColumns.has("rejection_comment");
+        const hasVerifiedBy = residentColumns.has("verified_by");
+        const hasVerifiedAt = residentColumns.has("verified_at");
 
         const existingResult = await pool.query(
-            `SELECT resident_id, full_name, email, status, rejection_comment
+            `SELECT resident_id, full_name, email, status,
+                    ${hasRejectionComment ? "rejection_comment" : "NULL::text AS rejection_comment"}
              FROM residents
              WHERE resident_id = $1
              LIMIT 1`,
@@ -983,25 +986,40 @@ async function updateResidentStatus(req, res) {
             });
         }
 
+        const setClauses = ["status = $2"];
+        const queryParams = [residentId, nextStatus];
+
+        if (hasRejectionComment) {
+            queryParams.push(reason);
+            const reasonParam = queryParams.length;
+            setClauses.push(`rejection_comment = CASE
+                WHEN $2 = 'inactive' AND $${reasonParam} <> '' THEN $${reasonParam}
+                WHEN $2 = 'active' THEN NULL
+                ELSE rejection_comment
+            END`);
+        }
+        if (hasVerifiedBy) {
+            queryParams.push(req.admin.id);
+            setClauses.push(`verified_by = CASE
+                WHEN $2 = 'active' THEN $${queryParams.length}
+                ELSE verified_by
+            END`);
+        }
+        if (hasVerifiedAt) {
+            setClauses.push(`verified_at = CASE
+                WHEN $2 = 'active' THEN NOW()
+                ELSE verified_at
+            END`);
+        }
+
         const result = await pool.query(
             `UPDATE residents
-             SET status = $2,
-                 rejection_comment = CASE
-                     WHEN $2 = 'inactive' AND $3 <> '' THEN $3
-                     WHEN $2 = 'active' THEN NULL
-                     ELSE rejection_comment
-                 END,
-                 verified_by = CASE
-                     WHEN $2 = 'active' THEN $4
-                     ELSE verified_by
-                 END,
-                 verified_at = CASE
-                     WHEN $2 = 'active' THEN NOW()
-                     ELSE verified_at
-                 END
+             SET ${setClauses.join(",\n                 ")}
              WHERE resident_id = $1
-             RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
-            [residentId, nextStatus, reason, req.admin.id],
+             RETURNING resident_id, full_name, status,
+                       ${hasVerifiedAt ? "verified_at" : "NULL::timestamp AS verified_at"},
+                       ${hasRejectionComment ? "rejection_comment" : "NULL::text AS rejection_comment"}`,
+            queryParams,
         );
 
         if (result.rows.length === 0) {

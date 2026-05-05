@@ -115,45 +115,19 @@ export default function ResidentLogin({ onLogin }) {
             return;
         }
         setIsLoading(true);
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: form.email.trim(),
-                password: form.password,
-            });
-
-            if (error) {
-                if ((error.message || "").includes("Email not confirmed")) {
-                    setError("Please verify your email first. Check your inbox.");
-                } else {
-                    setError("Invalid email or password. Please try again.");
-                }
-                return;
-            }
-
-            const res = await axios.post(
-                `${API}/auth/resident/login`,
-                {},
-                {
-                    headers: {
-                        Authorization: `Bearer ${data.session.access_token}`,
-                    },
-                },
-            );
-
-            localStorage.setItem(
-                "certifast_resident_token",
-                data.session.access_token,
-            );
+        const finishLogin = (token, resident) => {
+            localStorage.setItem("certifast_resident_token", token);
             localStorage.setItem(
                 "certifast_resident_auth",
                 JSON.stringify({
-                    token: data.session.access_token,
-                    resident: res.data.resident,
+                    token,
+                    resident,
                 }),
             );
 
-            if (onLogin) onLogin(res.data);
-        } catch (err) {
+            if (onLogin) onLogin({ token, resident });
+        };
+        const showBackendLoginError = (err) => {
             const data = err?.response?.data || {};
             if (data.code === "rejected") {
                 setNoticeModal({
@@ -180,9 +154,51 @@ export default function ResidentLogin({ onLogin }) {
                 });
                 return;
             }
-            setError(
-                data.message || "Login failed. Please try again.",
+            setError(data.message || "Login failed. Please try again.");
+        };
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: form.email.trim(),
+                password: form.password,
+            });
+
+            if (error) {
+                if ((error.message || "").includes("Email not confirmed")) {
+                    setError("Please verify your email first. Check your inbox.");
+                    return;
+                }
+
+                try {
+                    const legacyRes = await axios.post(
+                        `${API}/auth/resident/login`,
+                        {
+                            email: form.email.trim(),
+                            password: form.password,
+                        },
+                    );
+                    finishLogin(
+                        legacyRes.data.token,
+                        legacyRes.data.resident,
+                    );
+                } catch (legacyErr) {
+                    showBackendLoginError(legacyErr);
+                }
+                return;
+            }
+
+            const res = await axios.post(
+                `${API}/auth/resident/login`,
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${data.session.access_token}`,
+                    },
+                },
             );
+
+            finishLogin(data.session.access_token, res.data.resident);
+        } catch (err) {
+            showBackendLoginError(err);
         } finally {
             setIsLoading(false);
         }
