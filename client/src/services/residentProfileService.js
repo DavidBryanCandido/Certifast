@@ -1,7 +1,9 @@
 import axios from "axios";
 import authService from "./authService";
 
-const API = import.meta.env.VITE_API_URL;
+import { getApiBase } from "./apiBase";
+
+const API = getApiBase();
 
 function getResidentHeaders() {
     const token = authService.getResidentToken();

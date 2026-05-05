@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL;
+import { getApiBase } from "./apiBase";
+
+const API = getApiBase();
 
 const getToken = () => localStorage.getItem("certifast_admin_token");
 

@@ -23,7 +23,14 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^[A-Z_]',
+          // React component aliases in map/destructure: icon: Icon, item: Item, …
+          argsIgnorePattern: '^[A-Z_]',
+        },
+      ],
     },
   },
 ])

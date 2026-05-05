@@ -3,7 +3,6 @@
 // =============================================================
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import {
     LayoutDashboard,
     FilePlus,
@@ -1530,7 +1529,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                 Array.isArray(data.monthlyTrend) ? data.monthlyTrend : [],
             );
             setDailyData(Array.isArray(data.daily) ? data.daily : []);
-        } catch (err) {
+        } catch {
             // silently fail — charts stay empty
         } finally {
             setReportLoading(false);
@@ -1618,7 +1617,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                 type: "success",
             });
             setTimeout(() => setReportToast(null), 3500);
-        } catch (err) {
+        } catch {
             setReportToast({
                 msg: "Export failed. Please try again.",
                 type: "error",

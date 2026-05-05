@@ -13,10 +13,12 @@ import {
     X,
     AlertTriangle,
 } from "lucide-react";
+import { getApiBase } from "../apiBase";
 
 const BUCKET_LOGO =
     "https://fyihciqyaugzhqeezxci.supabase.co/storage/v1/object/public/certifast-uploads/branding/logo.png";
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+const API_URL = getApiBase();
 
 if (!document.head.querySelector("[data-resident-sidebar]")) {
     const s = document.createElement("style");

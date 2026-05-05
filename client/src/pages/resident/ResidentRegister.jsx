@@ -23,8 +23,9 @@ import {
     CalendarDays,
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
+import { getApiBase } from "../../apiBase";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API = getApiBase();
 
 // ─── Address data ─────────────────────────────────────────────
 // Fallback lists — used while API loads or on fetch failure.
@@ -549,8 +550,10 @@ export default function ResidentRegister({ onSuccess }) {
         setIsLoading(true);
         setError("");
         try {
-            const { data: authData, error: authError } =
-                await supabase.auth.signUp({
+            let authData;
+            let authError;
+            try {
+                const result = await supabase.auth.signUp({
                     email: form.email.trim(),
                     password,
                     options: {
@@ -577,6 +580,19 @@ export default function ResidentRegister({ onSuccess }) {
                         },
                     },
                 });
+                authData = result.data;
+                authError = result.error;
+            } catch (signUpThrown) {
+                // Supabase JS can throw (e.g. parsing a 500 body) instead of returning { error }.
+                const hint =
+                    "Could not send the verification email. In Supabase: Project Settings → Authentication → check email confirmations, SMTP (if custom), and Auth logs. Free-tier email rate limits can also cause this.";
+                throw new Error(
+                    signUpThrown?.message?.includes?.("payload") ||
+                        signUpThrown?.name === "TypeError"
+                        ? hint
+                        : signUpThrown?.message || hint,
+                );
+            }
 
             if (authError) {
                 if (
@@ -586,7 +602,18 @@ export default function ResidentRegister({ onSuccess }) {
                 ) {
                     throw new Error("Email already registered.");
                 }
-                throw new Error(authError.message);
+                const raw = authError.message || "";
+                if (
+                    /confirmation email|error sending|smtp|mail|email/i.test(
+                        raw,
+                    ) ||
+                    authError.status === 500
+                ) {
+                    throw new Error(
+                        "Could not send the verification email. Check Supabase Auth email/SMTP settings and Auth logs in the dashboard (rate limits or misconfigured SMTP).",
+                    );
+                }
+                throw new Error(raw || "Sign up failed.");
             }
 
             if (idFile && authData?.user) {
@@ -608,7 +635,11 @@ export default function ResidentRegister({ onSuccess }) {
             setSuccess(true);
             if (onSuccess) setTimeout(onSuccess, 3000);
         } catch (err) {
-            setError(err?.message || "Registration failed. Please try again.");
+            const fallback =
+                typeof err === "string" ? err : err?.message || "";
+            setError(
+                fallback || "Registration failed. Please try again.",
+            );
         } finally {
             setIsLoading(false);
         }

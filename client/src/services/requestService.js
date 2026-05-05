@@ -1,7 +1,8 @@
 import axios from "axios";
 import authService from "./authService";
+import { getApiBase } from "./apiBase";
 
-const API = import.meta.env.VITE_API_URL;
+const API = getApiBase();
 
 const requestService = {
     // GET all requests for logged-in resident

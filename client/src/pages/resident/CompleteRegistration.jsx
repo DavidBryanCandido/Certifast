@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../supabaseClient";
 import axios from "axios";
+import { getApiBase } from "../../apiBase";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API = getApiBase();
 
 /** One shared attempt per full page load (dedupes React StrictMode double-mount + duplicate auth events). */
 let completeRegistrationInFlight = null;

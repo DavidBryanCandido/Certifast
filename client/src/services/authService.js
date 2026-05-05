@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import { getApiBase } from "../apiBase";
+
+const API = getApiBase();
 
 const getTokenFromAuthBlob = (storageKey) => {
     const raw = localStorage.getItem(storageKey);

@@ -19,13 +19,20 @@ const certificateRoutes = require("./routes/certificates");
 
 const app = express();
 
+const defaultOrigins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://certifast-two.vercel.app",
+];
+const extraOrigins = (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+const corsOrigins = [...new Set([...defaultOrigins, ...extraOrigins])];
+
 app.use(
     cors({
-        origin: [
-            "http://localhost:5173",
-            "http://localhost:5174",
-            "https://certifast-two.vercel.app",
-        ],
+        origin: corsOrigins,
         credentials: true,
     }),
 );
@@ -38,11 +45,11 @@ app.use("/api/resident", residentRoutes);
 app.use("/api/certificates", certificateRoutes);
 // Keep /api/admin for backwards compatibility (if any existing clients still call it)
 app.use("/api/admin", require("./routes/admin"));
+const reportsRoutes = require("./routes/reports");
+app.use("/api/reports", reportsRoutes);
 
 // Health check
 app.get("/", (req, res) => res.json({ message: "CertiFast API is running" }));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-const reportsRoutes = require("./routes/reports");
-app.use("/api/reports", reportsRoutes);

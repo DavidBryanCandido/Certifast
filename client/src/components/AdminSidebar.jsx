@@ -12,10 +12,12 @@ import {
     X,
 } from "lucide-react";
 import authService from "../services/authService";
+import { getApiBase } from "../apiBase";
 
 const BUCKET_LOGO =
     "https://fyihciqyaugzhqeezxci.supabase.co/storage/v1/object/public/certifast-uploads/branding/logo.png";
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+const API_URL = getApiBase();
 
 function useBrgyLogo(token) {
     const [logo, setLogo] = useState(BUCKET_LOGO);

@@ -7,8 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import axios from "axios";
 import { supabase } from "../../supabaseClient";
+import { getApiBase } from "../../apiBase";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API = getApiBase();
 
 // ─── Inject styles (shared with admin login theme) ────────────
 if (!document.head.querySelector("[data-certifast-resident]")) {

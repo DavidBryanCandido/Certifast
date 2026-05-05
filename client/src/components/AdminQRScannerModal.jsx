@@ -32,7 +32,9 @@ import {
 } from "lucide-react";
 import authService from "../services/authService";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import { getApiBase } from "../apiBase";
+
+const API = getApiBase();
 
 // ─── Helpers ──────────────────────────────────────────────────
 function fmtDate(str) {

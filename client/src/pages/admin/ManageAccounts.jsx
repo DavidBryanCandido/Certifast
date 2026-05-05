@@ -30,7 +30,9 @@ import accountService from "../../services/accountService";
 import axios from "axios";
 import authService from "../../services/authService";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import { getApiBase } from "../../apiBase";
+
+const API = getApiBase();
 function adminHeaders() {
     return {
         headers: { Authorization: `Bearer ${authService.getAdminToken()}` },
