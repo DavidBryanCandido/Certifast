@@ -158,6 +158,7 @@ CREATE TABLE residents (
   street_other character varying,
   id_type character varying,
   id_image_url character varying,
+  rejection_comment text,
   verified_by integer,
   verified_at timestamp without time zone,
   nationality character varying DEFAULT 'Filipino'::character varying

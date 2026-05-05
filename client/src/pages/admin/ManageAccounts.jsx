@@ -69,7 +69,7 @@ function useMAStyles() {
         }
         .ma-res-row {
             display: grid;
-            grid-template-columns: 2fr 1.6fr 110px 130px 48px;
+            grid-template-columns: 2fr 140px 1.6fr 120px 130px 48px;
             align-items: center;
             padding: 13px 24px;
             border-bottom: 1px solid #f0ece4;
@@ -80,7 +80,7 @@ function useMAStyles() {
         .ma-res-row:last-child { border-bottom: none; }
         .ma-res-header {
             display: grid;
-            grid-template-columns: 2fr 1.6fr 110px 130px 48px;
+            grid-template-columns: 2fr 140px 1.6fr 120px 130px 48px;
             align-items: center;
             padding: 9px 24px;
             background: #f8f6f1;
@@ -97,6 +97,10 @@ function useMAStyles() {
         .ma-input { width: 100%; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; transition: border-color 0.15s, background 0.15s; box-sizing: border-box; }
         .ma-input:focus { border-color: #0e2554; background: #f0f3ff; }
         .ma-input::placeholder { color: #9090aa; font-size: 12.5px; }
+        .ma-textarea { width: 100%; min-height: 88px; resize: vertical; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; transition: border-color 0.15s, background 0.15s; box-sizing: border-box; }
+        .ma-textarea:focus { border-color: #0e2554; background: #f0f3ff; }
+        .ma-link-btn { font-size: 11px; color: #0e2554; text-decoration: underline; background: none; border: none; padding: 0; cursor: pointer; font-family: 'Source Serif 4', serif; text-align: left; }
+        .ma-link-btn:disabled { color: #9090aa; cursor: not-allowed; text-decoration: none; }
         .ma-select { width: 100%; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; cursor: pointer; appearance: none; transition: border-color 0.15s; }
         .ma-select:focus { border-color: #0e2554; }
         .ma-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 22px; background: linear-gradient(135deg, #163066, #091a3e); color: #fff; border: none; border-radius: 4px; font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
@@ -1050,6 +1054,187 @@ function ConfirmModal({
 }
 
 // ─── Row Dropdown Menu (staff/admin) ─────────────────────────
+function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
+    const [comment, setComment] = useState(resident?.rejection_comment || "");
+    const [submitting, setSubmitting] = useState("");
+    const status = String(resident?.status || "").toLowerCase();
+    const isActive = status === "active";
+
+    const handleApprove = async () => {
+        setSubmitting("approve");
+        try {
+            await onApprove(resident);
+            onClose();
+        } finally {
+            setSubmitting("");
+        }
+    };
+
+    const handleReject = async () => {
+        if (!comment.trim()) return;
+        setSubmitting("reject");
+        try {
+            await onReject(resident, comment.trim());
+            onClose();
+        } finally {
+            setSubmitting("");
+        }
+    };
+
+    return (
+        <div
+            className="ma-modal-overlay"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <div className="ma-modal" style={{ maxWidth: 760 }}>
+                <div className="ma-modal-header">
+                    <div className="ma-modal-title">Resident Submitted ID</div>
+                    <button className="ma-modal-close" onClick={onClose}>
+                        <X size={15} />
+                    </button>
+                </div>
+                <div className="ma-modal-body">
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            marginBottom: 14,
+                            flexWrap: "wrap",
+                        }}
+                    >
+                        <div>
+                            <div
+                                style={{
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                    color: "#1a1a2e",
+                                }}
+                            >
+                                {resident?.full_name}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#9090aa" }}>
+                                {resident?.email || "No email"}
+                            </div>
+                        </div>
+                        {resBadgeLabel(status)}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "center" }}>
+                        {resident?.id_image_url ? (
+                            <img
+                                src={resident.id_image_url}
+                                alt="Resident submitted ID"
+                                style={{
+                                    width: "100%",
+                                    maxHeight: "52vh",
+                                    objectFit: "contain",
+                                    borderRadius: 6,
+                                    border: "1px solid #e4dfd4",
+                                    background: "#f8f6f1",
+                                }}
+                            />
+                        ) : (
+                            <div
+                                style={{
+                                    width: "100%",
+                                    minHeight: 180,
+                                    border: "1px dashed #e4dfd4",
+                                    borderRadius: 6,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#9090aa",
+                                    background: "#f8f6f1",
+                                }}
+                            >
+                                No submitted ID file
+                            </div>
+                        )}
+                    </div>
+
+                    {!isActive && (
+                        <div className="ma-field" style={{ marginTop: 16 }}>
+                            <label>
+                                Rejection Comment <span className="req">*</span>
+                            </label>
+                            <textarea
+                                className="ma-textarea"
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                placeholder="Explain why this account is not activated."
+                            />
+                        </div>
+                    )}
+
+                    {isActive && resident?.rejection_comment && (
+                        <div
+                            style={{
+                                marginTop: 16,
+                                padding: "10px 14px",
+                                border: "1px solid #e4dfd4",
+                                borderRadius: 4,
+                                fontSize: 12,
+                                color: "#4a4a6a",
+                                background: "#f8f6f1",
+                            }}
+                        >
+                            Previous rejection comment:{" "}
+                            {resident.rejection_comment}
+                        </div>
+                    )}
+                </div>
+                <div className="ma-modal-footer">
+                    <button className="ma-btn-secondary" onClick={onClose}>
+                        Close
+                    </button>
+                    {!isActive && (
+                        <button
+                            className="ma-btn-secondary"
+                            onClick={handleReject}
+                            disabled={Boolean(submitting) || !comment.trim()}
+                            style={{ color: "#b02020" }}
+                        >
+                            <XCircle size={13} />
+                            {submitting === "reject" ? "Saving..." : "Reject"}
+                        </button>
+                    )}
+                    {!isActive && (
+                        <button
+                            className="ma-btn-primary"
+                            onClick={handleApprove}
+                            disabled={Boolean(submitting)}
+                        >
+                            <CheckCircle size={13} />
+                            {submitting === "approve"
+                                ? "Saving..."
+                                : "Activate"}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function resBadgeLabel(status) {
+    const s = String(status || "").toLowerCase();
+    if (s === "active")
+        return (
+            <span className="ma-badge-active">
+                <CheckCircle size={10} /> Active
+            </span>
+        );
+    if (s === "pending_verification")
+        return <span className="ma-badge-pending">Pending Review</span>;
+    return (
+        <span className="ma-badge-inactive">
+            <XCircle size={10} /> Inactive
+        </span>
+    );
+}
+
 function RowMenu({
     account,
     isSuperAdmin,
@@ -1292,8 +1477,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
 
     // ── Modals ──
     const [modal, setModal] = useState(null); // { mode, account }
-    const [resModal, setResModal] = useState(null); // { mode: 'password'|'deactivate', resident }
-    const [idPreviewModalUrl, setIdPreviewModalUrl] = useState("");
+    const [resModal, setResModal] = useState(null); // { mode: 'password'|'review', resident }
 
     // ── Toast ──
     const [toast, setToast] = useState(null);
@@ -1337,7 +1521,10 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
         try {
             const res = await axios.get(
                 `${API}/admin/residents`,
-                adminHeaders(),
+                {
+                    ...adminHeaders(),
+                    params: { sort: "date", limit: 100 },
+                },
             );
             const data = Array.isArray(res.data?.data)
                 ? res.data.data
@@ -1386,16 +1573,22 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     });
 
     // ── Filtered resident rows ──
-    const filteredRes = resRows.filter((r) => {
-        const q = resSearch.toLowerCase();
-        const st = String(r.status || "").toLowerCase();
-        return (
-            (!q ||
-                r.full_name.toLowerCase().includes(q) ||
-                (r.email || "").toLowerCase().includes(q)) &&
-            (!resStatusFilter || st === resStatusFilter)
-        );
-    });
+    const filteredRes = resRows
+        .filter((r) => {
+            const q = resSearch.toLowerCase();
+            const st = String(r.status || "").toLowerCase();
+            return (
+                (!q ||
+                    r.full_name.toLowerCase().includes(q) ||
+                    (r.email || "").toLowerCase().includes(q)) &&
+                (!resStatusFilter || st === resStatusFilter)
+            );
+        })
+        .sort((a, b) => {
+            const aDate = new Date(a.created_at || 0).getTime();
+            const bDate = new Date(b.created_at || 0).getTime();
+            return bDate - aDate || b.resident_id - a.resident_id;
+        });
 
     // ── Stats ──
     const totalAccounts = rows.length;
@@ -1516,16 +1709,12 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
             await loadResidents();
         } catch (err) {
             showToast(err?.response?.data?.message || "Failed.", "error");
+            throw err;
         }
     };
 
-    const handleResidentDeny = async (resident) => {
-        const reason = window.prompt(
-            "Enter reason for denial (this will be sent to the resident):",
-            "",
-        );
-        if (reason === null) return;
-        if (!reason.trim()) {
+    const handleResidentDeny = async (resident, reason) => {
+        if (!reason?.trim()) {
             showToast("Denial reason is required.", "error");
             return;
         }
@@ -1543,6 +1732,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
             await loadResidents();
         } catch (err) {
             showToast(err?.response?.data?.message || "Failed.", "error");
+            throw err;
         }
     };
 
@@ -2329,6 +2519,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                             <div className="ma-res-header">
                                 {[
                                     "Resident",
+                                    "Submitted ID",
                                     "Contact / Email",
                                     "Status",
                                     "Registered",
@@ -2424,35 +2615,25 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                                     >
                                                         {resId}
                                                     </div>
-                                                    {res.id_image_url && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setIdPreviewModalUrl(
-                                                                    res.id_image_url,
-                                                                )
-                                                            }
-                                                            style={{
-                                                                fontSize: 10.5,
-                                                                color: "#0e2554",
-                                                                textDecoration:
-                                                                    "underline",
-                                                                marginTop: 3,
-                                                                display:
-                                                                    "inline-block",
-                                                                background:
-                                                                    "none",
-                                                                border: "none",
-                                                                padding: 0,
-                                                                cursor: "pointer",
-                                                                fontFamily:
-                                                                    "'Source Serif 4', serif",
-                                                            }}
-                                                        >
-                                                            View submitted ID
-                                                        </button>
-                                                    )}
                                                 </div>
+                                            </div>
+                                            {/* Submitted ID */}
+                                            <div>
+                                                <button
+                                                    type="button"
+                                                    className="ma-link-btn"
+                                                    disabled={!res.id_image_url}
+                                                    onClick={() =>
+                                                        setResModal({
+                                                            mode: "review",
+                                                            resident: res,
+                                                        })
+                                                    }
+                                                >
+                                                    {res.id_image_url
+                                                        ? "View submitted ID"
+                                                        : "No ID submitted"}
+                                                </button>
                                             </div>
                                             {/* Contact / Email */}
                                             <div>
@@ -2495,10 +2676,16 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                                     })
                                                 }
                                                 onApprove={() =>
-                                                    handleResidentApprove(res)
+                                                    setResModal({
+                                                        mode: "review",
+                                                        resident: res,
+                                                    })
                                                 }
                                                 onDeny={() =>
-                                                    handleResidentDeny(res)
+                                                    setResModal({
+                                                        mode: "review",
+                                                        resident: res,
+                                                    })
                                                 }
                                                 onToggle={() =>
                                                     handleResidentToggle(res)
@@ -2569,46 +2756,13 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                     onSave={handleResidentPassword}
                 />
             )}
-            {Boolean(idPreviewModalUrl) && (
-                <div
-                    className="ma-modal-overlay"
-                    onClick={() => setIdPreviewModalUrl("")}
-                >
-                    <div
-                        className="ma-modal"
-                        style={{ maxWidth: 720 }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="ma-modal-header">
-                            <div className="ma-modal-title">
-                                Resident Submitted ID
-                            </div>
-                            <button
-                                className="ma-modal-close"
-                                onClick={() => setIdPreviewModalUrl("")}
-                            >
-                                <X size={15} />
-                            </button>
-                        </div>
-                        <div
-                            className="ma-modal-body"
-                            style={{ display: "flex", justifyContent: "center" }}
-                        >
-                            <img
-                                src={idPreviewModalUrl}
-                                alt="Resident submitted ID"
-                                style={{
-                                    width: "100%",
-                                    maxHeight: "70vh",
-                                    objectFit: "contain",
-                                    borderRadius: 6,
-                                    border: "1px solid #e4dfd4",
-                                    background: "#f8f6f1",
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
+            {resModal?.mode === "review" && (
+                <ResidentIdReviewModal
+                    resident={resModal.resident}
+                    onClose={() => setResModal(null)}
+                    onApprove={handleResidentApprove}
+                    onReject={handleResidentDeny}
+                />
             )}
 
             {/* Toast */}

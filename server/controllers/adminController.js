@@ -543,7 +543,7 @@ async function getResidents(req, res) {
     const statusRaw = String(req.query.status || "")
         .trim()
         .toLowerCase();
-    const sortRaw = String(req.query.sort || "name")
+    const sortRaw = String(req.query.sort || "date")
         .trim()
         .toLowerCase();
     const pageRaw = Number.parseInt(req.query.page, 10);
@@ -570,7 +570,11 @@ async function getResidents(req, res) {
         )`);
     }
 
-    if (statusRaw === "active" || statusRaw === "inactive") {
+    if (
+        statusRaw === "active" ||
+        statusRaw === "inactive" ||
+        statusRaw === "pending_verification"
+    ) {
         args.push(statusRaw);
         where.push(`LOWER(COALESCE(res.status, 'active')) = $${args.length}`);
     }
@@ -605,6 +609,7 @@ async function getResidents(req, res) {
                     res.contact_number,
                     res.id_type,
                     res.id_image_url,
+                    res.rejection_comment,
                     res.address_house,
                     res.address_street,
                     res.date_of_birth,
@@ -637,6 +642,7 @@ async function getResidents(req, res) {
                     res.contact_number,
                     NULL::text AS id_type,
                     NULL::text AS id_image_url,
+                    NULL::text AS rejection_comment,
                     res.address_house,
                     res.address_street,
                     res.date_of_birth,
@@ -689,6 +695,7 @@ async function getResidentById(req, res) {
                 res.address_street,
                 res.date_of_birth,
                 res.civil_status,
+                res.rejection_comment,
                 res.status,
                 res.created_at,
                 COALESCE(req.request_count, 0)::int AS request_count
@@ -938,6 +945,11 @@ async function updateResidentStatus(req, res) {
         const result = await pool.query(
             `UPDATE residents
              SET status = $2,
+                 rejection_comment = CASE
+                     WHEN $2 = 'inactive' AND $4 <> '' THEN $4
+                     WHEN $2 = 'active' THEN NULL
+                     ELSE rejection_comment
+                 END,
                  verified_by = CASE
                      WHEN $2 = 'active' AND LOWER(COALESCE(status, '')) = 'pending_verification'
                          THEN $3
@@ -949,8 +961,8 @@ async function updateResidentStatus(req, res) {
                      ELSE verified_at
                  END
              WHERE resident_id = $1
-             RETURNING resident_id, full_name, status, verified_at`,
-            [residentId, nextStatus, req.admin.id],
+             RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
+            [residentId, nextStatus, req.admin.id, reason],
         );
 
         if (result.rows.length === 0) {
@@ -1000,6 +1012,7 @@ async function updateResidentStatus(req, res) {
                 resident_id: updated.resident_id,
                 full_name: updated.full_name,
                 status: updated.status,
+                rejection_comment: updated.rejection_comment,
             },
         });
     } catch (err) {
