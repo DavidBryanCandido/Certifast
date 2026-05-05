@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { getApiBase } from "./apiBase";
+import { getApiBase } from "../apiBase";
 
 const API = getApiBase();
 
