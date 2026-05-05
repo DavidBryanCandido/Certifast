@@ -72,6 +72,15 @@ function ensureAdminOrSuperadmin(req, res) {
     return true;
 }
 
+async function ensureResidentReviewColumns() {
+    await pool.query(`
+        ALTER TABLE residents
+            ADD COLUMN IF NOT EXISTS rejection_comment text,
+            ADD COLUMN IF NOT EXISTS verified_by integer,
+            ADD COLUMN IF NOT EXISTS verified_at timestamp without time zone
+    `);
+}
+
 // Helper to create notifications for residents
 async function createNotification({
     residentId,
@@ -947,6 +956,8 @@ async function updateResidentStatus(req, res) {
     }
 
     try {
+        await ensureResidentReviewColumns();
+
         const existingResult = await pool.query(
             `SELECT resident_id, full_name, email, status, rejection_comment
              FROM residents
@@ -979,10 +990,18 @@ async function updateResidentStatus(req, res) {
                      WHEN $2 = 'inactive' AND $3 <> '' THEN $3
                      WHEN $2 = 'active' THEN NULL
                      ELSE rejection_comment
+                 END,
+                 verified_by = CASE
+                     WHEN $2 = 'active' THEN $4
+                     ELSE verified_by
+                 END,
+                 verified_at = CASE
+                     WHEN $2 = 'active' THEN NOW()
+                     ELSE verified_at
                  END
              WHERE resident_id = $1
              RETURNING resident_id, full_name, status, verified_at, rejection_comment`,
-            [residentId, nextStatus, reason],
+            [residentId, nextStatus, reason, req.admin.id],
         );
 
         if (result.rows.length === 0) {
