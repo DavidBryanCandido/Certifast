@@ -11,6 +11,15 @@ const supabase = (() => {
     return url && key ? createClient(url, key) : null;
 })();
 
+let residentRejectionColumnReady = false;
+async function ensureResidentRejectionColumn() {
+    if (residentRejectionColumnReady) return;
+    await pool.query(
+        "ALTER TABLE residents ADD COLUMN IF NOT EXISTS rejection_comment text",
+    );
+    residentRejectionColumnReady = true;
+}
+
 function makeWalkInDocId(certificateId) {
     const now = new Date();
     const y = now.getFullYear();
@@ -686,31 +695,61 @@ async function getResidentById(req, res) {
     }
 
     try {
-        const result = await pool.query(
-            `SELECT
-                res.resident_id,
-                res.full_name,
-                res.email,
-                res.contact_number,
-                res.address_house,
-                res.address_street,
-                res.date_of_birth,
-                res.civil_status,
-                res.rejection_comment,
-                res.status,
-                res.created_at,
-                COALESCE(req.request_count, 0)::int AS request_count
-             FROM residents res
-             LEFT JOIN (
-                SELECT resident_id, COUNT(*)::int AS request_count
-                FROM requests
-                GROUP BY resident_id
-             ) req
-               ON req.resident_id = res.resident_id
-             WHERE res.resident_id = $1
-             LIMIT 1`,
-            [residentId],
-        );
+        let result;
+        try {
+            result = await pool.query(
+                `SELECT
+                    res.resident_id,
+                    res.full_name,
+                    res.email,
+                    res.contact_number,
+                    res.address_house,
+                    res.address_street,
+                    res.date_of_birth,
+                    res.civil_status,
+                    res.rejection_comment,
+                    res.status,
+                    res.created_at,
+                    COALESCE(req.request_count, 0)::int AS request_count
+                 FROM residents res
+                 LEFT JOIN (
+                    SELECT resident_id, COUNT(*)::int AS request_count
+                    FROM requests
+                    GROUP BY resident_id
+                 ) req
+                   ON req.resident_id = res.resident_id
+                 WHERE res.resident_id = $1
+                 LIMIT 1`,
+                [residentId],
+            );
+        } catch (queryErr) {
+            if (queryErr?.code !== "42703") throw queryErr;
+            result = await pool.query(
+                `SELECT
+                    res.resident_id,
+                    res.full_name,
+                    res.email,
+                    res.contact_number,
+                    res.address_house,
+                    res.address_street,
+                    res.date_of_birth,
+                    res.civil_status,
+                    NULL::text AS rejection_comment,
+                    res.status,
+                    res.created_at,
+                    COALESCE(req.request_count, 0)::int AS request_count
+                 FROM residents res
+                 LEFT JOIN (
+                    SELECT resident_id, COUNT(*)::int AS request_count
+                    FROM requests
+                    GROUP BY resident_id
+                 ) req
+                   ON req.resident_id = res.resident_id
+                 WHERE res.resident_id = $1
+                 LIMIT 1`,
+                [residentId],
+            );
+        }
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Resident not found" });
@@ -942,6 +981,8 @@ async function updateResidentStatus(req, res) {
                     "A reason is required when denying a pending resident account",
             });
         }
+
+        await ensureResidentRejectionColumn();
 
         const result = await pool.query(
             `UPDATE residents
