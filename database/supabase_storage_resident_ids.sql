@@ -4,38 +4,32 @@
 -- Bucket: certifast-uploads
 -- Path pattern: resident-ids/{auth.uid()}.jpg | .png | .webp
 --
--- 1) Ensure the bucket exists and is public (or use signed URLs — your app uses getPublicUrl).
+-- 1) Dashboard → Storage → certifast-uploads → Policies — enable RLS and add policies below.
+-- 2) Ensure the bucket exists. Public bucket still requires INSERT policies for authenticated users.
 
--- 2) Allow authenticated users to upload only their own file in resident-ids/
+-- Drop old policies if you are re-running (ignore errors if they don't exist)
+-- DROP POLICY IF EXISTS "Residents upload own ID file" ON storage.objects;
+-- DROP POLICY IF EXISTS "Residents update own ID file" ON storage.objects;
+
+-- Allow authenticated users to insert only files named resident-ids/{their uid}.*
 CREATE POLICY "Residents upload own ID file"
 ON storage.objects
 FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'certifast-uploads'
-  AND (storage.foldername(name))[1] = 'resident-ids'
-  AND name IN (
-    'resident-ids/' || auth.uid()::text || '.jpg',
-    'resident-ids/' || auth.uid()::text || '.png',
-    'resident-ids/' || auth.uid()::text || '.webp'
-  )
+  AND name ~ ('^resident-ids/' || auth.uid()::text || '\.(jpg|jpeg|png|webp)$')
 );
 
--- 3) Optional: allow user to update/replace the same object
 CREATE POLICY "Residents update own ID file"
 ON storage.objects
 FOR UPDATE
 TO authenticated
 USING (
   bucket_id = 'certifast-uploads'
-  AND (storage.foldername(name))[1] = 'resident-ids'
-  AND (name = 'resident-ids/' || auth.uid()::text || '.jpg'
-    OR name = 'resident-ids/' || auth.uid()::text || '.png'
-    OR name = 'resident-ids/' || auth.uid()::text || '.webp')
+  AND name ~ ('^resident-ids/' || auth.uid()::text || '\.(jpg|jpeg|png|webp)$')
 )
 WITH CHECK (
   bucket_id = 'certifast-uploads'
-  AND (storage.foldername(name))[1] = 'resident-ids'
+  AND name ~ ('^resident-ids/' || auth.uid()::text || '\.(jpg|jpeg|png|webp)$')
 );
-
--- If policies already exist with the same name, drop them first or rename.

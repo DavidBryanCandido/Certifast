@@ -392,6 +392,7 @@ export default function ResidentRegister({ onSuccess }) {
     const [error, setError] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [idUploadWarning, setIdUploadWarning] = useState("");
 
     // Step 1 — personal info + address
     // Address options — loaded from DB via API, fallback to hardcoded
@@ -549,6 +550,7 @@ export default function ResidentRegister({ onSuccess }) {
         }
         setIsLoading(true);
         setError("");
+        setIdUploadWarning("");
         try {
             let authData;
             let authError;
@@ -626,8 +628,8 @@ export default function ResidentRegister({ onSuccess }) {
                         upsert: true,
                     });
                 if (uploadError) {
-                    throw new Error(
-                        uploadError.message || "Failed to upload ID image.",
+                    setIdUploadWarning(
+                        "Your ID photo could not be uploaded (usually Supabase Storage permissions). You can still verify your email—ask your admin to add Storage policies for bucket certifast-uploads, path resident-ids/. Staff may request your ID during review.",
                     );
                 }
             }
@@ -714,6 +716,24 @@ export default function ResidentRegister({ onSuccess }) {
                             your email, then come back in 1-3 business days
                             once the barangay has reviewed your ID.
                         </p>
+                        {idUploadWarning ? (
+                            <div
+                                style={{
+                                    background: "#fff4f0",
+                                    border: "1px solid #e8a598",
+                                    borderRadius: 7,
+                                    padding: "14px 18px",
+                                    marginBottom: 20,
+                                    textAlign: "left",
+                                    fontSize: 13,
+                                    color: "#7a2e24",
+                                    lineHeight: 1.65,
+                                }}
+                            >
+                                <strong>ID upload note:</strong>{" "}
+                                {idUploadWarning}
+                            </div>
+                        ) : null}
                         <div
                             style={{
                                 background: "#fff7e6",

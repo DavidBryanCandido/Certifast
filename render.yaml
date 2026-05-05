@@ -1,0 +1,16 @@
+# Render Blueprint — deploy the Express API from the `server/` folder.
+# If you created the service manually, set:
+#   Root Directory = server
+#   Build Command   = npm install
+#   Start Command   = npm start
+#
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: certifast-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /

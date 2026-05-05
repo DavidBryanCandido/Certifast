@@ -48,8 +48,14 @@ app.use("/api/admin", require("./routes/admin"));
 const reportsRoutes = require("./routes/reports");
 app.use("/api/reports", reportsRoutes);
 
-// Health check
-app.get("/", (req, res) => res.json({ message: "CertiFast API is running" }));
+// Health check + deploy sanity (useful when debugging 404s on Render)
+app.get("/", (req, res) =>
+    res.json({
+        message: "CertiFast API is running",
+        completeResidentRegistration:
+            "POST /api/auth/resident/complete-registration",
+    }),
+);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
