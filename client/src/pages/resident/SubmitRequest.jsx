@@ -8,8 +8,7 @@ import {
     FileText,
     Home,
     Plus,
-    QrCode,
-    LogOut,
+    Search,
     ChevronRight,
     ChevronLeft,
     Check,
@@ -31,6 +30,10 @@ import requestService from "../../services/requestService";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
+import {
+    DEFAULT_PUBLIC_BRANDING,
+    getPublicBrandingSettings,
+} from "../../services/publicBrandingService";
 import {
     DOC1_CERTIFICATE_OPTIONS,
     getTemplateFieldLabels,
@@ -99,6 +102,8 @@ function withIcon(cert) {
 }
 
 const ALL_CERTS = DOC1_CERTIFICATE_OPTIONS.map(withIcon);
+const CERTS_PER_PAGE_DESKTOP = 8;
+const CERTS_PER_PAGE_MOBILE = 5;
 
 function certIdentity(cert) {
     return cert?.templateKey || cert?.templateId || cert?.name || "";
@@ -529,6 +534,9 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [certs, setCerts] = useState(ALL_CERTS);
     const [certsLoading, setCertsLoading] = useState(true);
     const [certsError, setCertsError] = useState("");
+    const [certSearch, setCertSearch] = useState("");
+    const [certPage, setCertPage] = useState(1);
+    const [branding, setBranding] = useState(DEFAULT_PUBLIC_BRANDING);
 
     // Wizard state
     const [step, setStep] = useState(1);
@@ -547,6 +555,20 @@ export default function SubmitRequest({ resident, onLogout }) {
         const fn = () => setWidth(window.innerWidth);
         window.addEventListener("resize", fn);
         return () => window.removeEventListener("resize", fn);
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+
+        getPublicBrandingSettings()
+            .then((data) => {
+                if (mounted) setBranding(data);
+            })
+            .catch(() => {});
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -627,12 +649,37 @@ export default function SubmitRequest({ resident, onLogout }) {
     const isMobile = width < 768;
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra = selectedCert ? getCertificateFields(selectedCert) : [];
+    const activeCerts = certsLoading ? ALL_CERTS : certs;
+    const normalizedCertSearch = certSearch.trim().toLowerCase();
+    const filteredCerts = normalizedCertSearch
+        ? activeCerts.filter((cert) =>
+              [cert.name, cert.desc, cert.templateKey]
+                  .filter(Boolean)
+                  .some((text) =>
+                      String(text).toLowerCase().includes(normalizedCertSearch),
+                  ),
+          )
+        : activeCerts;
+    const certsPerPage = isMobile
+        ? CERTS_PER_PAGE_MOBILE
+        : CERTS_PER_PAGE_DESKTOP;
+    const certPageCount = Math.max(
+        1,
+        Math.ceil(filteredCerts.length / certsPerPage),
+    );
+    const currentCertPage = Math.min(certPage, certPageCount);
+    const visibleCerts = filteredCerts.slice(
+        (currentCertPage - 1) * certsPerPage,
+        currentCertPage * certsPerPage,
+    );
+    const officeSchedule =
+        branding.officeSchedule || DEFAULT_PUBLIC_BRANDING.officeSchedule;
     const fullAddress = profile
         ? [
               profile.address_house,
               profile.address_street,
-              "Barangay East Tapinac",
-              "Olongapo City",
+              branding.name,
+              branding.city,
           ]
               .filter((part) => String(part || "").trim())
               .join(", ")
@@ -646,6 +693,16 @@ export default function SubmitRequest({ resident, onLogout }) {
     useEffect(() => {
         setExtraFields({});
     }, [selectedCert]);
+
+    useEffect(() => {
+        setCertPage(1);
+    }, [certSearch, certs]);
+
+    useEffect(() => {
+        if (certPage > certPageCount) {
+            setCertPage(certPageCount);
+        }
+    }, [certPage, certPageCount]);
 
     function handleNext() {
         if (step === 1 && !selectedCert) return;
@@ -887,8 +944,8 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     }}
                                 >
                                     {selectedCert?.hasFee
-                                        ? "This certificate requires a fee. Bring payment when claiming at the Barangay East Tapinac office. Bring a valid ID."
-                                        : "Please bring a valid ID when claiming your certificate at the Barangay East Tapinac office."}
+                                        ? `This certificate requires a fee. Bring payment when claiming at the ${branding.name} office. Bring a valid ID.`
+                                        : `Please bring a valid ID when claiming your certificate at the ${branding.name} office.`}
                                 </span>
                             </div>
                             <div
@@ -961,8 +1018,75 @@ export default function SubmitRequest({ resident, onLogout }) {
                     {certsError || "Loading certificate templates..."}
                 </div>
             )}
+            <div style={{ marginBottom: 12 }}>
+                <div style={{ position: "relative" }}>
+                    <Search
+                        size={15}
+                        color="#9090aa"
+                        style={{
+                            position: "absolute",
+                            left: 12,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            pointerEvents: "none",
+                        }}
+                    />
+                    <input
+                        className="sr-input"
+                        type="search"
+                        value={certSearch}
+                        onChange={(e) => setCertSearch(e.target.value)}
+                        placeholder="Search certificate name or purpose..."
+                        style={{ paddingLeft: 36, paddingRight: 72 }}
+                    />
+                    {certSearch && (
+                        <button
+                            type="button"
+                            onClick={() => setCertSearch("")}
+                            style={{
+                                position: "absolute",
+                                right: 10,
+                                top: "50%",
+                                transform: "translateY(-50%)",
+                                border: "none",
+                                background: "none",
+                                color: "#0e2554",
+                                fontFamily: "'Source Serif 4',serif",
+                                fontSize: 11.5,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                padding: "3px 5px",
+                            }}
+                        >
+                            Clear
+                        </button>
+                    )}
+                </div>
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        marginTop: 8,
+                        fontSize: 11,
+                        color: "#9090aa",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    <span>
+                        Showing {filteredCerts.length === 0 ? 0 : (currentCertPage - 1) * certsPerPage + 1}
+                        {"-"}
+                        {Math.min(currentCertPage * certsPerPage, filteredCerts.length)} of {filteredCerts.length}
+                    </span>
+                    {certPageCount > 1 && (
+                        <span>
+                            Page {currentCertPage} of {certPageCount}
+                        </span>
+                    )}
+                </div>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {(certsLoading ? ALL_CERTS : certs).map((cert) => {
+                {visibleCerts.map((cert) => {
                     const Icon = cert.icon;
                     const identity = certIdentity(cert);
                     const isSelected =
@@ -1074,6 +1198,119 @@ export default function SubmitRequest({ resident, onLogout }) {
                     );
                 })}
             </div>
+            {visibleCerts.length === 0 && (
+                <div
+                    style={{
+                        background: "#f8f6f1",
+                        border: "1px dashed #d8d1c4",
+                        borderRadius: 8,
+                        padding: "22px 16px",
+                        textAlign: "center",
+                        marginTop: 8,
+                    }}
+                >
+                    <div
+                        style={{
+                            fontFamily: "'Playfair Display',serif",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "#0e2554",
+                            marginBottom: 4,
+                        }}
+                    >
+                        No matching certificate
+                    </div>
+                    <div style={{ fontSize: 12, color: "#9090aa" }}>
+                        Try a shorter search term, like clearance, indigency, business, or solo parent.
+                    </div>
+                </div>
+            )}
+            {certPageCount > 1 && (
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 10,
+                        marginTop: 14,
+                    }}
+                >
+                    <button
+                        type="button"
+                        className="sr-btn-ghost"
+                        onClick={() => setCertPage((page) => Math.max(1, page - 1))}
+                        disabled={currentCertPage === 1}
+                        style={{
+                            opacity: currentCertPage === 1 ? 0.45 : 1,
+                            cursor: currentCertPage === 1 ? "default" : "pointer",
+                            padding: "8px 12px",
+                        }}
+                    >
+                        <ChevronLeft size={13} /> Prev
+                    </button>
+                    <div
+                        style={{
+                            display: "flex",
+                            gap: 6,
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            justifyContent: "center",
+                        }}
+                    >
+                        {Array.from({ length: certPageCount }, (_, index) => index + 1).map((page) => (
+                            <button
+                                key={page}
+                                type="button"
+                                onClick={() => setCertPage(page)}
+                                aria-label={`Go to certificate page ${page}`}
+                                style={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 6,
+                                    border:
+                                        page === currentCertPage
+                                            ? "1px solid #0e2554"
+                                            : "1px solid #e4dfd4",
+                                    background:
+                                        page === currentCertPage
+                                            ? "#0e2554"
+                                            : "#fff",
+                                    color:
+                                        page === currentCertPage
+                                            ? "#fff"
+                                            : "#4a4a6a",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                    fontFamily: "'Source Serif 4',serif",
+                                }}
+                            >
+                                {page}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        className="sr-btn-ghost"
+                        onClick={() =>
+                            setCertPage((page) =>
+                                Math.min(certPageCount, page + 1),
+                            )
+                        }
+                        disabled={currentCertPage === certPageCount}
+                        style={{
+                            opacity: currentCertPage === certPageCount ? 0.45 : 1,
+                            cursor:
+                                currentCertPage === certPageCount
+                                    ? "default"
+                                    : "pointer",
+                            padding: "8px 12px",
+                        }}
+                    >
+                        Next <ChevronRight size={13} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 
@@ -1959,14 +2196,15 @@ export default function SubmitRequest({ resident, onLogout }) {
                                             margin: "0 0 6px",
                                         }}
                                     >
-                                        <strong>Mon – Fri:</strong> 8:00 AM –
-                                        5:00 PM
-                                        <br />
-                                        <strong>Saturday:</strong> 8:00 AM –
-                                        12:00 PM
-                                        <br />
-                                        <strong>Sunday & Holidays:</strong>{" "}
-                                        Closed
+                                        {officeSchedule.map((row, index) => (
+                                            <span key={`${row.label}-${index}`}>
+                                                <strong>{row.label}:</strong>{" "}
+                                                {row.time}
+                                                {index < officeSchedule.length - 1 && (
+                                                    <br />
+                                                )}
+                                            </span>
+                                        ))}
                                     </p>
                                     <p
                                         style={{
@@ -1975,8 +2213,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                             margin: 0,
                                         }}
                                     >
-                                        54 - 14th Street corner Gallagher
-                                        Street, Olongapo City
+                                        {branding.address}
                                     </p>
                                 </div>
                                 <div

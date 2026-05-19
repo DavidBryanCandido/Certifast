@@ -20,6 +20,10 @@ import {
     UserCircle,
 } from "lucide-react";
 import requestService from "../../services/requestService";
+import {
+    DEFAULT_PUBLIC_BRANDING,
+    getPublicBrandingSettings,
+} from "../../services/publicBrandingService";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
@@ -156,6 +160,7 @@ export default function ResidentHome({ resident, onLogout }) {
     const [requests, setRequests] = useState([]);
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [requestsError, setRequestsError] = useState("");
+    const [branding, setBranding] = useState(DEFAULT_PUBLIC_BRANDING);
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -211,9 +216,25 @@ export default function ResidentHome({ resident, onLogout }) {
         };
     }, []);
 
+    useEffect(() => {
+        let mounted = true;
+
+        getPublicBrandingSettings()
+            .then((data) => {
+                if (mounted) setBranding(data);
+            })
+            .catch(() => {});
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     const isMobile = width < 640;
     const isTablet = width >= 640 && width < 1024;
     const name = resident?.full_name || resident?.name || "Resident";
+    const officeSchedule =
+        branding.officeSchedule || DEFAULT_PUBLIC_BRANDING.officeSchedule;
 
     // Stats
     const stats = {
@@ -354,7 +375,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                         margin: "0 0 18px",
                                     }}
                                 >
-                                    Barangay East Tapinac · City of Olongapo
+                                    {branding.name} · {branding.city}
                                 </p>
                                 <button
                                     onClick={() =>
@@ -422,45 +443,22 @@ export default function ResidentHome({ resident, onLogout }) {
                                         fontFamily: "'Source Serif 4', serif",
                                     }}
                                 >
-                                    <div>
-                                        <span
-                                            style={{
-                                                color: "rgba(255,255,255,0.4)",
-                                                fontSize: 11,
-                                                display: "inline-block",
-                                                width: 72,
-                                            }}
-                                        >
-                                            Mon – Fri
-                                        </span>
-                                        8:00 AM – 5:00 PM
-                                    </div>
-                                    <div>
-                                        <span
-                                            style={{
-                                                color: "rgba(255,255,255,0.4)",
-                                                fontSize: 11,
-                                                display: "inline-block",
-                                                width: 72,
-                                            }}
-                                        >
-                                            Saturday
-                                        </span>
-                                        8:00 AM – 12:00 PM
-                                    </div>
-                                    <div>
-                                        <span
-                                            style={{
-                                                color: "rgba(255,255,255,0.4)",
-                                                fontSize: 11,
-                                                display: "inline-block",
-                                                width: 72,
-                                            }}
-                                        >
-                                            Sun & Hol.
-                                        </span>
-                                        Closed
-                                    </div>
+                                    {officeSchedule.map((row, index) => (
+                                        <div key={`${row.label}-${index}`}>
+                                            <span
+                                                style={{
+                                                    color: "rgba(255,255,255,0.4)",
+                                                    fontSize: 11,
+                                                    display: "inline-block",
+                                                    minWidth: 82,
+                                                    paddingRight: 10,
+                                                }}
+                                            >
+                                                {row.label}
+                                            </span>
+                                            {row.time}
+                                        </div>
+                                    ))}
                                 </div>
                                 <div
                                     style={{
@@ -473,8 +471,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                         lineHeight: 1.5,
                                     }}
                                 >
-                                    54 - 14th St. cor. Gallagher St., Olongapo
-                                    City
+                                    {branding.address}
                                 </div>
                             </div>
                         </div>

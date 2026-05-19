@@ -52,6 +52,8 @@ import adminDashboardService from "../../services/adminDashboardService";
 import adminRequestService from "../../services/adminRequestService";
 import reportsService from "../../services/reportsService";
 import logsService from "../../services/logsService";
+import * as settingsService from "../../services/settingsService";
+import { buildCertificatePrintHtml } from "../../utils/certificateTemplateEngine";
 import {
     AdminSidebar,
     AdminMobileSidebar,
@@ -510,6 +512,42 @@ function formatDateShort() {
     });
 }
 
+function parseDateValue(raw) {
+    if (!raw) return null;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatResidentBirthDate(raw) {
+    const date = parseDateValue(raw);
+    if (!date) return "N/A";
+    return date.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
+function calculateAgeFromBirthDate(raw) {
+    const birthDate = parseDateValue(raw);
+    if (!birthDate) return "";
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const birthdayThisYear = new Date(
+        today.getFullYear(),
+        birthDate.getMonth(),
+        birthDate.getDate(),
+    );
+    if (today < birthdayThisYear) age -= 1;
+    return Number.isFinite(age) && age >= 0 ? String(age) : "";
+}
+
+function normalizeAge(raw) {
+    const text = String(raw ?? "").trim();
+    if (!text || text === "0") return "";
+    return text;
+}
+
 // =============================================================
 // Request Drawer — wired to real API, same pattern as ManageRequests
 // =============================================================
@@ -520,6 +558,7 @@ function RequestDrawer({
     onRefresh,
     onOpenQRScanner,
     onLogout,
+    certificateSettings,
 }) {
     const [step, setStep] = useState("default");
     const [rejectReason, setRejectReason] = useState("");
@@ -622,6 +661,47 @@ function RequestDrawer({
         }
     };
 
+    const buildCertificateTemplateHtml = () =>
+        buildCertificatePrintHtml({
+            certType: request.certType,
+            templateKey: request.templateKey,
+            data: {
+                ...request,
+                residentName: request.name,
+                age: request.age || "",
+                dateOfBirth: request.dateOfBirth,
+                date_of_birth: request.dateOfBirth,
+                civilStatus: request.civil,
+                nationality: request.nationality,
+                extraFields: request.extraFields || {},
+                issuedAt: new Date(),
+            },
+            settings: certificateSettings,
+        });
+
+    const openCertificatePrintWindow = () => {
+        const win = window.open("", "_blank");
+        if (!win) {
+            setActionError("Unable to open print window. Please allow pop-ups.");
+            return false;
+        }
+
+        win.document.write(buildCertificateTemplateHtml());
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 350);
+        return true;
+    };
+
+    const handlePrintCertificate = () => {
+        const opened = openCertificatePrintWindow();
+        if (opened) setHasPrinted(true);
+    };
+
+    const handleReprint = () => {
+        openCertificatePrintWindow();
+    };
+
     const SectionTitle = ({ children }) => (
         <div className="cf-drawer-section-title">{children}</div>
     );
@@ -708,10 +788,7 @@ function RequestDrawer({
                     <button
                         className="cf-drawer-btn"
                         style={{ background: "#1a4a8a", color: "#fff" }}
-                        onClick={() => {
-                            setHasPrinted(true);
-                            window.print();
-                        }}
+                        onClick={handlePrintCertificate}
                     >
                         <Printer size={13} />{" "}
                         {hasPrinted ? "Reprint" : "Print Certificate"}
@@ -752,6 +829,7 @@ function RequestDrawer({
                             color: "#1a4a8a",
                             border: "1px solid #b8cce8",
                         }}
+                        onClick={handleReprint}
                     >
                         <Printer size={13} /> Reprint
                     </button>
@@ -779,6 +857,7 @@ function RequestDrawer({
                         color: "#1a4a8a",
                         border: "1px solid #b8cce8",
                     }}
+                    onClick={handleReprint}
                 >
                     <Printer size={13} /> Reprint Certificate
                 </button>
@@ -921,6 +1000,23 @@ function RequestDrawer({
                                     style={{ fontSize: 12 }}
                                 >
                                     {request.contact}
+                                </span>
+                            </div>
+                            <div className="cf-detail-item">
+                                <label>Date of Birth</label>
+                                <span className="cf-detail-value">
+                                    {request.birthDateText ||
+                                        formatResidentBirthDate(
+                                            request.dateOfBirth,
+                                        )}
+                                </span>
+                            </div>
+                            <div className="cf-detail-item">
+                                <label>Age</label>
+                                <span className="cf-detail-value">
+                                    {request.age
+                                        ? `${request.age} years old`
+                                        : "N/A"}
                                 </span>
                             </div>
                             <div
@@ -1216,6 +1312,8 @@ function StatCard({
     iconBg,
     change,
     changeType,
+    actionLabel,
+    onAction,
     compact,
 }) {
     const topColors = {
@@ -1286,22 +1384,67 @@ function StatCard({
                             marginTop: 10,
                             display: "flex",
                             alignItems: "center",
-                            gap: 4,
-                            color:
-                                changeType === "warn"
-                                    ? color === "purple"
-                                        ? "#6a3db8"
-                                        : "#b86800"
-                                    : "#1a7a4a",
+                            justifyContent: "space-between",
+                            gap: 8,
                         }}
                     >
-                        {changeType === "up" ? (
-                            <TrendingUp size={11} strokeWidth={2.5} />
-                        ) : (
-                            <AlertCircle size={11} strokeWidth={2.5} />
+                        <span
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                color:
+                                    changeType === "warn"
+                                        ? color === "purple"
+                                            ? "#6a3db8"
+                                            : "#b86800"
+                                        : "#1a7a4a",
+                            }}
+                        >
+                            {changeType === "up" ? (
+                                <TrendingUp size={11} strokeWidth={2.5} />
+                            ) : (
+                                <AlertCircle size={11} strokeWidth={2.5} />
+                            )}
+                            {change}
+                        </span>
+                        {onAction && (
+                            <button
+                                type="button"
+                                className="cf-panel-action"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAction();
+                                }}
+                                style={{
+                                    padding: 0,
+                                    color:
+                                        color === "amber"
+                                            ? "#b86800"
+                                            : "#163066",
+                                }}
+                            >
+                                {actionLabel || "View all"}
+                            </button>
                         )}
-                        {change}
                     </div>
+                )}
+                {compact && onAction && (
+                    <button
+                        type="button"
+                        className="cf-panel-action"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAction();
+                        }}
+                        style={{
+                            marginTop: 6,
+                            padding: 0,
+                            color: color === "amber" ? "#b86800" : "#163066",
+                        }}
+                    >
+                        {actionLabel || "View all"}
+                    </button>
                 )}
             </div>
         </div>
@@ -1349,6 +1492,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const [recentActivity, setRecentActivity] = useState([]);
     const [dashboardLoading, setDashboardLoading] = useState(true);
     const [dashboardError, setDashboardError] = useState("");
+    const [certificateSettings, setCertificateSettings] = useState({});
 
     // ── Statistics & Reports section state ──
     const [reportPeriod, setReportPeriod] = useState("month");
@@ -1372,6 +1516,66 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const [monthlyTrend, setMonthlyTrend] = useState([]);
     const [dailyData, setDailyData] = useState([]);
     const [reportLoading, setReportLoading] = useState(false);
+
+    const mapRequestRow = useCallback((row) => {
+        const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
+        const address = [row.resident_address_house, row.resident_address_street]
+            .filter((v) => String(v || "").trim())
+            .join(", ");
+        const extraFields = row.extra_fields || {};
+        const dateOfBirth =
+            row.resident_date_of_birth ||
+            extraFields.dateOfBirth ||
+            extraFields.date_of_birth ||
+            "";
+        const residentAge =
+            calculateAgeFromBirthDate(dateOfBirth) ||
+            normalizeAge(extraFields.age);
+
+        return {
+            rawId: row.request_id,
+            id: `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
+            name: row.resident_name || "Unknown Resident",
+            certType: row.cert_type || "Certificate Request",
+            type: row.cert_type || "Certificate Request",
+            purpose: row.purpose || "—",
+            date: requestedAt
+                ? requestedAt.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                  })
+                : "—",
+            time: requestedAt
+                ? requestedAt.toLocaleTimeString("en-US", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                  })
+                : "—",
+            status: String(row.status || "pending").toLowerCase(),
+            hasFee: Boolean(row.has_fee),
+            address: address || "N/A",
+            contact: row.resident_contact || "N/A",
+            email: row.resident_email || "N/A",
+            civil: row.resident_civil || "N/A",
+            nationality: row.resident_nationality || "Filipino",
+            age: residentAge,
+            dateOfBirth: dateOfBirth || null,
+            birthDateText: formatResidentBirthDate(dateOfBirth),
+            extraFields,
+            templateId: row.template_id || null,
+            templateKey:
+                row.template_key ||
+                extraFields.templateKey ||
+                extraFields.template_key ||
+                "",
+            rejection_reason: row.rejection_reason || "",
+            requestedAtIso: row.requested_at || null,
+            processedAtIso: row.processed_at || null,
+            releasedAtIso: row.released_at || null,
+            requestedAtMs: requestedAt ? requestedAt.getTime() : 0,
+        };
+    }, []);
 
     const loadDashboardData = useCallback(async () => {
         let mounted = true;
@@ -1415,6 +1619,15 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         ]
                             .filter((v) => String(v || "").trim())
                             .join(", ");
+                        const extraFields = row.extra_fields || {};
+                        const dateOfBirth =
+                            row.resident_date_of_birth ||
+                            extraFields.dateOfBirth ||
+                            extraFields.date_of_birth ||
+                            "";
+                        const residentAge =
+                            calculateAgeFromBirthDate(dateOfBirth) ||
+                            normalizeAge(extraFields.age);
                         return {
                             rawId: row.request_id,
                             id: `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
@@ -1444,6 +1657,16 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             email: row.resident_email || "N/A",
                             civil: row.resident_civil || "N/A",
                             nationality: row.resident_nationality || "Filipino",
+                            age: residentAge,
+                            dateOfBirth: dateOfBirth || null,
+                            birthDateText: formatResidentBirthDate(dateOfBirth),
+                            extraFields,
+                            templateId: row.template_id || null,
+                            templateKey:
+                                row.template_key ||
+                                extraFields.templateKey ||
+                                extraFields.template_key ||
+                                "",
                             rejection_reason: row.rejection_reason || "",
                             requestedAtMs: requestedAt
                                 ? requestedAt.getTime()
@@ -1503,7 +1726,47 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         loadDashboardData();
     }, [loadDashboardData]);
 
+    useEffect(() => {
+        let mounted = true;
+        async function loadCertificateSettings() {
+            try {
+                const token = localStorage.getItem("adminToken");
+                const data = await settingsService.getBarangaySettings(token);
+                if (mounted) setCertificateSettings(data || {});
+            } catch {
+                if (mounted) setCertificateSettings({});
+            }
+        }
+        loadCertificateSettings();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     // ── Load report/statistics data when period changes ──
+    const handleOpenRequest = useCallback(
+        async (request) => {
+            setSelectedRequest(request);
+            try {
+                const result = await adminRequestService.getRequests();
+                const rows = Array.isArray(result?.data)
+                    ? result.data
+                    : Array.isArray(result)
+                      ? result
+                      : [];
+                const fullRow = rows.find(
+                    (row) => Number(row.request_id) === Number(request.rawId),
+                );
+                if (fullRow) setSelectedRequest(mapRequestRow(fullRow));
+            } catch (err) {
+                if (err?.response?.status === 401 || err?.response?.status === 403) {
+                    onLogout?.();
+                }
+            }
+        },
+        [mapRequestRow, onLogout],
+    );
+
     const loadReportData = useCallback(async (period) => {
         setReportLoading(true);
         try {
@@ -1644,6 +1907,11 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         }
     };
 
+    const handleViewPendingRequests = () => {
+        setActivePage("manageRequests");
+        if (navProp) navProp("/admin/manage-requests?status=pending");
+    };
+
     const dynamicStats = [
         {
             label: "Total Requests",
@@ -1662,6 +1930,8 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             iconBg: "#fff3e0",
             change: "Needs attention",
             changeType: "warn",
+            actionLabel: "View all",
+            onAction: handleViewPendingRequests,
         },
         {
             label: "Released",
@@ -1756,6 +2026,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             setSelectedRequest(null);
                         }}
                         onLogout={onLogout}
+                        certificateSettings={certificateSettings}
                     />
                 )}
 
@@ -2048,7 +2319,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                 cursor: "pointer",
                                                             }}
                                                             onClick={() =>
-                                                                setSelectedRequest(
+                                                                handleOpenRequest(
                                                                     req,
                                                                 )
                                                             }
@@ -2153,7 +2424,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                             e,
                                                                         ) => {
                                                                             e.stopPropagation();
-                                                                            setSelectedRequest(
+                                                                            handleOpenRequest(
                                                                                 req,
                                                                             );
                                                                         }}
@@ -2249,7 +2520,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                     key={req.id}
                                                     className="cf-req-card"
                                                     onClick={() =>
-                                                        setSelectedRequest(req)
+                                                        handleOpenRequest(req)
                                                     }
                                                 >
                                                     <div className="cf-req-card-top">

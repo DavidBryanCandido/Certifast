@@ -18,6 +18,7 @@ import SubmitRequest from "./pages/resident/SubmitRequest";
 import MyRequests from "./pages/resident/MyRequests";
 import MyQRCode from "./pages/resident/MyQRCode";
 import ResidentProfile from "./pages/resident/ResidentProfile";
+import ResidentNotifications from "./pages/resident/ResidentNotifications";
 
 const ADMIN_KEY_TO_ROUTE = {
     dashboard: "/admin/dashboard",
@@ -48,6 +49,23 @@ function useSessionData() {
             resident: residentState?.resident || null,
         };
     }, []);
+}
+
+function clearResidentAuth() {
+    localStorage.removeItem("certifast_resident_auth");
+    localStorage.removeItem("certifast_resident_token");
+}
+
+function useResidentPageProps() {
+    const navigate = useNavigate();
+    const { resident } = useSessionData();
+
+    const handleResidentLogout = () => {
+        clearResidentAuth();
+        navigate("/resident/login");
+    };
+
+    return { resident, onLogout: handleResidentLogout };
 }
 
 const ADMIN_ONLY_ROUTES = [
@@ -105,32 +123,33 @@ function ResidentRegisterRoute() {
 }
 
 function ResidentHomeRoute() {
-    const navigate = useNavigate();
-    const { resident } = useSessionData();
-
-    const handleResidentLogout = () => {
-        localStorage.removeItem("certifast_resident_auth");
-        localStorage.removeItem("certifast_resident_token");
-        navigate("/resident/login");
-    };
-
-    return <ResidentHome resident={resident} onLogout={handleResidentLogout} />;
+    const props = useResidentPageProps();
+    return <ResidentHome {...props} />;
 }
 
 function ResidentQrRoute() {
-    const { resident } = useSessionData();
-    return <MyQRCode resident={resident} />;
+    const props = useResidentPageProps();
+    return <MyQRCode {...props} />;
 }
 
 function ResidentProfileRoute() {
-    const navigate = useNavigate();
-    const { resident } = useSessionData();
-    const handleLogout = () => {
-        localStorage.removeItem("certifast_resident_auth");
-        localStorage.removeItem("certifast_resident_token");
-        navigate("/resident/login");
-    };
-    return <ResidentProfile resident={resident} onLogout={handleLogout} />;
+    const props = useResidentPageProps();
+    return <ResidentProfile {...props} />;
+}
+
+function SubmitRequestRoute() {
+    const props = useResidentPageProps();
+    return <SubmitRequest {...props} />;
+}
+
+function MyRequestsRoute() {
+    const props = useResidentPageProps();
+    return <MyRequests {...props} />;
+}
+
+function ResidentNotificationsRoute() {
+    const props = useResidentPageProps();
+    return <ResidentNotifications {...props} />;
 }
 
 export default function App() {
@@ -198,10 +217,14 @@ export default function App() {
             <Route path="/resident/home" element={<ResidentHomeRoute />} />
             <Route
                 path="/resident/submit-request"
-                element={<SubmitRequest />}
+                element={<SubmitRequestRoute />}
             />
-            <Route path="/resident/my-requests" element={<MyRequests />} />
+            <Route path="/resident/my-requests" element={<MyRequestsRoute />} />
             <Route path="/resident/my-qr" element={<ResidentQrRoute />} />
+            <Route
+                path="/resident/notifications"
+                element={<ResidentNotificationsRoute />}
+            />
             <Route
                 path="/resident/profile"
                 element={<ResidentProfileRoute />}

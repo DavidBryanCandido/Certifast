@@ -26,16 +26,43 @@ router.post("/resident/login", residentLoginWithSupabase);
 router.post("/admin/login", adminLogin);
 router.get("/address-options", getAddressOptions);
 
-// Public endpoint for branding logo
+const PUBLIC_BRANDING_KEYS = [
+    "brgy_name",
+    "brgy_city",
+    "brgy_address",
+    "brgy_contact",
+    "brgy_email",
+    "brgy_logo_url",
+    "city_logo_url",
+    "office_schedule_line_1_label",
+    "office_schedule_line_1_time",
+    "office_schedule_line_2_label",
+    "office_schedule_line_2_time",
+    "office_schedule_line_3_label",
+    "office_schedule_line_3_time",
+];
+
+// Public endpoint for resident-facing branding details
 router.get("/public-branding", async (req, res) => {
     try {
         const pool = require("../db/pool");
         const result = await pool.query(
-            "SELECT setting_value FROM barangay_settings WHERE setting_key = 'brgy_logo_url'",
+            `SELECT setting_key, setting_value
+             FROM barangay_settings
+             WHERE setting_key = ANY($1::text[])`,
+            [PUBLIC_BRANDING_KEYS],
         );
-        return res.json({ logo_url: result.rows[0]?.setting_value || null });
+        const data = {};
+        result.rows.forEach((row) => {
+            data[row.setting_key] = row.setting_value;
+        });
+
+        return res.json({
+            logo_url: data.brgy_logo_url || null,
+            data,
+        });
     } catch {
-        return res.json({ logo_url: null });
+        return res.json({ logo_url: null, data: {} });
     }
 });
 

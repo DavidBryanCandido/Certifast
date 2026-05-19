@@ -20,6 +20,7 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import { useSearchParams } from "react-router-dom";
 import AdminQRScannerModal from "../../components/AdminQRScannerModal";
 import adminRequestService from "../../services/adminRequestService";
 import * as settingsService from "../../services/settingsService";
@@ -422,6 +423,7 @@ function RequestDrawer({
         if (status === "pending") return (
             <>
                 <button className="mr-drawer-btn"
+                    type="button"
                     style={{ background: "#fdecea", color: "#b02020", border: "1px solid #f5c0c0" }}
                     onClick={() => setStep("reject")}>
                     <X size={11} /> Reject
@@ -444,11 +446,13 @@ function RequestDrawer({
                     <X size={11} /> Reject
                 </button>
                 <button className="mr-drawer-btn"
+                    type="button"
                     style={{ background: "#1a4a8a", color: "#fff" }}
                     onClick={handlePrintCertificate}>
                     <Printer size={13} /> {hasPrinted ? "Reprint" : "Print Certificate"}
                 </button>
                 <button className="mr-drawer-btn"
+                    type="button"
                     style={{
                         background: hasPrinted ? "#d4edda" : "#f0f0f0",
                         color:      hasPrinted ? "#1a5c38" : "#aaa",
@@ -467,6 +471,7 @@ function RequestDrawer({
         if (status === "ready") return (
             <>
                 <button className="mr-drawer-btn"
+                    type="button"
                     style={{ background: "#e8eef8", color: "#1a4a8a", border: "1px solid #b8cce8" }}
                     onClick={handleReprint}>
                     <Printer size={13} /> Reprint
@@ -700,6 +705,12 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     const width     = useWindowSize();
     const isMobile  = width < 768;
     const isTablet  = width >= 768 && width < 1024;
+    const [searchParams] = useSearchParams();
+    const requestedStatus = String(searchParams.get("status") || "").toLowerCase();
+    const requestedRequestId = Number.parseInt(
+        searchParams.get("requestId") || "",
+        10,
+    );
 
     const [activePage, setActivePage]             = useState("manageRequests");
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -726,6 +737,41 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     const [qrReleaseLoading, setQrReleaseLoading] = useState(false);
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
+
+    useEffect(() => {
+        if (!requestedStatus) {
+            setActiveTab("all");
+            return;
+        }
+        if (STATUS_TABS.some((tab) => tab.key === requestedStatus)) {
+            setActiveTab(requestedStatus);
+        }
+    }, [requestedStatus]);
+
+    useEffect(() => {
+        if (!Number.isFinite(requestedRequestId) || requestedRequestId <= 0) {
+            return;
+        }
+        const matched = requests.find((req) => req.rawId === requestedRequestId);
+        if (!matched) return;
+
+        setSearch("");
+        setCertFilter("all");
+        setDateFilter("all");
+        setSortFilter("newest");
+        setActiveTab(matched.status || "all");
+        setSelectedRequest(matched);
+
+        const sameStatus = requests.filter(
+            (req) => req.status === matched.status,
+        );
+        const requestIndex = sameStatus.findIndex(
+            (req) => req.rawId === requestedRequestId,
+        );
+        if (requestIndex >= 0) {
+            setCurrentPage(Math.floor(requestIndex / ITEMS_PER_PAGE) + 1);
+        }
+    }, [requestedRequestId, requests]);
 
     const mapRequestRow = useCallback((row) => {
         const requestedAt = row.requested_at ? new Date(row.requested_at) : null;

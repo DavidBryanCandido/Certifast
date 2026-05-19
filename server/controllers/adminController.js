@@ -138,6 +138,8 @@ async function getRecentRequests(req, res) {
                 r.cert_type,
                 r.purpose,
                 r.rejection_reason,
+                r.template_id,
+                r.extra_fields,
                 r.requested_at,
                 r.status,
                 COALESCE(res.full_name, 'Unknown Resident') AS resident_name,
@@ -146,13 +148,23 @@ async function getRecentRequests(req, res) {
                 res.address_house AS resident_address_house,
                 res.address_street AS resident_address_street,
                 res.civil_status AS resident_civil,
+                res.date_of_birth AS resident_date_of_birth,
                 res.nationality AS resident_nationality,
+                ct.template_key,
                 COALESCE(ct.has_fee, false) AS has_fee
              FROM requests r
              LEFT JOIN residents res
                ON res.resident_id = r.resident_id
-             LEFT JOIN certificate_templates ct
-               ON ct.name = r.cert_type
+              LEFT JOIN LATERAL (
+                SELECT template_key, has_fee
+                FROM certificate_templates ct
+                WHERE ct.template_id = r.template_id
+                   OR (r.template_id IS NULL AND ct.name = r.cert_type)
+                ORDER BY CASE WHEN ct.template_id = r.template_id THEN 0 ELSE 1 END,
+                         COALESCE(ct.display_order, 0),
+                         ct.template_id
+                LIMIT 1
+              ) ct ON TRUE
              ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC
              LIMIT $1`,
             [limit],
@@ -288,10 +300,13 @@ async function rejectRequest(req, res) {
 
 async function getCertificateTemplates(req, res) {
     try {
+        const includeInactive = ["1", "true", "yes"].includes(
+            String(req.query.includeInactive || "").toLowerCase(),
+        );
         const result = await pool.query(
-            `SELECT template_id, name, template_key, has_fee, description, required_fields
+            `SELECT template_id, name, template_key, has_fee, description, required_fields, is_active, display_order
              FROM certificate_templates
-             WHERE is_active = TRUE
+             ${includeInactive ? "" : "WHERE is_active = TRUE"}
              ORDER BY COALESCE(display_order, 0), name ASC`,
         );
 
@@ -302,6 +317,8 @@ async function getCertificateTemplates(req, res) {
                 templateKey: row.template_key || "",
                 hasFee: Boolean(row.has_fee),
                 desc: row.description || "",
+                isActive: row.is_active !== false,
+                displayOrder: row.display_order ?? null,
                 fields: Array.isArray(row.required_fields)
                     ? row.required_fields
                     : [],
@@ -309,6 +326,121 @@ async function getCertificateTemplates(req, res) {
         });
     } catch (err) {
         console.error("getCertificateTemplates error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+function parseBooleanInput(value) {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["true", "1", "yes", "on", "active"].includes(normalized)) {
+            return true;
+        }
+        if (["false", "0", "no", "off", "inactive"].includes(normalized)) {
+            return false;
+        }
+    }
+    return null;
+}
+
+async function updateCertificateTemplate(req, res) {
+    const templateId = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(templateId) || templateId <= 0) {
+        return res.status(400).json({ message: "Invalid template id" });
+    }
+
+    try {
+        const body = req.body || {};
+        const hasFeeProvided =
+            Object.prototype.hasOwnProperty.call(body, "hasFee") ||
+            Object.prototype.hasOwnProperty.call(body, "has_fee");
+        const isActiveProvided =
+            Object.prototype.hasOwnProperty.call(body, "isActive") ||
+            Object.prototype.hasOwnProperty.call(body, "is_active");
+
+        const updates = [];
+        const values = [];
+
+        if (hasFeeProvided) {
+            const parsed = parseBooleanInput(
+                Object.prototype.hasOwnProperty.call(body, "hasFee")
+                    ? body.hasFee
+                    : body.has_fee,
+            );
+            if (parsed === null) {
+                return res
+                    .status(400)
+                    .json({ message: "hasFee must be true or false" });
+            }
+            values.push(parsed);
+            updates.push(`has_fee = $${values.length}`);
+        }
+
+        if (isActiveProvided) {
+            const parsed = parseBooleanInput(
+                Object.prototype.hasOwnProperty.call(body, "isActive")
+                    ? body.isActive
+                    : body.is_active,
+            );
+            if (parsed === null) {
+                return res
+                    .status(400)
+                    .json({ message: "isActive must be true or false" });
+            }
+            values.push(parsed);
+            updates.push(`is_active = $${values.length}`);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({
+                message: "No supported template fields were provided",
+            });
+        }
+
+        values.push(templateId);
+        const result = await pool.query(
+            `UPDATE certificate_templates
+             SET ${updates.join(", ")}
+             WHERE template_id = $${values.length}
+             RETURNING template_id, name, template_key, has_fee, description, required_fields, is_active, display_order`,
+            values,
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: "Template not found" });
+        }
+
+        const row = result.rows[0];
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "certificate_template_update",
+            targetTable: "certificate_templates",
+            targetId: templateId,
+            description: `Updated certificate template ${row.name}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({
+            message: "Certificate template updated successfully",
+            data: {
+                templateId: row.template_id,
+                name: row.name,
+                templateKey: row.template_key || "",
+                hasFee: Boolean(row.has_fee),
+                desc: row.description || "",
+                isActive: row.is_active !== false,
+                displayOrder: row.display_order ?? null,
+                fields: Array.isArray(row.required_fields)
+                    ? row.required_fields
+                    : [],
+            },
+        });
+    } catch (err) {
+        console.error("updateCertificateTemplate error:", err);
         return res.status(500).json({ message: "Server error" });
     }
 }
@@ -811,36 +943,51 @@ async function scanResidentQr(req, res) {
 
         const requestResult = await pool.query(
             `SELECT
-                request_id,
-                cert_type,
-                status,
-                purpose,
-                requested_at,
+                r.request_id,
+                r.cert_type,
+                r.status,
+                r.purpose,
+                r.requested_at,
+                r.processed_at,
+                r.released_at,
+                r.rejection_reason,
+                r.template_id,
+                r.extra_fields,
+                ct.template_key,
                 COALESCE(ct.has_fee, false) AS has_fee
              FROM requests r
-             LEFT JOIN certificate_templates ct
-               ON ct.name = r.cert_type
+             LEFT JOIN LATERAL (
+                SELECT template_key, has_fee
+                FROM certificate_templates ct
+                WHERE ct.template_id = r.template_id
+                   OR (r.template_id IS NULL AND ct.name = r.cert_type)
+                ORDER BY CASE WHEN ct.template_id = r.template_id THEN 0 ELSE 1 END,
+                         COALESCE(ct.display_order, 0),
+                         ct.template_id
+                LIMIT 1
+             ) ct ON TRUE
              WHERE r.resident_id = $1
-             ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC
-             LIMIT 1`,
+             ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC`,
             [parsedResidentId],
         );
 
-        const latestRow = requestResult.rows[0];
-        const latestRequest = latestRow
-            ? {
-                  request_id: `REQ-${String(latestRow.request_id).padStart(4, "0")}`,
-                  cert_type: latestRow.cert_type,
-                  status:
-                      latestRow.status === "approved" ||
-                      latestRow.status === "ready"
-                          ? "processing"
-                          : latestRow.status,
-                  purpose: latestRow.purpose || "Not specified",
-                  requested_at: latestRow.requested_at,
-                  has_fee: Boolean(latestRow.has_fee),
-              }
-            : null;
+        const requests = requestResult.rows.map((row) => ({
+            raw_id: row.request_id,
+            request_id: `REQ-${String(row.request_id).padStart(4, "0")}`,
+            cert_type: row.cert_type,
+            status: String(row.status || "pending").toLowerCase(),
+            purpose: row.purpose || "Not specified",
+            requested_at: row.requested_at,
+            processed_at: row.processed_at,
+            released_at: row.released_at,
+            rejection_reason: row.rejection_reason || "",
+            template_id: row.template_id || null,
+            template_key: row.template_key || "",
+            extra_fields: row.extra_fields || {},
+            has_fee: Boolean(row.has_fee),
+        }));
+
+        const latestRequest = requests[0] || null;
 
         await createAuditLog({
             actorId: req.admin.id,
@@ -860,6 +1007,7 @@ async function scanResidentQr(req, res) {
                 address: residentAddress || "Address not available",
             },
             latestRequest,
+            requests,
         });
     } catch (err) {
         console.error("scanResidentQr error:", err);
@@ -2074,6 +2222,7 @@ module.exports = {
     approveRequest,
     rejectRequest,
     getCertificateTemplates,
+    updateCertificateTemplate,
     issueWalkIn,
     getTodayWalkIn,
     getWalkInReprint,

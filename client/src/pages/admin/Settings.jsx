@@ -2,14 +2,19 @@
 // FILE: client/src/pages/admin/Settings.jsx
 // =============================================================
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
-import { Menu, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Menu, Search, X } from "lucide-react";
 import * as settingsService from "../../services/settingsService";
-import { DOC1_CERTIFICATE_OPTIONS } from "../../utils/certificateTemplateEngine";
+import { DEFAULT_OFFICE_SCHEDULE } from "../../services/publicBrandingService";
+import {
+    DOC1_CERTIFICATE_OPTIONS,
+    buildCertificatePrintHtml,
+    getTemplateFieldLabels,
+} from "../../utils/certificateTemplateEngine";
 
 // ─── Injected styles (mirrors HTML stylesheet) ───────────────
 let stylesInjected = false;
@@ -151,13 +156,31 @@ function useSettingsStyles() {
         .st-modal-footer { padding:14px 24px; border-top:1px solid #e4dfd4; display:flex; justify-content:space-between; align-items:center; background:#f8f6f1; }
 
         /* CERT TYPES TABLE */
-        .st-cert-row { display:grid; grid-template-columns:minmax(0,1fr) 90px 100px 100px; align-items:center; padding:12px 22px; border-bottom:1px solid #f0ece4; }
+        .st-cert-row { display:grid; grid-template-columns:minmax(220px,1fr) 110px 100px 210px; align-items:center; padding:12px 22px; border-bottom:1px solid #f0ece4; gap:10px; }
         .st-cert-row:last-child { border-bottom:none; }
         .st-cert-name { font-size:12.5px; font-weight:600; }
         .st-cert-desc { font-size:10.5px; color:#9090aa; margin-top:1px; }
         .st-badge-active   { font-size:10.5px; background:#e8f5ee; color:#1a7a4a; border-radius:10px; padding:2px 10px; font-weight:700; display:inline-block; width:fit-content; }
         .st-badge-inactive { font-size:10.5px; background:#f0ece4; color:#9090aa; border-radius:10px; padding:2px 10px; font-weight:700; display:inline-block; width:fit-content; }
         .st-toggle-btn { background:none; border:1px solid #e4dfd4; border-radius:4px; padding:5px 14px; font-size:10.5px; cursor:pointer; font-family:inherit; color:#9090aa; }
+        .st-toggle-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .st-view-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#fff; border:1px solid rgba(14,37,84,.22); border-radius:4px; padding:5px 12px; font-size:10.5px; cursor:pointer; font-family:inherit; color:#0e2554; white-space:nowrap; }
+        .st-view-btn:hover { background:#edf1fa; border-color:#0e2554; }
+        .st-cert-actions { display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:wrap; }
+        .st-cert-toolbar { padding:14px 22px; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid #e4dfd4; background:#fff; flex-wrap:wrap; }
+        .st-cert-search { position:relative; flex:1; min-width:240px; max-width:420px; }
+        .st-cert-search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#9090aa; }
+        .st-cert-search input { width:100%; padding:9px 12px 9px 34px; border:1.5px solid #e4dfd4; border-radius:4px; font-family:'Source Serif 4',serif; font-size:12.5px; background:#f8f6f1; color:#1a1a2e; outline:none; }
+        .st-cert-search input:focus { border-color:#0e2554; background:#f0f3ff; }
+        .st-fee-btn { background:#fff; border:1px solid #e4dfd4; border-radius:4px; padding:5px 12px; font-size:10.5px; font-weight:700; cursor:pointer; font-family:inherit; color:#9090aa; min-width:78px; }
+        .st-fee-btn.fee { border-color:rgba(184,104,0,.35); background:#fff8ed; color:#b86800; }
+        .st-fee-btn.free { border-color:rgba(26,122,74,.25); background:#f2fbf6; color:#1a7a4a; }
+        .st-fee-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .st-cert-pager { padding:10px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#f8f6f1; border-top:1px solid #e4dfd4; font-size:11px; color:#9090aa; flex-wrap:wrap; }
+        .st-cert-pager-actions { display:flex; align-items:center; gap:8px; }
+        .st-cert-page-btn { width:28px; height:28px; border:1px solid #e4dfd4; background:#fff; color:#4a4a6a; border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+        .st-cert-page-btn:disabled { opacity:.4; cursor:not-allowed; }
+        .st-cert-page-pill { min-width:72px; height:28px; padding:0 10px; border:1px solid #e4dfd4; background:#fff; color:#4a4a6a; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; }
 
         /* CERT CHIP SELECTOR */
         .st-cert-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:22px; }
@@ -171,6 +194,8 @@ function useSettingsStyles() {
             .st-esig-grid    { grid-template-columns:1fr; }
             .st-cert-row     { grid-template-columns:1fr auto; gap:8px; }
             .st-cert-row > span:first-of-type, .st-cert-row > span:last-of-type { grid-column: auto; }
+            .st-cert-toolbar { align-items:stretch; }
+            .st-cert-search { min-width:100%; max-width:none; }
             .st-modal { width:95vw; }
         }
         `;
@@ -179,6 +204,7 @@ function useSettingsStyles() {
 }
 
 const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
+const CERT_TYPES_PER_PAGE = 8;
 
 function dataUrlByteSize(dataUrl) {
     const base64 = String(dataUrl || "").split(",")[1] || "";
@@ -253,12 +279,216 @@ async function optimizeImageForSettings(file) {
 
 // ─── Cert types initial data ──────────────────────────────────
 const INITIAL_CERT_TYPES = DOC1_CERTIFICATE_OPTIONS.map((cert, index) => ({
-    id: index + 1,
+    id: cert.templateKey || index + 1,
+    templateId: null,
+    templateKey: cert.templateKey || "",
     name: cert.name,
     desc: cert.desc,
     fee: cert.hasFee,
     active: true,
 }));
+
+function mapCertificateTemplate(template, index) {
+    return {
+        id: template.templateId || template.templateKey || `template-${index}`,
+        templateId: template.templateId || null,
+        templateKey: template.templateKey || "",
+        name: template.name || "Certificate Template",
+        desc: template.desc || template.description || "",
+        fee: Boolean(template.hasFee ?? template.has_fee),
+        active: template.isActive !== false && template.is_active !== false,
+    };
+}
+
+const TEMPLATE_PREVIEW_BASE_DATA = {
+    residentName: "Juan Dela Cruz",
+    name: "Juan Dela Cruz",
+    resident_name: "Juan Dela Cruz",
+    prefix: "Mr.",
+    age: "35",
+    dateOfBirth: "1991-05-12",
+    date_of_birth: "1991-05-12",
+    civilStatus: "Single",
+    civil_status: "Single",
+    nationality: "Filipino",
+    address: "Purok 8, Del Pilar Street",
+    purpose: "Employment",
+    businessName: "Dela Cruz Sari-Sari Store",
+    businessType: "Retail",
+    businessAddress: "14th Street, East Tapinac",
+    businessArea: "24 sqm",
+    partnerName: "Maria Santos",
+    wardName: "Miguel Dela Cruz",
+    relationship: "uncle",
+    childName: "Miguel Dela Cruz",
+    childDOB: "2024-02-14",
+    fatherName: "Juan Dela Cruz",
+    motherName: "Maria Dela Cruz",
+    requestingInstitution: "City Employment Office",
+    claimantName: "Juan Dela Cruz",
+    claimantRelationship: "son",
+    assistanceType: "medical assistance",
+    issuedAt: new Date(),
+};
+
+function sampleValueForTemplateField(key) {
+    const normalized = String(key || "").toLowerCase();
+    if (normalized.includes("date") || normalized.includes("dob")) {
+        return "2026-05-19";
+    }
+    if (normalized.includes("age")) return "35";
+    if (normalized.includes("amount")) return "5000";
+    if (normalized.includes("area")) return "24 sqm";
+    if (normalized.includes("address")) return "Purok 8, Del Pilar Street";
+    if (normalized.includes("business")) return "Dela Cruz Sari-Sari Store";
+    if (normalized.includes("relationship")) return "son";
+    if (normalized.includes("purpose")) return "Employment";
+    if (normalized.includes("name")) return "Juan Dela Cruz";
+    return "Sample information";
+}
+
+function buildTemplatePreviewData(cert) {
+    const fieldEntries = getTemplateFieldLabels(cert?.templateKey, cert?.name).map(
+        (field) => [field.key, sampleValueForTemplateField(field.key)],
+    );
+    const extraFields = {
+        ...Object.fromEntries(fieldEntries),
+        templateKey: cert?.templateKey || "",
+    };
+
+    return {
+        ...TEMPLATE_PREVIEW_BASE_DATA,
+        ...extraFields,
+        certType: cert?.name || "Certificate Preview",
+        templateKey: cert?.templateKey || "",
+        extraFields,
+    };
+}
+
+function TemplatePreviewModal({ cert, settings, onClose }) {
+    const previewHtml = useMemo(() => {
+        if (!cert) return "";
+        return buildCertificatePrintHtml({
+            cert,
+            certType: cert.name,
+            templateKey: cert.templateKey,
+            data: buildTemplatePreviewData(cert),
+            settings,
+        });
+    }, [cert, settings]);
+
+    useEffect(() => {
+        if (!cert) return undefined;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [cert, onClose]);
+
+    if (!cert) return null;
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(9, 18, 38, 0.58)",
+                zIndex: 3000,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 20,
+            }}
+            onClick={onClose}
+        >
+            <div
+                style={{
+                    width: "min(1080px, 96vw)",
+                    height: "min(880px, 92vh)",
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 24px 70px rgba(0,0,0,.28)",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div
+                    style={{
+                        padding: "14px 18px",
+                        background: "#0e2554",
+                        color: "#fff",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                    }}
+                >
+                    <div style={{ minWidth: 0 }}>
+                        <div
+                            style={{
+                                fontFamily: "'Playfair Display',serif",
+                                fontSize: 15,
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                            }}
+                        >
+                            {cert.name}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 11,
+                                color: "rgba(255,255,255,.66)",
+                                marginTop: 2,
+                            }}
+                        >
+                            Template preview uses sample data.
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{
+                            width: 32,
+                            height: 32,
+                            border: "1px solid rgba(255,255,255,.28)",
+                            background: "rgba(255,255,255,.08)",
+                            color: "#fff",
+                            borderRadius: 4,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            flexShrink: 0,
+                        }}
+                        title="Close preview"
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+                <iframe
+                    title={`${cert.name} preview`}
+                    srcDoc={previewHtml}
+                    style={{
+                        border: "none",
+                        width: "100%",
+                        flex: 1,
+                        background: "#f4f2ed",
+                    }}
+                />
+            </div>
+        </div>
+    );
+}
 
 // ─── Signature Block Sub-component ───────────────────────────
 function SigBlock({ id, label, sublabel, sig, onSet, onClear, onDraw }) {
@@ -626,6 +856,16 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         contact: "(047) 123-4567",
         email: "brgy.easttapinac@olongapo.gov.ph",
     });
+    const [officeSchedule, setOfficeSchedule] = useState(
+        DEFAULT_OFFICE_SCHEDULE,
+    );
+    const updateOfficeSchedule = (index, key, value) => {
+        setOfficeSchedule((prev) =>
+            prev.map((row, rowIndex) =>
+                rowIndex === index ? { ...row, [key]: value } : row,
+            ),
+        );
+    };
 
     // branding – footer
     const [footer, setFooter] = useState({
@@ -650,13 +890,85 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [sig1, setSig1] = useState(null);
     const [sig2, setSig2] = useState(null);
     const [drawModal, setDrawModal] = useState({ open: false, target: null });
+    const [templatePreviewCert, setTemplatePreviewCert] = useState(null);
+    const templatePreviewSettings = useMemo(
+        () => ({
+            brgy_name: brgyInfo.name,
+            brgy_city: brgyInfo.city,
+            brgy_address: brgyInfo.address,
+            brgy_contact: brgyInfo.contact,
+            brgy_email: brgyInfo.email,
+            brgy_logo_url: brgyLogo || "",
+            city_logo_url: cityLogo || "",
+            captain_name: officials.captainName,
+            captain_title: officials.captainTitle,
+            kagawad_name: officials.kagawadName,
+            kagawad_title: officials.kagawadTitle,
+            kagawad_1_name: officials.kagawad1Name,
+            kagawad_1_title: officials.kagawad1Title,
+            kagawad_2_name: officials.kagawad2Name,
+            kagawad_2_title: officials.kagawad2Title,
+            secondary_name: officials.secondaryName,
+            secondary_title: officials.secondaryTitle,
+            captain_sig_base64: sig1 || "",
+            secondary_sig_base64: sig2 || "",
+        }),
+        [brgyInfo, brgyLogo, cityLogo, officials, sig1, sig2],
+    );
 
     // cert types
     const [certTypes, setCertTypes] = useState(INITIAL_CERT_TYPES);
-    const toggleCert = (id) => {
+    const [certSearch, setCertSearch] = useState("");
+    const [certPage, setCertPage] = useState(1);
+    const [certTemplatesLoading, setCertTemplatesLoading] = useState(false);
+    const [savingTemplateId, setSavingTemplateId] = useState(null);
+
+    const updateCertType = async (id, changes) => {
+        const current = certTypes.find((c) => c.id === id);
+        if (!current) return;
+        const next = { ...current, ...changes };
+
         setCertTypes((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, active: !c.active } : c)),
+            prev.map((c) => (c.id === id ? next : c)),
         );
+
+        if (!current.templateId) return;
+
+        setSavingTemplateId(id);
+        try {
+            const token = localStorage.getItem("adminToken");
+            await settingsService.updateCertificateTemplate(
+                current.templateId,
+                { hasFee: next.fee, isActive: next.active },
+                token,
+            );
+            setMessage({
+                text: "Certificate template updated.",
+                type: "success",
+            });
+        } catch (err) {
+            setCertTypes((prev) =>
+                prev.map((c) => (c.id === id ? current : c)),
+            );
+            setMessage({
+                text: err.message || "Failed to update certificate template",
+                type: "error",
+            });
+        } finally {
+            setSavingTemplateId(null);
+        }
+    };
+
+    const toggleCert = (id) => {
+        const current = certTypes.find((c) => c.id === id);
+        if (!current) return;
+        updateCertType(id, { active: !current.active });
+    };
+
+    const toggleCertFee = (id) => {
+        const current = certTypes.find((c) => c.id === id);
+        if (!current) return;
+        updateCertType(id, { fee: !current.fee });
     };
 
     // loading, errors, and messages
@@ -696,6 +1008,20 @@ export default function Settings({ admin, onNavigate, onLogout }) {
 
                 if (data.brgy_logo_url) setBrgyLogo(data.brgy_logo_url);
                 if (data.city_logo_url) setCityLogo(data.city_logo_url);
+
+                setOfficeSchedule(
+                    DEFAULT_OFFICE_SCHEDULE.map((row, index) => {
+                        const line = index + 1;
+                        return {
+                            label:
+                                data[`office_schedule_line_${line}_label`] ||
+                                row.label,
+                            time:
+                                data[`office_schedule_line_${line}_time`] ||
+                                row.time,
+                        };
+                    }),
+                );
 
                 if (data.footer_tagline)
                     setFooter((prev) => ({
@@ -775,6 +1101,77 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         loadSettings();
     }, []);
 
+    useEffect(() => {
+        let mounted = true;
+        const loadCertificateTemplates = async () => {
+            setCertTemplatesLoading(true);
+            try {
+                const token = localStorage.getItem("adminToken");
+                const data = await settingsService.getCertificateTemplates(token, {
+                    includeInactive: true,
+                });
+                if (mounted && Array.isArray(data) && data.length > 0) {
+                    setCertTypes(data.map(mapCertificateTemplate));
+                }
+            } catch (err) {
+                console.error("Failed to load certificate templates:", err);
+            } finally {
+                if (mounted) setCertTemplatesLoading(false);
+            }
+        };
+
+        loadCertificateTemplates();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const filteredCertTypes = useMemo(() => {
+        const term = certSearch.trim().toLowerCase();
+        if (!term) return certTypes;
+        return certTypes.filter((cert) => {
+            const haystack = [
+                cert.name,
+                cert.desc,
+                cert.templateKey,
+                cert.fee ? "fee with fee paid" : "free no fee",
+                cert.active ? "active enabled" : "inactive disabled",
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+            return haystack.includes(term);
+        });
+    }, [certSearch, certTypes]);
+
+    const certTotalPages = Math.max(
+        1,
+        Math.ceil(filteredCertTypes.length / CERT_TYPES_PER_PAGE),
+    );
+    const paginatedCertTypes = useMemo(
+        () =>
+            filteredCertTypes.slice(
+                (certPage - 1) * CERT_TYPES_PER_PAGE,
+                certPage * CERT_TYPES_PER_PAGE,
+            ),
+        [certPage, filteredCertTypes],
+    );
+    const certShowingStart = filteredCertTypes.length
+        ? (certPage - 1) * CERT_TYPES_PER_PAGE + 1
+        : 0;
+    const certShowingEnd = Math.min(
+        certPage * CERT_TYPES_PER_PAGE,
+        filteredCertTypes.length,
+    );
+
+    useEffect(() => {
+        setCertPage(1);
+    }, [certSearch]);
+
+    useEffect(() => {
+        setCertPage((page) => Math.min(page, certTotalPages));
+    }, [certTotalPages]);
+
     // Save branding settings
     const handleSaveBranding = async () => {
         setLoading(true);
@@ -790,10 +1187,15 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 brgy_logo_url: brgyLogo || "",
                 city_logo_url: cityLogo || "",
             };
+            officeSchedule.forEach((row, index) => {
+                const line = index + 1;
+                settings[`office_schedule_line_${line}_label`] = row.label;
+                settings[`office_schedule_line_${line}_time`] = row.time;
+            });
 
             await settingsService.updateBarangaySettings(settings, token);
             setMessage({
-                text: "Branding updated successfully!",
+                text: "Branding and office schedule updated successfully!",
                 type: "success",
             });
         } catch (err) {
@@ -1089,8 +1491,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         </div>
                                         <div className="st-panel-desc">
                                             Both seals appear on all generated
-                                            certificates — barangay seal on
-                                            top-left, city seal on top-right.
+                                            certificates: city seal on the
+                                            left, barangay seal on the right.
                                         </div>
                                     </div>
                                 </div>
@@ -1104,7 +1506,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         borderBottom: "1px solid #e4dfd4",
                                     }}
                                 >
-                                    {/* Barangay Seal */}
+                                    {/* City Seal */}
                                     <div
                                         style={{
                                             padding: 24,
@@ -1134,11 +1536,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     display: "inline-block",
                                                     width: 10,
                                                     height: 10,
-                                                    background: "#0e2554",
+                                                    background: "#c9a227",
                                                     borderRadius: 2,
                                                 }}
                                             />
-                                            Barangay Seal — Top Left
+                                            City / Municipal Seal - Top Left
                                         </div>
                                         <div
                                             style={{
@@ -1148,6 +1550,188 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             }}
                                         >
                                             <div className="st-logo-preview">
+                                                {cityLogo ? (
+                                                    <img
+                                                        src={cityLogo}
+                                                        alt="City Seal"
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        style={{
+                                                            display: "flex",
+                                                            flexDirection:
+                                                                "column",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 4,
+                                                            color: "#9090aa",
+                                                        }}
+                                                    >
+                                                        <svg
+                                                            width="28"
+                                                            height="28"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="#ccc"
+                                                            strokeWidth="1.5"
+                                                        >
+                                                            <rect
+                                                                x="3"
+                                                                y="3"
+                                                                width="18"
+                                                                height="18"
+                                                                rx="2"
+                                                            />
+                                                            <circle
+                                                                cx="8.5"
+                                                                cy="8.5"
+                                                                r="1.5"
+                                                            />
+                                                            <polyline points="21 15 16 10 5 21" />
+                                                        </svg>
+                                                        <span
+                                                            style={{
+                                                                fontSize: 9,
+                                                                letterSpacing: 1,
+                                                                textTransform:
+                                                                    "uppercase",
+                                                            }}
+                                                        >
+                                                            No Seal
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <h4
+                                                    style={{
+                                                        fontSize: 13,
+                                                        fontWeight: 600,
+                                                        color: "#1a1a2e",
+                                                        marginBottom: 6,
+                                                    }}
+                                                >
+                                                    City / Municipal Seal
+                                                </h4>
+                                                <p
+                                                    style={{
+                                                        fontSize: "11.5px",
+                                                        color: "#9090aa",
+                                                        lineHeight: 1.6,
+                                                        marginBottom: 12,
+                                                    }}
+                                                >
+                                                    Appears on the left side of
+                                                    generated certificates and
+                                                    permits.
+                                                    <br />
+                                                    PNG/JPG/SVG · 300×300px ·
+                                                    Max 2MB
+                                                </p>
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        gap: 8,
+                                                        flexWrap: "wrap",
+                                                    }}
+                                                >
+                                                    <button
+                                                        className="st-upload-btn"
+                                                        onClick={() =>
+                                                            cityFileRef.current.click()
+                                                        }
+                                                    >
+                                                        <svg
+                                                            width="13"
+                                                            height="13"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                        >
+                                                            <polyline points="16 16 12 12 8 16" />
+                                                            <line
+                                                                x1="12"
+                                                                y1="12"
+                                                                x2="12"
+                                                                y2="21"
+                                                            />
+                                                            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                                                        </svg>
+                                                        Upload
+                                                    </button>
+                                                    {cityLogo && (
+                                                        <button
+                                                            className="st-upload-btn-secondary"
+                                                            onClick={() =>
+                                                                setCityLogo(
+                                                                    null,
+                                                                )
+                                                            }
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    )}
+                                                    <input
+                                                        ref={cityFileRef}
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{
+                                                            display: "none",
+                                                        }}
+                                                        onChange={(e) =>
+                                                            handleLogoUpload(
+                                                                e,
+                                                                setCityLogo,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Barangay Seal */}
+                                    <div style={{ padding: 24 }}>
+                                        <div
+                                            style={{
+                                                fontSize: "10.5px",
+                                                fontWeight: 600,
+                                                color: "#4a4a6a",
+                                                letterSpacing: "1.2px",
+                                                textTransform: "uppercase",
+                                                marginBottom: 14,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    display: "inline-block",
+                                                    width: 10,
+                                                    height: 10,
+                                                    background: "#0e2554",
+                                                    borderRadius: 2,
+                                                }}
+                                            />
+                                            Barangay Seal - Top Right
+                                        </div>
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 24,
+                                            }}
+                                        >
+                                            <div
+                                                className="st-logo-preview"
+                                                style={{
+                                                    borderStyle: brgyLogo
+                                                        ? "solid"
+                                                        : "dashed",
+                                                }}
+                                            >
                                                 {brgyLogo ? (
                                                     <img
                                                         src={brgyLogo}
@@ -1220,8 +1804,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     }}
                                                 >
                                                     Appears on login page,
-                                                    sidebar, and top-left of all
-                                                    certificates.
+                                                    sidebar, and the right side
+                                                    of generated certificates.
                                                     <br />
                                                     PNG/JPG/SVG · 300×300px ·
                                                     Max 2MB
@@ -1288,188 +1872,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* City Seal */}
-                                    <div style={{ padding: 24 }}>
-                                        <div
-                                            style={{
-                                                fontSize: "10.5px",
-                                                fontWeight: 600,
-                                                color: "#4a4a6a",
-                                                letterSpacing: "1.2px",
-                                                textTransform: "uppercase",
-                                                marginBottom: 14,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                            }}
-                                        >
-                                            <span
-                                                style={{
-                                                    display: "inline-block",
-                                                    width: 10,
-                                                    height: 10,
-                                                    background: "#c9a227",
-                                                    borderRadius: 2,
-                                                }}
-                                            />
-                                            City / Municipal Seal — Top Right
-                                        </div>
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 24,
-                                            }}
-                                        >
-                                            <div
-                                                className="st-logo-preview"
-                                                style={{
-                                                    borderStyle: cityLogo
-                                                        ? "solid"
-                                                        : "dashed",
-                                                }}
-                                            >
-                                                {cityLogo ? (
-                                                    <img
-                                                        src={cityLogo}
-                                                        alt="City Seal"
-                                                    />
-                                                ) : (
-                                                    <div
-                                                        style={{
-                                                            display: "flex",
-                                                            flexDirection:
-                                                                "column",
-                                                            alignItems:
-                                                                "center",
-                                                            gap: 4,
-                                                            color: "#9090aa",
-                                                        }}
-                                                    >
-                                                        <svg
-                                                            width="28"
-                                                            height="28"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="#ccc"
-                                                            strokeWidth="1.5"
-                                                        >
-                                                            <rect
-                                                                x="3"
-                                                                y="3"
-                                                                width="18"
-                                                                height="18"
-                                                                rx="2"
-                                                            />
-                                                            <circle
-                                                                cx="8.5"
-                                                                cy="8.5"
-                                                                r="1.5"
-                                                            />
-                                                            <polyline points="21 15 16 10 5 21" />
-                                                        </svg>
-                                                        <span
-                                                            style={{
-                                                                fontSize: 9,
-                                                                letterSpacing: 1,
-                                                                textTransform:
-                                                                    "uppercase",
-                                                            }}
-                                                        >
-                                                            No Seal
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <h4
-                                                    style={{
-                                                        fontSize: 13,
-                                                        fontWeight: 600,
-                                                        color: "#1a1a2e",
-                                                        marginBottom: 6,
-                                                    }}
-                                                >
-                                                    City / Municipal Seal
-                                                </h4>
-                                                <p
-                                                    style={{
-                                                        fontSize: "11.5px",
-                                                        color: "#9090aa",
-                                                        lineHeight: 1.6,
-                                                        marginBottom: 12,
-                                                    }}
-                                                >
-                                                    Appears on top-right of all
-                                                    generated certificates and
-                                                    permits.
-                                                    <br />
-                                                    PNG/JPG/SVG · 300×300px ·
-                                                    Max 2MB
-                                                </p>
-                                                <div
-                                                    style={{
-                                                        display: "flex",
-                                                        gap: 8,
-                                                        flexWrap: "wrap",
-                                                    }}
-                                                >
-                                                    <button
-                                                        className="st-upload-btn"
-                                                        onClick={() =>
-                                                            cityFileRef.current.click()
-                                                        }
-                                                    >
-                                                        <svg
-                                                            width="13"
-                                                            height="13"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2"
-                                                        >
-                                                            <polyline points="16 16 12 12 8 16" />
-                                                            <line
-                                                                x1="12"
-                                                                y1="12"
-                                                                x2="12"
-                                                                y2="21"
-                                                            />
-                                                            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                                                        </svg>
-                                                        Upload
-                                                    </button>
-                                                    {cityLogo && (
-                                                        <button
-                                                            className="st-upload-btn-secondary"
-                                                            onClick={() =>
-                                                                setCityLogo(
-                                                                    null,
-                                                                )
-                                                            }
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    )}
-                                                    <input
-                                                        ref={cityFileRef}
-                                                        type="file"
-                                                        accept="image/*"
-                                                        style={{
-                                                            display: "none",
-                                                        }}
-                                                        onChange={(e) =>
-                                                            handleLogoUpload(
-                                                                e,
-                                                                setCityLogo,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
 
                                 {/* Certificate Layout Preview */}
@@ -1526,9 +1928,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     flexShrink: 0,
                                                 }}
                                             >
-                                                {brgyLogo ? (
+                                                {cityLogo ? (
                                                     <img
-                                                        src={brgyLogo}
+                                                        src={cityLogo}
                                                         style={{
                                                             width: 66,
                                                             height: 66,
@@ -1628,9 +2030,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     marginLeft: "auto",
                                                 }}
                                             >
-                                                {cityLogo ? (
+                                                {brgyLogo ? (
                                                     <img
-                                                        src={cityLogo}
+                                                        src={brgyLogo}
                                                         style={{
                                                             width: 66,
                                                             height: 66,
@@ -1862,6 +2264,91 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             />
                                         </div>
                                     </div>
+                                    <div
+                                        style={{
+                                            borderTop: "1px solid #e4dfd4",
+                                            marginTop: 22,
+                                            paddingTop: 22,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                gap: 14,
+                                                alignItems: "flex-start",
+                                                marginBottom: 14,
+                                                flexWrap: "wrap",
+                                            }}
+                                        >
+                                            <div>
+                                                <div className="st-panel-title">
+                                                    Office Schedule
+                                                </div>
+                                                <div className="st-panel-desc">
+                                                    Resident-facing office hours
+                                                    and pickup address.
+                                                </div>
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: "#9090aa",
+                                                    lineHeight: 1.5,
+                                                    textAlign: "right",
+                                                }}
+                                            >
+                                                Address uses the Full Address
+                                                field above.
+                                            </div>
+                                        </div>
+                                        {officeSchedule.map((row, index) => (
+                                            <div
+                                                key={`office-schedule-${index}`}
+                                                className="st-form-grid-2"
+                                                style={{
+                                                    marginBottom:
+                                                        index ===
+                                                        officeSchedule.length - 1
+                                                            ? 0
+                                                            : 12,
+                                                }}
+                                            >
+                                                <div className="st-field">
+                                                    <label>
+                                                        Schedule Row {index + 1}
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.label}
+                                                        onChange={(e) =>
+                                                            updateOfficeSchedule(
+                                                                index,
+                                                                "label",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="Mon - Thu"
+                                                    />
+                                                </div>
+                                                <div className="st-field">
+                                                    <label>Hours / Status</label>
+                                                    <input
+                                                        type="text"
+                                                        value={row.time}
+                                                        onChange={(e) =>
+                                                            updateOfficeSchedule(
+                                                                index,
+                                                                "time",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="8:00 AM - 5:00 PM"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="st-save-bar">
                                     <p>
@@ -1881,6 +2368,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     contact: "(047) 123-4567",
                                                     email: "brgy.easttapinac@olongapo.gov.ph",
                                                 });
+                                                setOfficeSchedule(
+                                                    DEFAULT_OFFICE_SCHEDULE,
+                                                );
                                                 setBrgyLogo(null);
                                                 setCityLogo(null);
                                             }}
@@ -1906,7 +2396,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             </svg>
                                             {loading
                                                 ? "Saving..."
-                                                : "Save Branding"}
+                                                : "Save Branding & Schedule"}
                                         </button>
                                     </div>
                                 </div>
@@ -2370,11 +2860,36 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     marginTop: 2,
                                                 }}
                                             >
-                                                Templates are hardcoded. Enable
-                                                or disable types to control what
-                                                staff can issue.
+                                                Templates are loaded from
+                                                Supabase. Set which certificates
+                                                are free or fee-based here.
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <div className="st-cert-toolbar">
+                                    <div className="st-cert-search">
+                                        <Search size={14} />
+                                        <input
+                                            type="text"
+                                            value={certSearch}
+                                            onChange={(e) =>
+                                                setCertSearch(e.target.value)
+                                            }
+                                            placeholder="Search certificate templates..."
+                                        />
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            color: "#9090aa",
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        {certTemplatesLoading
+                                            ? "Loading templates..."
+                                            : `${filteredCertTypes.length} of ${certTypes.length} templates`}
                                     </div>
                                 </div>
 
@@ -2384,7 +2899,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         style={{
                                             display: "grid",
                                             gridTemplateColumns:
-                                                "minmax(0,1fr) 90px 100px 100px",
+                                                "minmax(220px,1fr) 110px 100px 210px",
+                                            gap: 10,
                                             background: "#f8f6f1",
                                             borderBottom: "1px solid #e4dfd4",
                                             padding: "9px 22px",
@@ -2410,7 +2926,19 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             </span>
                                         ))}
                                     </div>
-                                    {certTypes.map((ct) => (
+                                    {paginatedCertTypes.length === 0 && (
+                                        <div
+                                            style={{
+                                                padding: "24px 22px",
+                                                color: "#9090aa",
+                                                fontSize: 12,
+                                                textAlign: "center",
+                                            }}
+                                        >
+                                            No certificate templates found.
+                                        </div>
+                                    )}
+                                    {paginatedCertTypes.map((ct) => (
                                         <div
                                             key={ct.id}
                                             className="st-cert-row"
@@ -2426,19 +2954,24 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     {ct.desc}
                                                 </div>
                                             </div>
-                                            <span
-                                                style={{
-                                                    fontSize: 11,
-                                                    color: ct.fee
-                                                        ? "#b86800"
-                                                        : "#9090aa",
-                                                    fontWeight: ct.fee
-                                                        ? 600
-                                                        : 400,
-                                                }}
+                                            <button
+                                                type="button"
+                                                className={`st-fee-btn ${
+                                                    ct.fee ? "fee" : "free"
+                                                }`}
+                                                onClick={() =>
+                                                    toggleCertFee(ct.id)
+                                                }
+                                                disabled={
+                                                    savingTemplateId === ct.id
+                                                }
                                             >
-                                                {ct.fee ? "₱ Fee" : "No fee"}
-                                            </span>
+                                                {savingTemplateId === ct.id
+                                                    ? "Saving"
+                                                    : ct.fee
+                                                      ? "With fee"
+                                                      : "Free"}
+                                            </button>
                                             <span
                                                 className={
                                                     ct.active
@@ -2450,56 +2983,85 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     ? "Active"
                                                     : "Inactive"}
                                             </span>
-                                            <button
-                                                className="st-toggle-btn"
-                                                style={{
-                                                    color: ct.active
-                                                        ? "#9090aa"
-                                                        : "#1a7a4a",
-                                                }}
-                                                onClick={() =>
-                                                    toggleCert(ct.id)
-                                                }
-                                            >
-                                                {ct.active
-                                                    ? "Disable"
-                                                    : "Enable"}
-                                            </button>
+                                            <div className="st-cert-actions">
+                                                <button
+                                                    type="button"
+                                                    className="st-view-btn"
+                                                    onClick={() =>
+                                                        setTemplatePreviewCert(ct)
+                                                    }
+                                                    title="View template preview"
+                                                >
+                                                    <Eye size={12} />
+                                                    View Template
+                                                </button>
+                                                <button
+                                                    className="st-toggle-btn"
+                                                    style={{
+                                                        color: ct.active
+                                                            ? "#9090aa"
+                                                            : "#1a7a4a",
+                                                    }}
+                                                    onClick={() =>
+                                                        toggleCert(ct.id)
+                                                    }
+                                                    disabled={
+                                                        savingTemplateId === ct.id
+                                                    }
+                                                >
+                                                    {savingTemplateId === ct.id
+                                                        ? "Saving"
+                                                        : ct.active
+                                                          ? "Disable"
+                                                          : "Enable"}
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                                <div
-                                    style={{
-                                        padding: "10px 22px",
-                                        background: "#f8f6f1",
-                                        borderTop: "1px solid #e4dfd4",
-                                        fontSize: 11,
-                                        color: "#9090aa",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 6,
-                                    }}
-                                >
-                                    <svg
-                                        width="12"
-                                        height="12"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                    >
-                                        <circle cx="12" cy="12" r="10" />
-                                        <line x1="12" y1="8" x2="12" y2="12" />
-                                        <line
-                                            x1="12"
-                                            y1="16"
-                                            x2="12.01"
-                                            y2="16"
-                                        />
-                                    </svg>
-                                    Disabling a type hides it from the staff
-                                    cert picker. Templates are managed in the
-                                    backend source code.
+                                <div className="st-cert-pager">
+                                    <span>
+                                        Showing {certShowingStart}-
+                                        {certShowingEnd} of{" "}
+                                        {filteredCertTypes.length} templates.
+                                        Fee and active status save to Supabase.
+                                    </span>
+                                    <div className="st-cert-pager-actions">
+                                        <button
+                                            type="button"
+                                            className="st-cert-page-btn"
+                                            onClick={() =>
+                                                setCertPage((page) =>
+                                                    Math.max(1, page - 1),
+                                                )
+                                            }
+                                            disabled={certPage <= 1}
+                                            title="Previous page"
+                                        >
+                                            <ChevronLeft size={14} />
+                                        </button>
+                                        <span className="st-cert-page-pill">
+                                            {certPage} / {certTotalPages}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="st-cert-page-btn"
+                                            onClick={() =>
+                                                setCertPage((page) =>
+                                                    Math.min(
+                                                        certTotalPages,
+                                                        page + 1,
+                                                    ),
+                                                )
+                                            }
+                                            disabled={
+                                                certPage >= certTotalPages
+                                            }
+                                            title="Next page"
+                                        >
+                                            <ChevronRight size={14} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </>
@@ -2515,6 +3077,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                     if (drawModal.target === "esig1") setSig1(dataUrl);
                     if (drawModal.target === "esig2") setSig2(dataUrl);
                 }}
+            />
+            <TemplatePreviewModal
+                cert={templatePreviewCert}
+                settings={templatePreviewSettings}
+                onClose={() => setTemplatePreviewCert(null)}
             />
         </div>
     );

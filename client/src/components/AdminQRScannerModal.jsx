@@ -45,7 +45,9 @@ function fmtDate(str) {
 function StatusBadge({ status }) {
     const map = {
         pending:    { bg: "#fff7e6", color: "#b86800", border: "#f5d78e", label: "Pending" },
+        approved:   { bg: "#eef2ff", color: "#1a4a8a", border: "#c7d2fe", label: "Approved" },
         processing: { bg: "#eef2ff", color: "#3730a3", border: "#c7d2fe", label: "Processing" },
+        ready:      { bg: "#e8f5ee", color: "#1a7a4a", border: "#a8d8bc", label: "Ready" },
         released:   { bg: "#e8f5ee", color: "#1a7a4a", border: "#a8d8bc", label: "Released" },
         rejected:   { bg: "#fdecea", color: "#b02020", border: "#f5c6c6", label: "Rejected" },
     };
@@ -54,6 +56,81 @@ function StatusBadge({ status }) {
         <span style={{ fontSize: 10, background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: "2px 10px", fontWeight: 700, whiteSpace: "nowrap" }}>
             {s.label}
         </span>
+    );
+}
+
+const REQUEST_FILTERS = [
+    { key: "all", label: "All" },
+    { key: "latest", label: "Latest" },
+    { key: "ongoing", label: "Ongoing" },
+    { key: "ready", label: "Ready" },
+    { key: "released", label: "Released" },
+    { key: "rejected", label: "Rejected" },
+];
+
+function requestRawId(request) {
+    if (!request) return null;
+    if (Number.isFinite(Number(request.raw_id))) return Number(request.raw_id);
+    if (Number.isFinite(Number(request.rawId))) return Number(request.rawId);
+    const match = String(request.request_id || "").match(/(\d+)/);
+    return match ? Number(match[1]) : null;
+}
+
+function isOngoingStatus(status) {
+    return ["pending", "approved", "ready", "processing"].includes(
+        String(status || "").toLowerCase(),
+    );
+}
+
+function RequestHistoryCard({ request, isLatest = false, onOpen = null }) {
+    const hasFee = Boolean(request?.has_fee ?? request?.hasFee);
+    const accent = hasFee ? "#f5d78e" : "#c7d2fe";
+    const tint = hasFee ? "#fff7e6" : "#eef2ff";
+    const status = String(request?.status || "pending").toLowerCase();
+
+    return (
+        <div style={{ border: `1.5px solid ${accent}`, borderRadius: 8, overflow: "hidden", background: "#fff" }}>
+            <div style={{ padding: "12px 14px", background: tint, display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "start" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, minWidth: 0 }}>
+                    <FileText size={15} color={hasFee ? "#b86800" : "#3730a3"} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {request?.cert_type || "Certificate Request"}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 1 }}>
+                            {request?.request_id || "REQ"} · Submitted {fmtDate(request?.requested_at)}
+                            {isLatest ? " · Latest" : ""}
+                        </div>
+                    </div>
+                </div>
+                <StatusBadge status={status} />
+            </div>
+            <div style={{ padding: "9px 14px", borderTop: `1px solid ${accent}`, display: "grid", gridTemplateColumns: "76px minmax(0,1fr)", gap: 8, alignItems: "start" }}>
+                <span style={{ fontSize: 10, color: "#9090aa", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8 }}>Purpose</span>
+                <span style={{ fontSize: 12.5, color: "#1a1a2e", lineHeight: 1.45 }}>{request?.purpose || "Not specified"}</span>
+            </div>
+            {status === "rejected" && request?.rejection_reason && (
+                <div style={{ padding: "9px 14px", borderTop: `1px solid ${accent}`, display: "grid", gridTemplateColumns: "76px minmax(0,1fr)", gap: 8, alignItems: "start", background: "#fff8f8" }}>
+                    <span style={{ fontSize: 10, color: "#b02020", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8 }}>Reason</span>
+                    <span style={{ fontSize: 12.5, color: "#7a2020", lineHeight: 1.45 }}>{request.rejection_reason}</span>
+                </div>
+            )}
+            <div style={{ padding: "9px 14px", borderTop: `1px solid ${accent}`, background: hasFee ? "#fff7e6" : "#e8f5ee", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 700, color: hasFee ? "#b86800" : "#1a7a4a" }}>
+                    <AlertCircle size={12} />
+                    {hasFee ? "With fee" : "Free"}
+                </span>
+                {onOpen && (
+                    <button
+                        type="button"
+                        onClick={() => onOpen(request)}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#fff", border: "1px solid #d8d2c6", borderRadius: 4, color: "#0e2554", fontFamily: "'Source Serif 4',serif", fontSize: 11.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                    >
+                        <FileOutput size={12} /> Open
+                    </button>
+                )}
+            </div>
+        </div>
     );
 }
 
@@ -67,9 +144,11 @@ export default function AdminQRScannerModal({
     // Release-context props (optional — passed from ManageRequests)
     onReleaseConfirm = null,
     releaseHasFee    = false,
+    releaseRequestId = null,
 }) {
     const [state, setState]       = useState("idle");
     const [scanData, setScanData] = useState(null);
+    const [requestFilter, setRequestFilter] = useState("all");
     const [errorMsg, setErrorMsg] = useState("");
     const [camReady, setCamReady] = useState(false);
     const [flash, setFlash]       = useState(false);
@@ -233,6 +312,7 @@ export default function AdminQRScannerModal({
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         pausedRef.current = false;
         setScanData(null);
+        setRequestFilter("all");
         setErrorMsg("");
         setReleaseLoading(false);
         if (streamRef.current) { setState("scanning"); rafRef.current = requestAnimationFrame(() => startScanLoop(streamRef.current)); }
@@ -251,7 +331,7 @@ export default function AdminQRScannerModal({
     };
 
     const modalRadius = isMobile ? "16px 16px 0 0" : "10px";
-    const modalWidth  = isMobile ? "100%" : "440px";
+    const modalWidth  = isMobile ? "100%" : state === "result" ? "680px" : "440px";
 
     const subtitle = {
         idle:     "Camera access required to scan",
@@ -262,6 +342,53 @@ export default function AdminQRScannerModal({
         error:    "Unrecognised QR code",
         denied:   "Camera access unavailable",
     }[state] ?? "";
+
+    const residentRequests = Array.isArray(scanData?.requests)
+        ? scanData.requests
+        : scanData?.latestRequest
+          ? [scanData.latestRequest]
+          : [];
+    const releaseTargetRequest =
+        residentRequests.find(
+            (request) => requestRawId(request) === Number(releaseRequestId),
+        ) ||
+        scanData?.latestRequest ||
+        residentRequests[0] ||
+        null;
+    const primaryRequest = onReleaseConfirm
+        ? releaseTargetRequest
+        : scanData?.latestRequest;
+    const filteredRequests = residentRequests.filter((request, index) => {
+        const status = String(request.status || "").toLowerCase();
+        if (requestFilter === "all") return true;
+        if (requestFilter === "latest") return index === 0;
+        if (requestFilter === "ongoing") return isOngoingStatus(status);
+        return status === requestFilter;
+    });
+    const requestCountForFilter = (filterKey) =>
+        residentRequests.filter((request, index) => {
+            const status = String(request.status || "").toLowerCase();
+            if (filterKey === "all") return true;
+            if (filterKey === "latest") return index === 0;
+            if (filterKey === "ongoing") return isOngoingStatus(status);
+            return status === filterKey;
+        }).length;
+    const openRequestInManageRequests = (request) => {
+        const rawId = requestRawId(request);
+        if (!rawId) return;
+        const status = String(request.status || "").toLowerCase();
+        const statusParam = [
+            "pending",
+            "approved",
+            "ready",
+            "released",
+            "rejected",
+        ].includes(status)
+            ? `&status=${encodeURIComponent(status)}`
+            : "";
+        onClose();
+        onNavigate?.(`/admin/manage-requests?requestId=${rawId}${statusParam}`);
+    };
 
     return (
         // z-index 600 — sits above the ManageRequests drawer (500) and other overlays
@@ -277,7 +404,7 @@ export default function AdminQRScannerModal({
                 .qr-in { animation: qr-in .28s ease both; }
             `}</style>
 
-            <div style={{ width: modalWidth, borderRadius: modalRadius, background: "#fff", boxShadow: "0 8px 40px rgba(0,0,0,.3)", overflow: "hidden", maxHeight: isMobile ? "92vh" : "auto", display: "flex", flexDirection: "column", fontFamily: "'Source Serif 4', serif" }}>
+            <div style={{ width: modalWidth, borderRadius: modalRadius, background: "#fff", boxShadow: "0 8px 40px rgba(0,0,0,.3)", overflow: "hidden", maxHeight: isMobile ? "92vh" : state === "result" ? "86vh" : "auto", display: "flex", flexDirection: "column", fontFamily: "'Source Serif 4', serif" }}>
 
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: "linear-gradient(135deg, #0e2554, #163066)", flexShrink: 0 }}>
@@ -426,34 +553,75 @@ export default function AdminQRScannerModal({
                             <Check size={18} color="#1a7a4a" strokeWidth={2.5} />
                         </div>
 
-                        {scanData.latestRequest ? (
+                        {primaryRequest ? (
                             <>
                                 <div style={{ fontSize: 10, fontWeight: 700, color: "#9090aa", textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 10 }}>
                                     {onReleaseConfirm ? "Request Being Released" : "Latest Request"}
                                 </div>
 
-                                <div style={{ border: `1.5px solid ${scanData.latestRequest.has_fee ? "#f5d78e" : "#c7d2fe"}`, borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
-                                    <div style={{ padding: "12px 16px", background: scanData.latestRequest.has_fee ? "#fff7e6" : "#eef2ff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                                <div style={{ border: `1.5px solid ${primaryRequest.has_fee ? "#f5d78e" : "#c7d2fe"}`, borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
+                                    <div style={{ padding: "12px 16px", background: primaryRequest.has_fee ? "#fff7e6" : "#eef2ff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                            <FileText size={15} color={scanData.latestRequest.has_fee ? "#b86800" : "#3730a3"} strokeWidth={1.8} />
+                                            <FileText size={15} color={primaryRequest.has_fee ? "#b86800" : "#3730a3"} strokeWidth={1.8} />
                                             <div>
-                                                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>{scanData.latestRequest.cert_type}</div>
-                                                <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 1 }}>{scanData.latestRequest.request_id} · Submitted {fmtDate(scanData.latestRequest.requested_at)}</div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e" }}>{primaryRequest.cert_type}</div>
+                                                <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 1 }}>{primaryRequest.request_id} · Submitted {fmtDate(primaryRequest.requested_at)}</div>
                                             </div>
                                         </div>
-                                        <StatusBadge status={scanData.latestRequest.status} />
+                                        <StatusBadge status={primaryRequest.status} />
                                     </div>
-                                    <div style={{ padding: "10px 16px", borderTop: `1px solid ${scanData.latestRequest.has_fee ? "#f5d78e" : "#c7d2fe"}`, background: "#fff", display: "flex", gap: 8, alignItems: "center" }}>
+                                    <div style={{ padding: "10px 16px", borderTop: `1px solid ${primaryRequest.has_fee ? "#f5d78e" : "#c7d2fe"}`, background: "#fff", display: "flex", gap: 8, alignItems: "center" }}>
                                         <span style={{ fontSize: 10, color: "#9090aa", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.8, flexShrink: 0 }}>Purpose</span>
-                                        <span style={{ fontSize: 12.5, color: "#1a1a2e" }}>{scanData.latestRequest.purpose}</span>
+                                        <span style={{ fontSize: 12.5, color: "#1a1a2e" }}>{primaryRequest.purpose}</span>
                                     </div>
-                                    <div style={{ padding: "10px 16px", borderTop: `1px solid ${scanData.latestRequest.has_fee ? "#f5d78e" : "#c7d2fe"}`, background: scanData.latestRequest.has_fee ? "#fff7e6" : "#e8f5ee", display: "flex", gap: 8, alignItems: "center" }}>
-                                        <AlertCircle size={13} color={scanData.latestRequest.has_fee ? "#b86800" : "#1a7a4a"} style={{ flexShrink: 0 }} />
-                                        <span style={{ fontSize: 12, fontWeight: 700, color: scanData.latestRequest.has_fee ? "#b86800" : "#1a7a4a" }}>
-                                            {scanData.latestRequest.has_fee ? "Fee required — collect payment before releasing" : "No fee — ready to release directly"}
+                                    <div style={{ padding: "10px 16px", borderTop: `1px solid ${primaryRequest.has_fee ? "#f5d78e" : "#c7d2fe"}`, background: primaryRequest.has_fee ? "#fff7e6" : "#e8f5ee", display: "flex", gap: 8, alignItems: "center" }}>
+                                        <AlertCircle size={13} color={primaryRequest.has_fee ? "#b86800" : "#1a7a4a"} style={{ flexShrink: 0 }} />
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: primaryRequest.has_fee ? "#b86800" : "#1a7a4a" }}>
+                                            {primaryRequest.has_fee ? "Fee required — collect payment before releasing" : "No fee — ready to release directly"}
                                         </span>
                                     </div>
                                 </div>
+
+                                {!onReleaseConfirm && residentRequests.length > 0 && (
+                                    <div style={{ marginBottom: 16 }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+                                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9090aa", textTransform: "uppercase", letterSpacing: 1.2 }}>
+                                                All Certificate Requests
+                                            </div>
+                                            <div style={{ fontSize: 11, color: "#9090aa" }}>
+                                                {residentRequests.length} total
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                                            {REQUEST_FILTERS.map((filter) => {
+                                                const count = requestCountForFilter(filter.key);
+                                                if (filter.key !== "all" && count === 0) return null;
+                                                const active = requestFilter === filter.key;
+                                                return (
+                                                    <button
+                                                        key={filter.key}
+                                                        type="button"
+                                                        onClick={() => setRequestFilter(filter.key)}
+                                                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 20, border: `1.5px solid ${active ? "#0e2554" : "#e4dfd4"}`, background: active ? "#0e2554" : "#fff", color: active ? "#fff" : "#4a4a6a", fontFamily: "'Source Serif 4',serif", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+                                                    >
+                                                        {filter.label}
+                                                        <span style={{ fontSize: 10, opacity: active ? 0.85 : 0.65 }}>{count}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        <div style={{ display: "grid", gap: 10, maxHeight: isMobile ? "38vh" : "36vh", overflowY: "auto", paddingRight: 2 }}>
+                                            {filteredRequests.map((request, index) => (
+                                                <RequestHistoryCard
+                                                    key={request.raw_id || request.request_id || index}
+                                                    request={request}
+                                                    isLatest={residentRequests.indexOf(request) === 0}
+                                                    onOpen={openRequestInManageRequests}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Release context: fee warning + confirm button */}
                                 {onReleaseConfirm ? (
@@ -495,9 +663,9 @@ export default function AdminQRScannerModal({
                                     <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
                                         <Clock size={22} color="#c4bfb5" />
                                     </div>
-                                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: 700, color: "#0e2554", marginBottom: 6 }}>No Active Request</div>
+                                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: 700, color: "#0e2554", marginBottom: 6 }}>No Certificate Requests</div>
                                     <p style={{ fontSize: 12.5, color: "#9090aa", margin: "0 0 20px", lineHeight: 1.6 }}>
-                                        This resident has no pending or processing request.
+                                        This resident has no certificate requests on record.
                                     </p>
                                 </div>
                                 <button onClick={handleReset} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px", background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 4, color: "#4a4a6a", fontFamily: "'Source Serif 4',serif", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>

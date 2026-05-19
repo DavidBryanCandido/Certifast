@@ -746,6 +746,11 @@ function PrintPreviewModal({
         "December",
     ];
     const dateStr = `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+    const barangayName = settings?.brgy_name || "Barangay East Tapinac";
+    const barangayCity = settings?.brgy_city || "City of Olongapo";
+    const barangayAddress =
+        settings?.brgy_address ||
+        "54 - 14th Street corner Gallagher Street, Olongapo City";
 
     const buildBody = () => {
         const name    = formData.residentName;
@@ -765,30 +770,30 @@ function PrintPreviewModal({
 
         const person = `<strong style="text-decoration:underline;text-transform:uppercase;">${name}</strong>, ${age}y/o, born on <strong>${dob}</strong>, ${civil}, ${nat} citizen`;
 
-        let body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, and presently residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is personally known to this office to be a person of good standing in the community.`;
+        let body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, and presently residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, is personally known to this office to be a person of good standing in the community.`;
 
         if (cert.name === "Certificate of Indigency") {
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, belongs to an indigent family within the jurisdiction of this barangay and is qualified to avail of government assistance programs.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, belongs to an indigent family within the jurisdiction of this barangay and is qualified to avail of government assistance programs.`;
         } else if (cert.name === "Certificate of Residency") {
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, with good moral character and a law-abiding citizen, is presently residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, with good moral character and a law-abiding citizen, is presently residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}.`;
         } else if (cert.name === "Business Permit" || cert.name === "Barangay Business Clearance (Renewal)") {
             const bname = formData.businessName ? ` known as <strong>${formData.businessName}</strong>` : "";
             const btype = formData.businessType ? ` for <strong>${formData.businessType}</strong>` : "";
             const barea = formData.businessArea ? ` covering an area of <strong>${formData.businessArea}</strong>` : "";
             const baddr = formData.businessAddress ? ` located at <strong>${formData.businessAddress}</strong>` : "";
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is hereby authorized to operate a business establishment${bname}${btype}${baddr}${barea}.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, is hereby authorized to operate a business establishment${bname}${btype}${baddr}${barea}.`;
         } else if (cert.name === "Certificate of Cohabitation" && formData.partnerName) {
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, and <strong style="text-decoration:underline;text-transform:uppercase;">${formData.partnerName}</strong> are known to this office to be cohabiting as a couple within the jurisdiction of this barangay.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, and <strong style="text-decoration:underline;text-transform:uppercase;">${formData.partnerName}</strong> are known to this office to be cohabiting as a couple within the jurisdiction of this barangay.`;
         } else if (cert.name === "Certificate of Guardianship" && formData.wardName) {
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is the legal guardian of <strong style="text-decoration:underline;text-transform:uppercase;">${formData.wardName}</strong> as ${formData.relationship || "guardian"}.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, is the legal guardian of <strong style="text-decoration:underline;text-transform:uppercase;">${formData.wardName}</strong> as ${formData.relationship || "guardian"}.`;
         } else if (cert.name === "Certificate of Live Birth (Endorsement)" && formData.childName) {
             const childDOBStr = formData.childDOB
                 ? new Date(formData.childDOB).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
                 : "";
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is endorsing the late registration of the birth of <strong style="text-decoration:underline;text-transform:uppercase;">${formData.childName}</strong>${childDOBStr ? `, born on <strong>${childDOBStr}</strong>` : ""}${formData.fatherName ? `, father: <strong>${formData.fatherName}</strong>` : ""}${formData.motherName ? `, mother: <strong>${formData.motherName}</strong>` : ""}.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, is endorsing the late registration of the birth of <strong style="text-decoration:underline;text-transform:uppercase;">${formData.childName}</strong>${childDOBStr ? `, born on <strong>${childDOBStr}</strong>` : ""}${formData.fatherName ? `, father: <strong>${formData.fatherName}</strong>` : ""}${formData.motherName ? `, mother: <strong>${formData.motherName}</strong>` : ""}.`;
         } else if (cert.name === "Good Moral Certificate") {
             const inst = formData.requestingInstitution ? ` for submission to <strong>${formData.requestingInstitution}</strong>` : "";
-            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, Barangay East Tapinac, Olongapo City, is a person of good moral character and is known to this office as a law-abiding citizen of the barangay${inst}.`;
+            body = `TO WHOM IT MAY CONCERN:<br/><br/>This is to certify that ${person}, residing at <strong>${address}</strong>, ${barangayName}, ${barangayCity}, is a person of good moral character and is known to this office as a law-abiding citizen of the barangay${inst}.`;
         }
 
         body += `<br/><br/>This certification is being issued upon the request of the above-named individual for <strong>${purpose}</strong> and for whatever legal purpose it may serve.`;
@@ -920,7 +925,7 @@ function PrintPreviewModal({
                                     marginTop: 2,
                                 }}
                             >
-                                City Government of Olongapo · Zambales
+                                {barangayCity} · Zambales
                             </div>
                             <div
                                 style={{
@@ -931,7 +936,7 @@ function PrintPreviewModal({
                                     marginTop: 2,
                                 }}
                             >
-                                Barangay East Tapinac
+                                {barangayName}
                             </div>
                             <div
                                 style={{
@@ -940,8 +945,7 @@ function PrintPreviewModal({
                                     marginTop: 3,
                                 }}
                             >
-                                54 – 14th Street corner Gallagher Street,
-                                Olongapo City
+                                {barangayAddress}
                             </div>
                         </div>
                         <hr
@@ -995,7 +999,7 @@ function PrintPreviewModal({
                             }}
                         >
                             <div style={{ fontSize: 11, color: "#4a4a6a" }}>
-                                Issued at Barangay East Tapinac
+                                Issued at {barangayName}
                                 <br />
                                 <strong
                                     style={{

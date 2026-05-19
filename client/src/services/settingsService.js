@@ -56,3 +56,48 @@ export const updateBarangaySettings = async (settings, token) => {
     const json = await readJsonSafe(res);
     return json;
 };
+
+export const getCertificateTemplates = async (
+    token,
+    { includeInactive = false } = {},
+) => {
+    const params = new URLSearchParams();
+    if (includeInactive) params.set("includeInactive", "true");
+
+    const res = await fetch(
+        `${API_URL}/admin/certificates/templates${params.toString() ? `?${params.toString()}` : ""}`,
+        {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+        },
+    );
+
+    if (!res.ok) {
+        const error = await readJsonSafe(res);
+        throw new Error(error.message || "Failed to fetch certificate templates");
+    }
+
+    const json = await readJsonSafe(res);
+    return json.data;
+};
+
+export const updateCertificateTemplate = async (templateId, updates, token) => {
+    const res = await fetch(`${API_URL}/admin/certificates/templates/${templateId}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updates),
+    });
+
+    if (!res.ok) {
+        const error = await readJsonSafe(res);
+        throw new Error(error.message || "Failed to update certificate template");
+    }
+
+    return readJsonSafe(res);
+};

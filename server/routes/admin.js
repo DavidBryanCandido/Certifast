@@ -9,6 +9,7 @@ const {
     approveRequest,
     rejectRequest,
     getCertificateTemplates,
+    updateCertificateTemplate,
     issueWalkIn,
     getTodayWalkIn,
     getWalkInReprint,
@@ -59,6 +60,7 @@ router.post("/requests/:id/reject", adminAuth, rejectRequest);
 router.post("/requests/:id/mark-ready", adminAuth, markRequestReady);
 router.post("/requests/:id/release", adminAuth, releaseRequest);
 router.get("/certificates/templates", adminAuth, getCertificateTemplates);
+router.put("/certificates/templates/:id", adminAuth, updateCertificateTemplate);
 router.post("/walkin/issue", adminAuth, issueWalkIn);
 router.get("/walkin/today", adminAuth, getTodayWalkIn);
 router.get("/walkin/:id/reprint", adminAuth, getWalkInReprint);
