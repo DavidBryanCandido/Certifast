@@ -35,7 +35,7 @@ import {
     getPublicBrandingSettings,
 } from "../../services/publicBrandingService";
 import {
-    DOC1_CERTIFICATE_OPTIONS,
+    CERTIFICATE_TEMPLATE_OPTIONS,
     getTemplateFieldLabels,
 } from "../../utils/certificateTemplateEngine";
 
@@ -101,7 +101,7 @@ function withIcon(cert) {
     };
 }
 
-const ALL_CERTS = DOC1_CERTIFICATE_OPTIONS.map(withIcon);
+const ALL_CERTS = CERTIFICATE_TEMPLATE_OPTIONS.map(withIcon);
 const CERTS_PER_PAGE_DESKTOP = 8;
 const CERTS_PER_PAGE_MOBILE = 5;
 

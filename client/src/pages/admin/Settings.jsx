@@ -7,12 +7,13 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
-import { ChevronLeft, ChevronRight, Eye, Menu, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, HelpCircle, Menu, Search, X } from "lucide-react";
 import * as settingsService from "../../services/settingsService";
 import { DEFAULT_OFFICE_SCHEDULE } from "../../services/publicBrandingService";
 import {
-    DOC1_CERTIFICATE_OPTIONS,
+    CERTIFICATE_TEMPLATE_OPTIONS,
     buildCertificatePrintHtml,
+    getSignatoryTemplateUsage,
     getTemplateFieldLabels,
 } from "../../utils/certificateTemplateEngine";
 
@@ -62,6 +63,9 @@ function useSettingsStyles() {
         .st-field { display:flex; flex-direction:column; gap:6px; }
         .st-field label { font-size:10.5px; font-weight:600; color:#4a4a6a; letter-spacing:1.2px; text-transform:uppercase; }
         .st-field label .req { color:#b02020; margin-left:2px; }
+        .st-label-with-help { display:flex; align-items:center; gap:7px; }
+        .st-help-btn { width:18px; height:18px; border:1px solid #d8cfbd; border-radius:50%; background:#fff; color:#4a4a6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
+        .st-help-btn:hover { border-color:#0e2554; color:#0e2554; background:#edf1fa; }
         .st-field input, .st-field textarea, .st-field select {
             width:100%; padding:10px 14px;
             border:1.5px solid #e4dfd4; border-radius:4px;
@@ -151,6 +155,12 @@ function useSettingsStyles() {
         .st-modal-title { font-family:'Playfair Display',serif; font-size:15px; color:#fff; font-weight:700; }
         .st-modal-close { background:none; border:none; cursor:pointer; color:rgba(255,255,255,.6); }
         .st-modal-body { padding:20px 24px; }
+        .st-usage-summary { font-size:12px; color:#4a4a6a; line-height:1.55; margin-bottom:12px; }
+        .st-usage-list { display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto; padding-right:4px; }
+        .st-usage-item { border:1px solid #eee7da; border-radius:5px; padding:10px 12px; background:#fbfaf7; }
+        .st-usage-name { font-size:12.5px; font-weight:700; color:#0e2554; }
+        .st-usage-desc { font-size:10.8px; color:#77758d; margin-top:2px; line-height:1.4; }
+        .st-usage-key { font-family:'Courier New',monospace; font-size:10px; color:#9090aa; margin-top:5px; }
         .st-modal-canvas { width:100%; height:180px; border:1.5px solid #e4dfd4; border-radius:4px; background:#fff; cursor:crosshair; display:block; touch-action:none; }
         .st-modal-hint { font-size:10.5px; color:#9090aa; text-align:center; margin-top:6px; }
         .st-modal-footer { padding:14px 24px; border-top:1px solid #e4dfd4; display:flex; justify-content:space-between; align-items:center; background:#f8f6f1; }
@@ -205,6 +215,29 @@ function useSettingsStyles() {
 
 const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
 const CERT_TYPES_PER_PAGE = 8;
+
+const SIGNATORY_HELP_META = {
+    captain: {
+        title: "Punong Barangay (Captain)",
+        note: "Templates where the Punong Barangay appears as the approving signatory.",
+    },
+    kagawad: {
+        title: "Barangay Kagawad",
+        note: "Templates that use the main Kagawad slot, usually beside or instead of the captain.",
+    },
+    kagawad1: {
+        title: "Witness Kagawad 1",
+        note: "Templates that place this Kagawad in a witness or Kagawad-only signature block.",
+    },
+    kagawad2: {
+        title: "Witness Kagawad 2",
+        note: "Templates that place this Kagawad in a witness or Kagawad-only signature block.",
+    },
+    kagawad3: {
+        title: "Kagawad 3",
+        note: "Templates that use the third Kagawad signature slot from Doc #2.",
+    },
+};
 
 function dataUrlByteSize(dataUrl) {
     const base64 = String(dataUrl || "").split(",")[1] || "";
@@ -278,7 +311,7 @@ async function optimizeImageForSettings(file) {
 }
 
 // ─── Cert types initial data ──────────────────────────────────
-const INITIAL_CERT_TYPES = DOC1_CERTIFICATE_OPTIONS.map((cert, index) => ({
+const INITIAL_CERT_TYPES = CERTIFICATE_TEMPLATE_OPTIONS.map((cert, index) => ({
     id: cert.templateKey || index + 1,
     templateId: null,
     templateKey: cert.templateKey || "",
@@ -337,12 +370,28 @@ function sampleValueForTemplateField(key) {
         return "2026-05-19";
     }
     if (normalized.includes("age")) return "35";
+    if (normalized.includes("gender")) return "Female";
     if (normalized.includes("amount")) return "5000";
     if (normalized.includes("area")) return "24 sqm";
     if (normalized.includes("address")) return "Purok 8, Del Pilar Street";
     if (normalized.includes("business")) return "Dela Cruz Sari-Sari Store";
     if (normalized.includes("relationship")) return "son";
     if (normalized.includes("purpose")) return "Employment";
+    if (normalized.includes("partner") || normalized.includes("spouse")) {
+        return "Maria Santos";
+    }
+    if (normalized.includes("companiontwoname")) return "Keisha Dela Cruz";
+    if (normalized.includes("companionname")) return "Mark Anthony Ramirez";
+    if (normalized.includes("companionrole")) return "Driver";
+    if (normalized.includes("companiontworole")) return "Passenger";
+    if (normalized.includes("wardthreename")) return "Czyrine Bordios";
+    if (normalized.includes("wardtwoname")) return "Keisha Bordios";
+    if (normalized.includes("wardname")) return "Aleah Bordios";
+    if (normalized.includes("boundarynorth")) return "ALN 167 Right of Way";
+    if (normalized.includes("boundaryeast")) return "ALN 167";
+    if (normalized.includes("boundarysouth")) return "ALN 016";
+    if (normalized.includes("boundarywest")) return "ALN 013";
+    if (normalized.includes("bordersize")) return "300 sqm";
     if (normalized.includes("name")) return "Juan Dela Cruz";
     return "Sample information";
 }
@@ -491,6 +540,64 @@ function TemplatePreviewModal({ cert, settings, onClose }) {
 }
 
 // ─── Signature Block Sub-component ───────────────────────────
+function SignatoryUsageModal({ slot, usage, onClose }) {
+    if (!slot) return null;
+    const meta = SIGNATORY_HELP_META[slot] || {
+        title: "Signatory",
+        note: "Templates that use this signatory slot.",
+    };
+
+    return (
+        <div className="st-modal-overlay open" style={{ zIndex: 3200 }}>
+            <div className="st-modal" style={{ width: 620, maxWidth: "95vw" }}>
+                <div className="st-modal-header">
+                    <div>
+                        <div className="st-modal-title">{meta.title}</div>
+                        <div
+                            style={{
+                                fontSize: 11,
+                                color: "rgba(255,255,255,.65)",
+                                marginTop: 3,
+                            }}
+                        >
+                            Certificate signature usage
+                        </div>
+                    </div>
+                    <button className="st-modal-close" onClick={onClose}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="st-modal-body">
+                    <div className="st-usage-summary">
+                        {meta.note} <strong>{usage.length}</strong>{" "}
+                        {usage.length === 1 ? "template uses" : "templates use"} this slot.
+                    </div>
+                    <div className="st-usage-list">
+                        {usage.length === 0 ? (
+                            <div className="st-usage-item">
+                                <div className="st-usage-name">No templates yet</div>
+                                <div className="st-usage-desc">
+                                    This signatory slot is configured but not currently used by a template layout.
+                                </div>
+                            </div>
+                        ) : (
+                            usage.map((item) => (
+                                <div className="st-usage-item" key={item.templateKey}>
+                                    <div className="st-usage-name">{item.name}</div>
+                                    {item.desc && (
+                                        <div className="st-usage-desc">{item.desc}</div>
+                                    )}
+                                    <div className="st-usage-key">{item.templateKey}</div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SigBlock({ id, label, sublabel, sig, onSet, onClear, onDraw }) {
     const fileRef = useRef();
     const handleFile = (e) => {
@@ -884,6 +991,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         kagawad1Title: "Barangay Kagawad",
         kagawad2Name: "Hon. Florencia S. Abad",
         kagawad2Title: "Barangay Kagawad",
+        kagawad3Name: "Hon. Andrea A. Austria",
+        kagawad3Title: "Barangay Kagawad",
         secondaryName: "",
         secondaryTitle: "",
     });
@@ -891,6 +1000,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [sig2, setSig2] = useState(null);
     const [drawModal, setDrawModal] = useState({ open: false, target: null });
     const [templatePreviewCert, setTemplatePreviewCert] = useState(null);
+    const [signatoryHelpSlot, setSignatoryHelpSlot] = useState(null);
+    const signatoryUsage = useMemo(() => getSignatoryTemplateUsage(), []);
     const templatePreviewSettings = useMemo(
         () => ({
             brgy_name: brgyInfo.name,
@@ -908,6 +1019,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             kagawad_1_title: officials.kagawad1Title,
             kagawad_2_name: officials.kagawad2Name,
             kagawad_2_title: officials.kagawad2Title,
+            kagawad_3_name: officials.kagawad3Name,
+            kagawad_3_title: officials.kagawad3Title,
             secondary_name: officials.secondaryName,
             secondary_title: officials.secondaryTitle,
             captain_sig_base64: sig1 || "",
@@ -1078,6 +1191,16 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                     setOfficials((prev) => ({
                         ...prev,
                         kagawad2Title: data.kagawad_2_title,
+                    }));
+                if (data.kagawad_3_name)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawad3Name: data.kagawad_3_name,
+                    }));
+                if (data.kagawad_3_title)
+                    setOfficials((prev) => ({
+                        ...prev,
+                        kagawad3Title: data.kagawad_3_title,
                     }));
                 if (data.secondary_name)
                     setOfficials((prev) => ({
@@ -1250,6 +1373,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 kagawad_1_title: officials.kagawad1Title,
                 kagawad_2_name: officials.kagawad2Name,
                 kagawad_2_title: officials.kagawad2Title,
+                kagawad_3_name: officials.kagawad3Name,
+                kagawad_3_title: officials.kagawad3Title,
                 secondary_name: officials.secondaryName,
                 secondary_title: officials.secondaryTitle,
                 captain_sig_base64: sig1 || "",
@@ -2547,8 +2672,22 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                     >
                                         <div className="st-field">
                                             <label>
-                                                Punong Barangay (Captain){" "}
-                                                <span className="req">*</span>
+                                                <span className="st-label-with-help">
+                                                    <span>
+                                                        Punong Barangay (Captain){" "}
+                                                        <span className="req">*</span>
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        className="st-help-btn"
+                                                        title="Show certificate usage"
+                                                        onClick={() =>
+                                                            setSignatoryHelpSlot("captain")
+                                                        }
+                                                    >
+                                                        <HelpCircle size={12} />
+                                                    </button>
+                                                </span>
                                             </label>
                                             <input
                                                 type="text"
@@ -2582,7 +2721,21 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         style={{ marginBottom: 18 }}
                                     >
                                         <div className="st-field">
-                                            <label>Barangay Kagawad</label>
+                                            <label>
+                                                <span className="st-label-with-help">
+                                                    <span>Barangay Kagawad</span>
+                                                    <button
+                                                        type="button"
+                                                        className="st-help-btn"
+                                                        title="Show certificate usage"
+                                                        onClick={() =>
+                                                            setSignatoryHelpSlot("kagawad")
+                                                        }
+                                                    >
+                                                        <HelpCircle size={12} />
+                                                    </button>
+                                                </span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 value={officials.kagawadName}
@@ -2610,7 +2763,21 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             />
                                         </div>
                                         <div className="st-field">
-                                            <label>Witness Kagawad 1</label>
+                                            <label>
+                                                <span className="st-label-with-help">
+                                                    <span>Witness Kagawad 1</span>
+                                                    <button
+                                                        type="button"
+                                                        className="st-help-btn"
+                                                        title="Show certificate usage"
+                                                        onClick={() =>
+                                                            setSignatoryHelpSlot("kagawad1")
+                                                        }
+                                                    >
+                                                        <HelpCircle size={12} />
+                                                    </button>
+                                                </span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 value={officials.kagawad1Name}
@@ -2624,7 +2791,21 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             />
                                         </div>
                                         <div className="st-field">
-                                            <label>Witness Kagawad 2</label>
+                                            <label>
+                                                <span className="st-label-with-help">
+                                                    <span>Witness Kagawad 2</span>
+                                                    <button
+                                                        type="button"
+                                                        className="st-help-btn"
+                                                        title="Show certificate usage"
+                                                        onClick={() =>
+                                                            setSignatoryHelpSlot("kagawad2")
+                                                        }
+                                                    >
+                                                        <HelpCircle size={12} />
+                                                    </button>
+                                                </span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 value={officials.kagawad2Name}
@@ -2632,6 +2813,48 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     setOfficials({
                                                         ...officials,
                                                         kagawad2Name:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="st-field">
+                                            <label>
+                                                <span className="st-label-with-help">
+                                                    <span>Kagawad 3</span>
+                                                    <button
+                                                        type="button"
+                                                        className="st-help-btn"
+                                                        title="Show certificate usage"
+                                                        onClick={() =>
+                                                            setSignatoryHelpSlot("kagawad3")
+                                                        }
+                                                    >
+                                                        <HelpCircle size={12} />
+                                                    </button>
+                                                </span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={officials.kagawad3Name}
+                                                onChange={(e) =>
+                                                    setOfficials({
+                                                        ...officials,
+                                                        kagawad3Name:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="st-field">
+                                            <label>Kagawad 3 Title</label>
+                                            <input
+                                                type="text"
+                                                value={officials.kagawad3Title}
+                                                onChange={(e) =>
+                                                    setOfficials({
+                                                        ...officials,
+                                                        kagawad3Title:
                                                             e.target.value,
                                                     })
                                                 }
@@ -2733,6 +2956,10 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     kagawad2Name:
                                                         "Hon. Florencia S. Abad",
                                                     kagawad2Title:
+                                                        "Barangay Kagawad",
+                                                    kagawad3Name:
+                                                        "Hon. Andrea A. Austria",
+                                                    kagawad3Title:
                                                         "Barangay Kagawad",
                                                     secondaryName: "",
                                                     secondaryTitle: "",
@@ -3082,6 +3309,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 cert={templatePreviewCert}
                 settings={templatePreviewSettings}
                 onClose={() => setTemplatePreviewCert(null)}
+            />
+            <SignatoryUsageModal
+                slot={signatoryHelpSlot}
+                usage={signatoryUsage[signatoryHelpSlot] || []}
+                onClose={() => setSignatoryHelpSlot(null)}
             />
         </div>
     );

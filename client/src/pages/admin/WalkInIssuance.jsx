@@ -26,7 +26,7 @@ import {
 import walkInService from "../../services/walkInService";
 import * as settingsService from "../../services/settingsService";
 import {
-    DOC1_CERTIFICATE_OPTIONS,
+    CERTIFICATE_TEMPLATE_OPTIONS,
     buildCertificatePrintHtml,
 } from "../../utils/certificateTemplateEngine";
 import {
@@ -162,7 +162,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
 // =============================================================
 // Certificate registry fallback
 // =============================================================
-const ALL_CERTS = DOC1_CERTIFICATE_OPTIONS;
+const ALL_CERTS = CERTIFICATE_TEMPLATE_OPTIONS;
 
 // Quick cards shown without opening modal (first 6)
 const QUICK_CERTS = ALL_CERTS.slice(0, 6);
