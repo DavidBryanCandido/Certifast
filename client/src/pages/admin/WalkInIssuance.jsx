@@ -13,7 +13,6 @@ import {
     UserCog,
     Settings,
     LogOut,
-    Calendar,
     Search,
     X,
     Eye,
@@ -28,11 +27,14 @@ import * as settingsService from "../../services/settingsService";
 import {
     CERTIFICATE_TEMPLATE_OPTIONS,
     buildCertificatePrintHtml,
+    getTemplateFieldLabels,
 } from "../../utils/certificateTemplateEngine";
 import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 
 // =============================================================
 // useWindowSize
@@ -170,14 +172,6 @@ const QUICK_CERTS = ALL_CERTS.slice(0, 6);
 // =============================================================
 // Helpers
 // =============================================================
-function formatDate() {
-    return new Date().toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
-}
 function formatDateShort() {
     return new Date().toLocaleDateString("en-US", {
         month: "short",
@@ -204,6 +198,94 @@ const initials = (name = "") =>
         .slice(0, 2)
         .map((part) => part[0].toUpperCase())
         .join("");
+
+const BASE_WALK_IN_FIELDS = new Set([
+    "residentName",
+    "dateOfBirth",
+    "civilStatus",
+    "nationality",
+    "address",
+    "purpose",
+    "age",
+]);
+
+const WALK_IN_HANDLED_FIELDS_BY_NAME = {
+    "Business Permit": new Set([
+        "businessName",
+        "businessAddress",
+        "businessType",
+        "businessArea",
+    ]),
+    "Barangay Business Clearance (Renewal)": new Set([
+        "businessPermitNo",
+        "businessName",
+        "businessAddress",
+        "operatorName",
+        "businessOwnerAddress",
+    ]),
+    "Certificate of Cohabitation": new Set(["partnerName"]),
+    "Certificate of Guardianship": new Set(["wardName", "relationship"]),
+    "Certificate of Live Birth (Endorsement)": new Set([
+        "childName",
+        "childDOB",
+        "fatherName",
+        "motherName",
+    ]),
+    "Good Moral Certificate": new Set(["requestingInstitution"]),
+};
+
+function humanizeFieldKey(key) {
+    return String(key || "")
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function normalizeWalkInField(field, cert) {
+    const key =
+        typeof field === "string" ? field : field?.key || field?.name || "";
+    if (!key || BASE_WALK_IN_FIELDS.has(key)) return null;
+
+    const meta = getTemplateFieldLabels(cert?.templateKey, cert?.name).find(
+        (item) => item.key === key,
+    );
+
+    return {
+        key,
+        label: field?.label || meta?.label || humanizeFieldKey(key),
+        placeholder: field?.placeholder || "",
+        required: field?.required ?? meta?.required ?? true,
+        type:
+            field?.type ||
+            meta?.type ||
+            (key.toLowerCase().includes("date") ||
+            key.toLowerCase().includes("dob")
+                ? "date"
+                : "text"),
+        defaultValue: field?.defaultValue ?? meta?.defaultValue,
+    };
+}
+
+function getWalkInTemplateFields(cert) {
+    if (!cert) return [];
+    const rawFields =
+        Array.isArray(cert.fields) && cert.fields.length > 0
+            ? cert.fields
+            : getTemplateFieldLabels(cert.templateKey, cert.name);
+    const handled = WALK_IN_HANDLED_FIELDS_BY_NAME[cert.name] || new Set();
+
+    return rawFields
+        .map((field) => normalizeWalkInField(field, cert))
+        .filter((field) => field && !handled.has(field.key));
+}
+
+function defaultWalkInValues(fields = []) {
+    return Object.fromEntries(
+        fields
+            .filter((field) => field.defaultValue !== undefined)
+            .map((field) => [field.key, field.defaultValue]),
+    );
+}
 
 // =============================================================
 // Sidebar
@@ -1135,6 +1217,9 @@ export default function WalkInIssuance({
 
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
     const quickCerts = certs.slice(0, 6);
+    const walkInExtraFields = selectedCert
+        ? getWalkInTemplateFields(selectedCert)
+        : [];
 
     useEffect(() => {
         let mounted = true;
@@ -1188,7 +1273,7 @@ export default function WalkInIssuance({
     }, [onLogout]);
 
     const handleNavigate = (page) => {
-        setActivePage(page);
+        if (!String(page).startsWith("/")) setActivePage(page);
         if (navProp) navProp(page);
     };
 
@@ -1206,6 +1291,7 @@ export default function WalkInIssuance({
     };
 
     const handleSelectCert = (cert) => {
+        const templateFields = getWalkInTemplateFields(cert);
         setSelectedCert(cert);
         setFormData({
             residentName: "", dateOfBirth: "", civilStatus: "Single",
@@ -1215,13 +1301,18 @@ export default function WalkInIssuance({
             partnerName: "", wardName: "", relationship: "",
             childName: "", childDOB: "", fatherName: "", motherName: "",
             requestingInstitution: "",
+            ...defaultWalkInValues(templateFields),
         });
         setFormError("");
     };
 
     const handleFormChange = (e) => {
         setFormError("");
-        setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, type, checked, value } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            [name]: type === "checkbox" ? checked : value,
+        }));
     };
 
     const handleOpenPreview = () => {
@@ -1245,6 +1336,16 @@ export default function WalkInIssuance({
         }
         if (selectedCert.name === "Certificate of Live Birth (Endorsement)" && !formData.childName.trim()) {
             setFormError("Please enter the child's full name."); return;
+        }
+        for (const field of walkInExtraFields) {
+            if (
+                field.required &&
+                field.type !== "checkbox" &&
+                !String(formData[field.key] ?? "").trim()
+            ) {
+                setFormError(`Please enter ${field.label}.`);
+                return;
+            }
         }
         setFormError("");
         setShowPreview(true);
@@ -1520,12 +1621,12 @@ p { margin: 4px 0; font-size: 14px; }
                             </span>
                         )}
                     </div>
-                    {!isMobile && (
-                        <div style={tb.topbarDate}>
-                            <Calendar size={12} />
-                            {isTablet ? formatDateShort() : formatDate()}
-                        </div>
-                    )}
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={handleLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Page content */}
@@ -1918,6 +2019,44 @@ p { margin: 4px 0; font-size: 14px; }
                                     )}
 
                                     {/* Row 3 — purpose + action */}
+                                    {walkInExtraFields.length > 0 && (
+                                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, padding: "12px 14px", background: "#faf8ff", border: "1px solid #ede8ff", borderRadius: 6 }}>
+                                            <div style={{ gridColumn: "1 / -1", fontSize: 10, fontWeight: 700, color: "#6a3db8", textTransform: "uppercase", letterSpacing: 1 }}>Template Details</div>
+                                            {walkInExtraFields.map((field) => {
+                                                const checked =
+                                                    formData[field.key] !== undefined
+                                                        ? Boolean(formData[field.key])
+                                                        : Boolean(field.defaultValue);
+                                                return (
+                                                    <div key={field.key}>
+                                                        <div style={f.label}>
+                                                            {field.label}
+                                                            {field.required && field.type !== "checkbox" && (
+                                                                <span style={{ color: "#b02020" }}> *</span>
+                                                            )}
+                                                        </div>
+                                                        {field.type === "checkbox" ? (
+                                                            <label style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 36, padding: "8px 10px", border: "1.5px solid #e4dfd4", borderRadius: 4, background: "#fff", fontSize: 12.5, cursor: "pointer" }}>
+                                                                <input name={field.key} type="checkbox" checked={checked} onChange={handleFormChange} />
+                                                                <span>{checked ? "Yes" : "No"}</span>
+                                                            </label>
+                                                        ) : (
+                                                            <input
+                                                                className="wi-input"
+                                                                name={field.key}
+                                                                type={field.type || "text"}
+                                                                placeholder={field.placeholder || ""}
+                                                                value={formData[field.key] || ""}
+                                                                onChange={handleFormChange}
+                                                                max={field.type === "date" ? new Date().toISOString().split("T")[0] : undefined}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
                                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 10, alignItems: "flex-end" }}>
                                         <div>
                                             <div style={f.label}>Purpose <span style={{ color: "#b02020" }}>*</span></div>

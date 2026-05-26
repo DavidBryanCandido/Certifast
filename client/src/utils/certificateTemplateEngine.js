@@ -30,6 +30,8 @@ const FIELD_LABELS = {
     businessType: "Type of Business",
     businessArea: "Coverage / Area",
     businessPermitNo: "Barangay Permit No.",
+    businessCompliant: "Business is compliant",
+    businessNoObjection: "Interpose no objection",
     operatorName: "Operator / Manager",
     partnerName: "Partner's Full Name",
     wardName: "Ward's Full Name",
@@ -126,6 +128,189 @@ const FIELD_LABELS = {
     caregiverDescription: "Caregiver / Situation Details",
     wakeDays: "Wake Use Days",
     permitConditions: "Permit Conditions",
+    eventName: "Event Name",
+    eventOrganizer: "Event Organizer",
+    eventPartner: "Partner Organization",
+    eventDate: "Event Date",
+    eventTime: "Event Time",
+    eventVenue: "Event Venue",
+    dateIssued: "Date Issued",
+    validUntil: "Valid Until",
+    childAge: "Child Age",
+    childDetails: "Child Details",
+    nonResidentNames: "Non-Resident Names",
+    requestingOfficerName: "Requesting Officer Name",
+    requestingOfficerTitle: "Requesting Officer Title",
+    companyName: "Company / Applicant Name",
+    permitType: "Permit Type",
+    expirationDate: "Expiration Date",
+    ownerName: "Owner Name",
+    aliveStatus: "Alive / Well Status",
+    siblingName: "Sibling / Stepbrother Name",
+    siblingAge: "Sibling Age",
+    siblingGender: "Sibling Gender",
+    siblingDOB: "Sibling Date of Birth",
+    siblingBirthPlace: "Sibling Birth Place",
+    requesterAge: "Requester Age",
+    damageCause: "Damage Cause",
+    damageDate: "Damage Date",
+    damageTime: "Damage Time",
+    repatriationDate: "Repatriation Date",
+    unemploymentStartDate: "Unemployment Start Date",
+    businessClosureDate: "Business Closure Date",
+    businessStatusPeriod: "Business Status Period",
+    renovationStartDate: "Renovation Start Date",
+    renovationEndDate: "Renovation End Date",
+    occupation: "Occupation / Role",
+    incomeStartYear: "Income Start Year",
+    monthlyIncome: "Monthly Income",
+};
+
+const FIELD_TYPES = {
+    dateIssued: "date",
+    validUntil: "date",
+    businessCompliant: "checkbox",
+    businessNoObjection: "checkbox",
+};
+
+const FIELD_DEFAULTS = {
+    businessCompliant: false,
+    businessNoObjection: false,
+};
+
+const FIELD_REQUIRED = {
+    businessPermitNo: false,
+    dateIssued: false,
+    validUntil: false,
+    businessCompliant: false,
+    businessNoObjection: false,
+};
+
+const FIELD_ADMIN_ONLY = {
+    businessPermitNo: true,
+    dateIssued: true,
+    validUntil: true,
+    businessCompliant: true,
+    businessNoObjection: true,
+};
+
+function proof(key, label, required = true, accept = "image/*,.pdf") {
+    return { key, label, required, accept };
+}
+
+const PROOF_LIBRARY = {
+    requestLetter: proof(
+        "request_letter",
+        "Request letter or agency requirement document",
+    ),
+    business: proof(
+        "business_documents",
+        "Business registration, permit application, or authorization",
+    ),
+    businessRenewal: proof(
+        "business_renewal_documents",
+        "Previous permit or business renewal document",
+    ),
+    property: proof(
+        "property_documents",
+        "Property title, tax declaration, lease, or lot document",
+    ),
+    medical: proof("medical_documents", "Medical certificate, bill, or hospital document"),
+    school: proof("school_documents", "School requirement, enrollment, or assessment document"),
+    birth: proof("birth_record", "Birth certificate, PSA record, or civil registry document"),
+    guardianship: proof(
+        "guardianship_documents",
+        "Birth record, guardianship proof, or authorization document",
+    ),
+    death: proof("death_certificate", "Death certificate or funeral document"),
+    calamity: proof("calamity_proof", "Photo, incident report, or damage proof"),
+    employment: proof("employment_documents", "Employment, income, or job seeker document"),
+    legal: proof("legal_documents", "Legal document, court record, or agency request"),
+    event: proof("event_documents", "Event proposal, authorization, or organizer letter"),
+    assistance: proof("assistance_documents", "Assistance request, referral, or supporting document"),
+    travel: proof("travel_documents", "Travel, repatriation, or destination document"),
+};
+
+const TEMPLATE_PROOF_REQUIREMENTS = {
+    "doc1-barangay-clearance": [],
+    "doc1-certificate-residency": [],
+    "doc1-indigency-medical": [PROOF_LIBRARY.medical],
+    "doc1-work-permit-certification": [PROOF_LIBRARY.business],
+    "doc1-good-moral": [PROOF_LIBRARY.school],
+    "doc1-live-birth-endorsement": [PROOF_LIBRARY.birth],
+    "doc1-cohabitation": [],
+    "doc1-no-business": [PROOF_LIBRARY.business],
+    "doc1-guardianship": [PROOF_LIBRARY.guardianship],
+    "doc1-business-renewal-endorsement": [PROOF_LIBRARY.businessRenewal],
+    "doc1-property-ownership": [PROOF_LIBRARY.property],
+    "doc1-certificate-appearance": [PROOF_LIBRARY.legal],
+    "doc1-endorsement-toda-courtesy-call": [PROOF_LIBRARY.event],
+    "doc1-acceptance-letter-quarantine": [PROOF_LIBRARY.travel],
+    "doc1-household-angkas-pass": [PROOF_LIBRARY.requestLetter],
+    "doc1-family-home-property": [PROOF_LIBRARY.property],
+    "doc1-first-time-jobseeker": [PROOF_LIBRARY.employment],
+    "doc1-endorsement-financial-assistance": [PROOF_LIBRARY.assistance],
+    "doc1-dswd-eligibility-certification": [PROOF_LIBRARY.assistance],
+    "doc1-lot-occupancy": [PROOF_LIBRARY.property],
+    "doc1-undertaking-quarantine": [PROOF_LIBRARY.travel],
+    "doc1-detained-bail-certification": [PROOF_LIBRARY.legal],
+    "doc1-indigency-sibling-assistance": [PROOF_LIBRARY.assistance],
+    "doc1-endorsement-medical-assistance": [PROOF_LIBRARY.medical],
+    "doc1-lockdown-residency-certification": [PROOF_LIBRARY.requestLetter],
+    "doc1-extended-duty-shift": [PROOF_LIBRARY.employment],
+    "doc1-burial-assistance": [PROOF_LIBRARY.death],
+    "doc1-indigency-educational-assistance": [PROOF_LIBRARY.school],
+    "doc1-telecom-nap-permit": [PROOF_LIBRARY.business],
+    "doc1-marital-separation-certification": [PROOF_LIBRARY.legal],
+    "doc1-business-owner-bir-certification": [PROOF_LIBRARY.business],
+    "doc1-no-marriage-death-claim": [PROOF_LIBRARY.death, PROOF_LIBRARY.legal],
+    "doc1-hearing-impairment-certification": [PROOF_LIBRARY.medical],
+    "doc1-indigency-spes-leap": [PROOF_LIBRARY.school, PROOF_LIBRARY.employment],
+    "doc1-simple-residency-loan": [PROOF_LIBRARY.requestLetter],
+    "doc1-solo-parent-certification": [PROOF_LIBRARY.legal],
+    "doc2-indigency-income-means": [PROOF_LIBRARY.assistance],
+    "doc2-flooded-residence-certification": [PROOF_LIBRARY.calamity],
+    "doc2-indigent-good-moral-medical": [PROOF_LIBRARY.medical],
+    "doc2-residency-bank-record": [PROOF_LIBRARY.requestLetter],
+    "doc2-minor-athlete-financial-assistance": [PROOF_LIBRARY.school, PROOF_LIBRARY.assistance],
+    "doc2-parent-relationship-spes": [PROOF_LIBRARY.birth],
+    "doc2-business-closure-court-records": [PROOF_LIBRARY.business],
+    "doc2-general-legal-records": [PROOF_LIBRARY.legal],
+    "doc2-centenarian-living-veteran": [PROOF_LIBRARY.requestLetter],
+    "doc2-first-time-jobseeker-oath": [PROOF_LIBRARY.employment],
+    "doc2-funeral-covered-court-indigency": [PROOF_LIBRARY.death],
+    "doc2-endorsement-hospital-return": [PROOF_LIBRARY.medical, PROOF_LIBRARY.travel],
+    "doc2-business-assessor-permit": [PROOF_LIBRARY.business],
+    "doc2-residency-school-requirement": [PROOF_LIBRARY.school],
+    "doc2-registered-business-bank": [PROOF_LIBRARY.business],
+    "doc2-guardian-psa-certification": [PROOF_LIBRARY.guardianship],
+    "doc2-indigency-guardian-medical": [PROOF_LIBRARY.medical, PROOF_LIBRARY.guardianship],
+    "doc2-organization-water-clearance": [PROOF_LIBRARY.event],
+    "doc2-unemployment-spes-certification": [PROOF_LIBRARY.employment],
+    "doc2-lpg-house-to-house-permit": [PROOF_LIBRARY.business],
+    "doc3-mlbb-tournament-permit": [PROOF_LIBRARY.event],
+    "doc3-business-renewal-travel": [PROOF_LIBRARY.businessRenewal],
+    "doc3-child-details-4ps": [PROOF_LIBRARY.birth],
+    "doc3-non-resident-persons": [PROOF_LIBRARY.legal],
+    "doc3-indigency-medical-assistance": [PROOF_LIBRARY.medical],
+    "doc3-road-damage-permit": [PROOF_LIBRARY.business],
+    "doc3-bmbe-business-certificate": [PROOF_LIBRARY.business],
+    "doc3-senior-alive-well": [PROOF_LIBRARY.requestLetter],
+    "doc3-minor-stepbrother-birth-record": [PROOF_LIBRARY.birth],
+    "doc3-fire-damage-certification": [PROOF_LIBRARY.calamity],
+    "doc3-first-time-jobseeker-clearance": [PROOF_LIBRARY.employment],
+    "doc3-repatriated-ofw-unemployment": [PROOF_LIBRARY.travel, PROOF_LIBRARY.employment],
+    "doc3-pandemic-business-non-operation": [PROOF_LIBRARY.business],
+    "doc3-sole-guardian-travel-assistance": [PROOF_LIBRARY.guardianship, PROOF_LIBRARY.travel],
+    "doc3-business-closure": [PROOF_LIBRARY.business],
+    "doc3-renovation-non-operational-business": [PROOF_LIBRARY.business],
+    "doc3-flood-victim-financial-assistance": [PROOF_LIBRARY.calamity],
+    "doc3-flood-victim-calamity-loan": [PROOF_LIBRARY.calamity],
+    "doc3-low-income-purok-leader": [PROOF_LIBRARY.employment],
+    "doc3-low-income-tricycle-driver": [PROOF_LIBRARY.employment],
+    "doc3-blank-indigency-form": [PROOF_LIBRARY.assistance],
+    "doc3-business-renewal-store": [PROOF_LIBRARY.businessRenewal],
+    "doc3-business-new-endorsement": [PROOF_LIBRARY.business],
 };
 
 export const DOC1_CERTIFICATE_OPTIONS = [
@@ -470,9 +655,151 @@ export const DOC2_CERTIFICATE_OPTIONS = [
     },
 ];
 
+export const DOC3_CERTIFICATE_OPTIONS = [
+    {
+        name: "Barangay Permit: MLBB Tournament",
+        templateKey: "doc3-mlbb-tournament-permit",
+        hasFee: true,
+        desc: "Doc #3 barangay permit to hold a Mobile Legends tournament.",
+    },
+    {
+        name: "Business Renewal Endorsement: Travel Services",
+        templateKey: "doc3-business-renewal-travel",
+        hasFee: true,
+        desc: "Doc #3 renewal endorsement form for travel services business permit.",
+    },
+    {
+        name: "4Ps Child Details Certification",
+        templateKey: "doc3-child-details-4ps",
+        hasFee: false,
+        desc: "Doc #3 resident certification with child details for 4Ps requirement.",
+    },
+    {
+        name: "Non-Resident Persons Certificate",
+        templateKey: "doc3-non-resident-persons",
+        hasFee: false,
+        desc: "Doc #3 certification listing persons who are non-residents of the barangay.",
+    },
+    {
+        name: "Indigency: Medical Assistance",
+        templateKey: "doc3-indigency-medical-assistance",
+        hasFee: false,
+        desc: "Doc #3 indigency certification for medical assistance.",
+    },
+    {
+        name: "Road Damage Permit Certification",
+        templateKey: "doc3-road-damage-permit",
+        hasFee: true,
+        desc: "Doc #3 certification for road damage permit application.",
+    },
+    {
+        name: "BMBE Business Certificate",
+        templateKey: "doc3-bmbe-business-certificate",
+        hasFee: true,
+        desc: "Doc #3 barangay certificate for Barangay Micro Business Enterprise benefits.",
+    },
+    {
+        name: "Senior Alive and Well Certificate",
+        templateKey: "doc3-senior-alive-well",
+        hasFee: false,
+        desc: "Doc #3 certificate confirming a senior resident is alive and well.",
+    },
+    {
+        name: "Minor Stepbrother Birth Record Certification",
+        templateKey: "doc3-minor-stepbrother-birth-record",
+        hasFee: false,
+        desc: "Doc #3 certification for a minor stepbrother birth record requirement.",
+    },
+    {
+        name: "Fire Damage Certification",
+        templateKey: "doc3-fire-damage-certification",
+        hasFee: false,
+        desc: "Doc #3 certification for property or building damaged by fire.",
+    },
+    {
+        name: "First Time Jobseeker Clearance Certification",
+        templateKey: "doc3-first-time-jobseeker-clearance",
+        hasFee: false,
+        desc: "Doc #3 first time job seeker certification with one-year validity wording.",
+    },
+    {
+        name: "Repatriated OFW Unemployment Certification",
+        templateKey: "doc3-repatriated-ofw-unemployment",
+        hasFee: false,
+        desc: "Doc #3 certification for repatriated OFW unemployment and educational requirement.",
+    },
+    {
+        name: "Pandemic Business Non-Operation Certificate",
+        templateKey: "doc3-pandemic-business-non-operation",
+        hasFee: true,
+        desc: "Doc #3 certificate that a business was non-operational during the pandemic period.",
+    },
+    {
+        name: "Sole Guardian Travel Assistance Certificate",
+        templateKey: "doc3-sole-guardian-travel-assistance",
+        hasFee: false,
+        desc: "Doc #3 certificate that a resident is sole guardian for travel assistance.",
+    },
+    {
+        name: "Barangay Business Closure",
+        templateKey: "doc3-business-closure",
+        hasFee: true,
+        desc: "Doc #3 barangay closure certificate for a business that ceased operation.",
+    },
+    {
+        name: "Renovation Non-Operational Business Certificate",
+        templateKey: "doc3-renovation-non-operational-business",
+        hasFee: true,
+        desc: "Doc #3 certificate for business non-operation due to repair or renovation.",
+    },
+    {
+        name: "Typhoon Carina Flood Victim: Financial Assistance",
+        templateKey: "doc3-flood-victim-financial-assistance",
+        hasFee: false,
+        desc: "Doc #3 flood victim certification for financial assistance requirement.",
+    },
+    {
+        name: "Typhoon Carina Flood Victim: Calamity Loan",
+        templateKey: "doc3-flood-victim-calamity-loan",
+        hasFee: false,
+        desc: "Doc #3 flood victim certification for calamity loan requirement.",
+    },
+    {
+        name: "Low-Income Certification: Purok Leader",
+        templateKey: "doc3-low-income-purok-leader",
+        hasFee: false,
+        desc: "Doc #3 low-income certification for a purok leader.",
+    },
+    {
+        name: "Low-Income Certification: Tricycle Driver",
+        templateKey: "doc3-low-income-tricycle-driver",
+        hasFee: false,
+        desc: "Doc #3 low-income certification for a tricycle driver.",
+    },
+    {
+        name: "Barangay Indigency Blank Form",
+        templateKey: "doc3-blank-indigency-form",
+        hasFee: false,
+        desc: "Doc #3 blank-style barangay indigency form.",
+    },
+    {
+        name: "Business Renewal Endorsement: Sari-Sari Store",
+        templateKey: "doc3-business-renewal-store",
+        hasFee: true,
+        desc: "Doc #3 renewal endorsement form for sari-sari store business permit.",
+    },
+    {
+        name: "Business New Endorsement",
+        templateKey: "doc3-business-new-endorsement",
+        hasFee: true,
+        desc: "Doc #3 new business endorsement form for business permit.",
+    },
+];
+
 export const CERTIFICATE_TEMPLATE_OPTIONS = [
     ...DOC1_CERTIFICATE_OPTIONS,
     ...DOC2_CERTIFICATE_OPTIONS,
+    ...DOC3_CERTIFICATE_OPTIONS,
 ];
 
 const TEMPLATE_ALIASES = {
@@ -545,6 +872,39 @@ const TEMPLATE_ALIASES = {
         "doc2-organization-water-clearance",
     "unemployment / spes certification": "doc2-unemployment-spes-certification",
     "lpg house-to-house activity permit": "doc2-lpg-house-to-house-permit",
+    "barangay permit: mlbb tournament": "doc3-mlbb-tournament-permit",
+    "business renewal endorsement: travel services": "doc3-business-renewal-travel",
+    "4ps child details certification": "doc3-child-details-4ps",
+    "non-resident persons certificate": "doc3-non-resident-persons",
+    "indigency: medical assistance": "doc3-indigency-medical-assistance",
+    "road damage permit certification": "doc3-road-damage-permit",
+    "bmbe business certificate": "doc3-bmbe-business-certificate",
+    "senior alive and well certificate": "doc3-senior-alive-well",
+    "minor stepbrother birth record certification":
+        "doc3-minor-stepbrother-birth-record",
+    "fire damage certification": "doc3-fire-damage-certification",
+    "first time jobseeker clearance certification":
+        "doc3-first-time-jobseeker-clearance",
+    "repatriated ofw unemployment certification":
+        "doc3-repatriated-ofw-unemployment",
+    "pandemic business non-operation certificate":
+        "doc3-pandemic-business-non-operation",
+    "sole guardian travel assistance certificate":
+        "doc3-sole-guardian-travel-assistance",
+    "barangay business closure": "doc3-business-closure",
+    "renovation non-operational business certificate":
+        "doc3-renovation-non-operational-business",
+    "typhoon carina flood victim: financial assistance":
+        "doc3-flood-victim-financial-assistance",
+    "typhoon carina flood victim: calamity loan":
+        "doc3-flood-victim-calamity-loan",
+    "low-income certification: purok leader": "doc3-low-income-purok-leader",
+    "low-income certification: tricycle driver":
+        "doc3-low-income-tricycle-driver",
+    "barangay indigency blank form": "doc3-blank-indigency-form",
+    "business renewal endorsement: sari-sari store":
+        "doc3-business-renewal-store",
+    "business new endorsement": "doc3-business-new-endorsement",
 };
 
 function normalizeKey(value) {
@@ -568,6 +928,30 @@ function value(data, key, fallback = "________________") {
     const selected = direct ?? extra;
     const text = String(selected ?? "").trim();
     return text || fallback;
+}
+
+function rawValue(data, key) {
+    const direct = data?.[key];
+    const extra = data?.extraFields?.[key] ?? data?.extra_fields?.[key];
+    return direct ?? extra;
+}
+
+function boolValue(data, key, fallback = false) {
+    const selected = rawValue(data, key);
+    if (selected === undefined || selected === null || selected === "") {
+        return fallback;
+    }
+    if (typeof selected === "boolean") return selected;
+    if (typeof selected === "number") return selected !== 0;
+
+    const normalized = String(selected).trim().toLowerCase();
+    if (["true", "1", "yes", "y", "on", "checked"].includes(normalized)) {
+        return true;
+    }
+    if (["false", "0", "no", "n", "off", "unchecked"].includes(normalized)) {
+        return false;
+    }
+    return fallback;
 }
 
 function valueAny(data, keys, fallback = "________________") {
@@ -795,6 +1179,78 @@ function letterHeader(data, subjectFallback = "ENDORSEMENT") {
 
 function letterClosing(closing = "Respectfully,") {
     return `<p>${escapeHtml(closing)}</p>`;
+}
+
+function dateFieldText(data, key, fallback = "________________") {
+    const raw = value(data, key, "");
+    if (!raw) return fallback;
+    const parsed = dateObj(raw);
+    return parsed ? formatDate(parsed) : raw;
+}
+
+function splitListValue(raw, fallback = []) {
+    const source = String(raw || "").trim();
+    const lines = source ? source.split(/\r?\n|;/) : fallback;
+    return lines.map((line) => String(line).trim()).filter(Boolean);
+}
+
+function centeredLines(lines, className = "cf-centered-lines") {
+    return `
+        <div class="${className}">
+            ${lines.map((line) => `<div>${escapeHtml(upper(line))}</div>`).join("")}
+        </div>`;
+}
+
+function validityBlock(data, validFallback = "December 31, 2026") {
+    return `
+        <div class="cf-validity-block">
+            <div>DATE ISSUED: ${escapeHtml(dateFieldText(data, "dateIssued", formatDate(data?.issuedAt || new Date())))}</div>
+            <div>VALID UNTIL: ${escapeHtml(dateFieldText(data, "validUntil", validFallback))}</div>
+        </div>`;
+}
+
+function businessCheckRow(checked, label, text) {
+    return `
+        <div class="cf-business-check-row">
+            <span class="cf-business-box">${checked ? "&#9745;" : "&#9744;"}</span>
+            <span><strong>${escapeHtml(label)}</strong> ${escapeHtml(text)}</span>
+        </div>`;
+}
+
+function doc3BusinessEndorsement(data, documentType = "BUSINESS RENEWAL") {
+    const permitNo = value(data, "businessPermitNo", "ET-BPI-2026-0000");
+    const business = value(data, "businessName", "________________");
+    const businessAddress = value(data, "businessAddress", address(data));
+    const operator = value(data, "operatorName", personName(data));
+    const ownerAddress = value(data, "businessOwnerAddress", address(data));
+    const isCompliant = boolValue(data, "businessCompliant", false);
+    const hasNoObjection = boolValue(data, "businessNoObjection", false);
+
+    return `
+        <div class="cf-business-endorsement">
+            <div class="cf-business-heading-row">
+                <div class="cf-business-document-type">${escapeHtml(documentType)}</div>
+                <div class="cf-business-heading">
+                    <div>ENDORSEMENT</div>
+                    <small>${escapeHtml(upper(permitNo))}</small>
+                </div>
+            </div>
+            <p class="cf-business-endorse">THIS IS TO ENDORSE;</p>
+            <div class="cf-form-lines cf-business-lines">
+                <div>${escapeHtml(upper(business))}</div><small>(Business Name)</small>
+                <div>${escapeHtml(upper(businessAddress))}</div><small>(LOCATION)</small>
+                <div>${escapeHtml(upper(operator))}</div><small>(Operator/Manager)</small>
+                <div>${escapeHtml(upper(ownerAddress))}</div><small>(Owner's Address)</small>
+            </div>
+            <div class="cf-business-checks">
+                <p><strong>Applying for the corresponding BUSINESS PERMIT that has been found to be:</strong></p>
+                ${businessCheckRow(isCompliant, "Compliant", "with the provisions of existing Barangay Ordinances, rules and regulations being enforced in this barangay;")}
+                ${businessCheckRow(!isCompliant, "NON-COMPLIANT", "with the provisions of existing Barangay Ordinances rules and regulations being enforced in this barangay;")}
+                <p class="cf-business-center"><strong>In view of the foregoing, this barangay, thru the undersigned.</strong></p>
+                ${businessCheckRow(hasNoObjection, "Interposes NO OBJECTION", "for the issuances of the corresponding Mayor's Permit being applied for.")}
+                ${businessCheckRow(!hasNoObjection, "Recommends for the NON-ISSUANCE", "of the corresponding Mayor's Permit being applied for.")}
+            </div>
+        </div>`;
 }
 
 function householdMembersTable(data) {
@@ -2023,6 +2479,425 @@ const TEMPLATES = {
                 ])}`;
         },
     },
+    "doc3-mlbb-tournament-permit": {
+        title: "BARANGAY PERMIT",
+        signatures: "captain-right",
+        fields: [
+            "eventName",
+            "eventOrganizer",
+            "eventPartner",
+            "eventDate",
+            "eventTime",
+            "eventVenue",
+        ],
+        render(data) {
+            const eventName = value(
+                data,
+                "eventName",
+                "Mobile Legends Bang Bang (MLBB) Tournament 2025",
+            );
+            const organizer = value(
+                data,
+                "eventOrganizer",
+                "Sangguniang Kabataan of Barangay East Tapinac",
+            );
+            const partner = value(data, "eventPartner", "community heroes");
+            return paragraphs([
+                {
+                    className: "salutation",
+                    html: `SUBJECT: PERMIT TO HOLD ${escapeHtml(upper(eventName))}`,
+                },
+                { className: "salutation", html: "To Whom It May Concern;" },
+                `This is to grant permission to the ${strong(organizer)} partnered with ${strong(partner)} to hold ${strong(eventName)} on ${strong(dateFieldText(data, "eventDate", "________________"))}, ${strong(value(data, "eventTime", "10 am onwards"))} to be held at ${strong(value(data, "eventVenue", "Barangay East Tapinac Covered Court"))}.`,
+                "This event is endorsed by the Sangguniang Barangay of East Tapinac and the organizers are authorized to use venue for this purpose. The Sangguniang Barangay expect that all necessary preparations, precaution and compliance with local regulations such as peace and order and health protocol will be observed.",
+                `Issued this ${issuedDate(data, "day-of")} at Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-business-renewal-travel": {
+        title: "ENDORSEMENT",
+        hideTitle: true,
+        signatures: "captain-right",
+        fields: [
+            "businessPermitNo",
+            "businessName",
+            "businessAddress",
+            "operatorName",
+            "businessOwnerAddress",
+            "businessCompliant",
+            "businessNoObjection",
+            "dateIssued",
+            "validUntil",
+        ],
+        render(data) {
+            return doc3BusinessEndorsement(data, "BUSSINESS RENEWAL");
+        },
+        renderPostSignatures(data) {
+            return validityBlock(data);
+        },
+    },
+    "doc3-child-details-4ps": {
+        title: "BARANGAY CERTIFICATION",
+        signatures: "captain-right",
+        fields: ["childName", "childAge", "childDOB", "purposeDetail"],
+        render(data) {
+            const child = value(data, "childName", "________________");
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern;" },
+                `This is to certify that, ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} is a resident of this barangay with postal address at ${strong(address(data))}.`,
+                `This further certifies that the following details is provided by the above-named, ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} of legal age with the same postal address.`,
+                {
+                    className: "center-strong",
+                    html: `CHILD NAME 1: ${escapeHtml(upper(child))} - ${escapeHtml(value(data, "childAge", "____"))} YRS. OLD - ${escapeHtml(dateFieldText(data, "childDOB", "________________"))}`,
+                },
+                `Certification is being issued for ${strong(upper(value(data, "purposeDetail", purpose(data))))} purpose.`,
+                `Issued this ${issuedDate(data)} at Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-non-resident-persons": {
+        title: "BARANGAY CERTIFICATE",
+        signatures: "kagawad1-right",
+        fields: ["nonResidentNames", "requestingOfficerName", "requestingOfficerTitle"],
+        render(data) {
+            const names = splitListValue(value(data, "nonResidentNames", ""), [
+                "Chaehun Bae",
+                "Yunghae Lee",
+                "Eunhwan Lee",
+            ]);
+            const officer = value(
+                data,
+                "requestingOfficerName",
+                "POLICE CAPTAIN MELCHOR S. CATIGDAY",
+            );
+            const officerTitle = value(
+                data,
+                "requestingOfficerTitle",
+                "Officer in charge",
+            );
+            return `
+                ${paragraphs([
+                    { className: "salutation", html: "TO WHOM IT MAY CONCERN;" },
+                    "This is to certify that the below named persons are Non-Resident of Brgy. East Tapinac, Olongapo City.",
+                ])}
+                ${centeredLines(names)}
+                ${paragraphs([
+                    `Certification is being issued upon request of ${strong(upper(officer))} ${escapeHtml(officerTitle)} for whatever legal purpose it may serve.`,
+                    `Issued this ${issuedDate(data)} at Barangay East Tapinac, Olongapo City.`,
+                ])}`;
+        },
+    },
+    "doc3-indigency-medical-assistance": {
+        title: "CERTIFICATION OF INDIGENCY",
+        signatures: "captain-right",
+        fields: ["assistanceType"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To Whom it my Concern," },
+                `This is to certify that, ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} of legal age, Filipino Citizen and a resident of this Barangay, with postal address at ${strong(address(data))} has no derogatory record on file, pursuant to Republic Act No.7160, otherwise known as the Local Government code of 1991.`,
+                "This further certifies that the above-named person belongs to indigent family in this barangay.",
+                `This certification is being issued upon the request of the above-named for ${strong(upper(value(data, "assistanceType", purpose(data))))} purposes.`,
+                `Signed and issued this ${issuedDate(data)} at Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-road-damage-permit": {
+        title: "BARANGAY CERTIFICATION",
+        signatures: "captain-right",
+        fields: ["permitType", "companyName", "businessAddress"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To Whom it may concern:" },
+                `This is to certifies that the application for ${strong(upper(value(data, "permitType", "ROAD DAMAGE PERMIT")))} of ${strong(upper(value(data, "companyName", "SUBIC WATER AND SEWERAGE CO. INC.")))}, for ${strong(value(data, "businessAddress", "East Tapinac, Olongapo City"))}.`,
+                "Further certifies that the above mentioned a residence was converted to Business Establishment as per the Purok Leaders inspection of the said area.",
+                `Given this ${issuedDate(data, "day-of")}, at the Barangay East Tapinac, Olongapo City for ${strong(upper(purpose(data)))} purposes.`,
+            ]);
+        },
+    },
+    "doc3-bmbe-business-certificate": {
+        title: "BARANGAY CERTIFICATE",
+        signatures: "captain-right",
+        fields: [
+            "businessName",
+            "businessAddress",
+            "businessOwnerName",
+            "businessOwnerAddress",
+            "expirationDate",
+        ],
+        render(data) {
+            return `
+                ${paragraphs([
+                    { className: "salutation", html: "TO WHOM IT MY CONCERN:" },
+                    `This Certificate, which is effective for two (2) year, entitles the registered Barangay Micro Business Enterprise (BMBE) to all the benefits and incentive, subject to the terms and conditions, of Republic Act No. 9178, signed by President Gloria Macapagal Arroyo on 13 November 2002, and the implementing rules and regulations there of issued by Secretary of Trade and Industry MAR ROXAS on 07 February 2003. This certificate will expire on ${strong(dateFieldText(data, "expirationDate", "________________"))}.`,
+                    "GRANTED TO:",
+                ])}
+                <div class="cf-form-lines cf-granted-lines">
+                    <div>${escapeHtml(upper(value(data, "businessName", "________________")))}</div><small>Name of Business</small>
+                    <div>${escapeHtml(upper(value(data, "businessAddress", address(data))))}</div><small>BUSINESS ADDRESS</small>
+                    <div>${escapeHtml(upper(value(data, "businessOwnerName", personName(data))))}</div><small>OWNERS NAME</small>
+                    <div>${escapeHtml(upper(value(data, "businessOwnerAddress", address(data))))}</div><small>OWNERS ADDRESS</small>
+                </div>`;
+        },
+    },
+    "doc3-senior-alive-well": {
+        title: "BARANGAY CERTIFICATE",
+        signatures: "captain-right",
+        fields: ["age", "aliveStatus", "claimantName", "claimantRelationship", "requirementName"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "TO WHON IT MY CONCERN:" },
+                `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, ${escapeHtml(value(data, "age", yearsOld(data) || "____"))} yrs. old, a resident of this barangay, with postal address at ${strong(address(data))} with no derogatory record on file pursuant to Rep. Act No. 7160, otherwise known as the Local Government Code of 1991.`,
+                `This further certifies that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, is ${escapeHtml(value(data, "aliveStatus", "still alive and well"))}.`,
+                `Certification is being issued to ${strong(upper(value(data, "claimantName", "________________")))}, (${escapeHtml(value(data, "claimantRelationship", "daughter"))}) of the above-named, for ${strong(upper(value(data, "requirementName", purpose(data))))} requirement purpose.`,
+                `Issued this ${issuedDate(data, "day-of")} at Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-minor-stepbrother-birth-record": {
+        title: "BARANGAY CERTIFICATION",
+        signatures: "captain-right",
+        fields: [
+            "siblingName",
+            "siblingAge",
+            "siblingGender",
+            "siblingDOB",
+            "siblingBirthPlace",
+            "requesterAge",
+            "purposeDetail",
+        ],
+        render(data) {
+            const sibling = value(data, "siblingName", "________________");
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern:" },
+                `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, is a resident of this barangay with postal address at ${strong(address(data))}, with no derogatory record on file pursuant to Republic Act No. 7160, otherwise known as the Local Government Code of 1991.`,
+                `This further certifies that the above-named has sought the assistance of this office in favor of her minor stepbrother named as ${strong(upper(sibling))}, (${escapeHtml(value(data, "siblingAge", "____"))} years old) (${escapeHtml(value(data, "siblingGender", "Male"))}), born on ${strong(dateFieldText(data, "siblingDOB", "________________"))} in ${strong(value(data, "siblingBirthPlace", "Olongapo City"))}, who is still registered with the Local Civil Registry.`,
+                "The above-named is advised to seek assistance with the Local Civil Registry, Olongapo City for the proper registration of the above-named minor.",
+                `Certification is being issued to ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} (${escapeHtml(value(data, "requesterAge", yearsOld(data) || "____"))} Yrs. Old) for ${strong(upper(value(data, "purposeDetail", purpose(data))))} requirement purpose.`,
+                `Issued this ${issuedDate(data, "day-of")} at Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-fire-damage-certification": {
+        title: "BARANGAY CERTIFICATION",
+        signatures: "kagawad-right",
+        fields: ["damageCause", "damageDate", "damageTime"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "TO WHOM IT MY CONCERN:" },
+                `This is to certify that, ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, of legal age, a resident of ${strong(address(data))}, has no derogatory record files in this barangay office pursuant to Rep. Act No. 7160 otherwise known as the local government code of 1991.`,
+                `This further certifies that the property/building was damage due to ${strong(upper(value(data, "damageCause", "FIRE BLAZE")))} on ${strong(dateFieldText(data, "damageDate", "________________"))} at ${strong(value(data, "damageTime", "9:30 P.M."))} affecting the residents of ${strong(address(data))}.`,
+                `Given this, ${issuedDate(data, "day-of")}, at Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-first-time-jobseeker-clearance": {
+        title: "BARANGAY CERTIFICATION",
+        signatures: "captain-right",
+        fields: ["effectivePeriod"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "TO WHOM IT MY CONCERN:" },
+                `This is to certify that, ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, is a resident of ${strong(address(data))} is a bonafide resident of this barangay since birth has no derogatory record on file in this office pursuant to Republic Act No.7160, otherwise known as the local government code of 1991.`,
+                `This further certify that the above-named is known in this barangay clearance is issued for the above-named for ${strong(upper(purpose(data)))} purposes.`,
+                `Issued this, ${issuedDate(data, "day-of")} at Barangay East Tapinac, Olongapo City, (${escapeHtml(value(data, "effectivePeriod", "Valid for one (1) year upon issuance"))})`,
+            ]);
+        },
+    },
+    "doc3-repatriated-ofw-unemployment": {
+        title: "BARANGAY CERTIFICATION",
+        signatures: "captain-right",
+        fields: ["repatriationDate", "unemploymentStartDate", "programName"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To whom it may concern:" },
+                `This is to certify that, ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, with address at ${strong(address(data))}, is a bonifide resident and a law-abiding citizen of this community.`,
+                `This further certifies that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} has repatriated to the Philippines last ${strong(dateFieldText(data, "repatriationDate", "________________"))}, and was unemployed as OFW since then up to present.`,
+                `Given this ${issuedDate(data, "day-of")}, upon the request of the above-named for ${strong(upper(value(data, "programName", purpose(data))))} purposes.`,
+            ]);
+        },
+    },
+    "doc3-pandemic-business-non-operation": {
+        title: "BARANGAY CERTIFICATE",
+        signatures: "captain-right",
+        fields: ["businessName", "businessAddress", "businessOwnerName", "businessStatusPeriod"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To whom may it concern;" },
+                `This is to certify that upon actual verification and inspection of this Office, it was found out that the business establishment registered as ${strong(upper(value(data, "businessName", "________________")))} located at ${strong(value(data, "businessAddress", address(data)))} and under the management and proprietorship of ${strong(upper(value(data, "businessOwnerName", personName(data))))} its business is non-operation during pandemic period last ${strong(value(data, "businessStatusPeriod", "March 2020 to January 2021"))}.`,
+                `This certification is being issued upon the request of ${strong(upper(value(data, "businessOwnerName", personName(data))))} for whatever legal intent this may serve.`,
+                `Given this ${issuedDate(data, "day-of")} at the Barangay Hall of East Tapinac Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-sole-guardian-travel-assistance": {
+        title: "BARANGAY CERTIFICATE",
+        signatures: "captain-right",
+        fields: ["age", "wardName", "wardAge", "purposeDetail"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To whom it may concern;" },
+                `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, ${escapeHtml(value(data, "age", yearsOld(data) || "____"))} years old is a bonafide resident of this barangay with postal address at ${strong(address(data))} has no derogatory record pursuant to Republic act No.7160 otherwise known as the local Government Code of 1991.`,
+                `Further certified that the above-named is the sole guardian of ${strong(upper(value(data, "wardName", "________________")))}, ${escapeHtml(value(data, "wardAge", "____"))} years old.`,
+                `Certification is being granted as per request of the subject person for ${strong(upper(value(data, "purposeDetail", purpose(data))))}.`,
+                `Give this ${issuedDate(data, "day-of")} at the Barangay East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-business-closure": {
+        title: "BARANGAY CLOSURE",
+        signatures: "kagawad1-right",
+        fields: [
+            "businessName",
+            "businessAddress",
+            "businessOwnerName",
+            "businessClosureDate",
+            "dateIssued",
+            "validUntil",
+        ],
+        render(data) {
+            return `
+                ${paragraphs([
+                    { className: "salutation", html: "To whom may it concern;" },
+                    `This is to certify that upon actual verification and inspection of this Office, it was found out that the business establishment registered as ${strong(upper(value(data, "businessName", "________________")))} located at ${strong(value(data, "businessAddress", address(data)))} and under the management and proprietorship of ${strong(upper(value(data, "businessOwnerName", personName(data))))} has ceased its business operation last ${strong(dateFieldText(data, "businessClosureDate", "________________"))}.`,
+                    `This certification is being issued upon the request of ${strong(upper(value(data, "businessOwnerName", personName(data))))} for whatever legal intent this may serve.`,
+                ])}
+                ${validityBlock(data, "May 21, 2026")}`;
+        },
+    },
+    "doc3-renovation-non-operational-business": {
+        title: "BARANGAY CERTIFICATE",
+        signatures: "captain-right",
+        fields: [
+            "businessName",
+            "businessAddress",
+            "renovationStartDate",
+            "renovationEndDate",
+            "businessPurpose",
+        ],
+        render(data) {
+            const start = dateFieldText(data, "renovationStartDate", "________________");
+            const end = dateFieldText(data, "renovationEndDate", "________________");
+            return paragraphs([
+                { className: "salutation", html: "To whom may it concern;" },
+                `This is to certify that ${strong(upper(value(data, "businessName", "________________")))}, Located at ${strong(value(data, "businessAddress", address(data)))}, had undergone general repair/ renovation from ${strong(start)} to ${strong(end)}. Accordingly, it was not fit for occupancy, hence, not operational.`,
+                `This certificate is issued for business permit for ${strong(upper(value(data, "businessPurpose", purpose(data))))} purposes.`,
+            ]);
+        },
+    },
+    "doc3-flood-victim-financial-assistance": {
+        title: "CERTIFICATION",
+        signatures: "captain-right",
+        fields: ["incidentName", "incidentDate", "requirementName"],
+        render(data) {
+            const incident = value(data, "incidentName", "Typhoon Carina");
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern:" },
+                `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, is a resident of this barangay with postal address at ${strong(address(data))} with no derogatory record on file Pursuant to Republic Act No. 7160, otherwise known as the Local Government Code of 1991.`,
+                `This further certifies that the above-named was among the flood victims on the onset of ${strong(incident)} on ${strong(dateFieldText(data, "incidentDate", "24th July 2024"))}.`,
+                `Certification is being issued to the above-named for ${strong(upper(value(data, "requirementName", "FINANCIAL ASSISTANCE")))} requirement purpose.`,
+                `Issued this ${issuedDate(data, "day-of")} at Brgy. East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-flood-victim-calamity-loan": {
+        title: "CERTIFICATION",
+        signatures: "captain-right",
+        fields: ["incidentName", "incidentDate", "requirementName"],
+        render(data) {
+            const incident = value(data, "incidentName", "Typhoon Carina");
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern:" },
+                `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} is a resident of this barangay with postal address at ${strong(address(data))} with no derogatory record on file Pursuant to Republic Act No. 7160, otherwise known as the Local Government Code of 1991.`,
+                `This further certifies that the above-named was among the flood victims on the onset of ${strong(incident)} on ${strong(dateFieldText(data, "incidentDate", "24th July 2024"))}.`,
+                `Certification is being issued to the above-named for ${strong(upper(value(data, "requirementName", "CALAMITY LOAN")))} requirement purposes.`,
+                `Issued this ${issuedDate(data, "day-of")} at Brgy. East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-low-income-purok-leader": {
+        title: "CERTIFICATION OF LAW-INCOME",
+        signatures: "captain-right",
+        fields: ["occupation", "incomeStartYear", "monthlyIncome"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern;" },
+                `This is to certify ${strong(upper(personName(data)))} is a ${strong(upper(value(data, "occupation", "PUROK LEADER")))} since ${strong(value(data, "incomeStartYear", "2023"))} up to present with a monthly income of ${strong(value(data, "monthlyIncome", "P3,800"))} monthly.`,
+                "This certificate is issued upon the request of above-mentioned name for whatever purpose and intent it may serve his/her best.",
+                `Given this ${issuedDate(data, "day-of")} in Barangay East Tapinac Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-low-income-tricycle-driver": {
+        title: "CERTIFICATION OF LOW-INCOME",
+        signatures: "kagawad1-right",
+        fields: ["occupation", "incomeStartYear", "monthlyIncome", "purposeDetail"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern;" },
+                `This is to certify ${strong(`${personPrefix(data)} ${upper(personName(data))}`)} is a ${strong(upper(value(data, "occupation", "TRICYCLE DRIVER")))} since ${strong(value(data, "incomeStartYear", "2014"))} up to present, with income of ${strong(value(data, "monthlyIncome", "Three Thousand Pesos (P3000.00)"))} monthly.`,
+                `This certificate is issued upon the request of above-mentioned name for his/her ${strong(value(data, "purposeDetail", purpose(data)))} purposes.`,
+                `Given this ${issuedDate(data, "day-of")} in Barangay East Tapinac Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-blank-indigency-form": {
+        title: "BARANGAY INDIGENCY",
+        signatures: "captain-right",
+        fields: ["assistanceType"],
+        render(data) {
+            return paragraphs([
+                { className: "salutation", html: "To Whom It May Concern;" },
+                `This is to certify that, ${strong(upper(personName(data)))} is a resident of this barangay with postal address at ${strong(address(data))}, has no derogatory record filed pursuant to Republic Act No. 7160 otherwise known as the Local Government Code of 1991.`,
+                "This further certifies that the above-named belongs to an Indigent family in this barangay.",
+                `Certification is issued upon the request of the above named for ${strong(upper(value(data, "assistanceType", purpose(data))))} purposes.`,
+                `Given this ${issuedDate(data, "day-of")} at the Barangay Hall of East Tapinac, Olongapo City.`,
+            ]);
+        },
+    },
+    "doc3-business-renewal-store": {
+        title: "ENDORSEMENT",
+        hideTitle: true,
+        signatures: "captain-right",
+        fields: [
+            "businessPermitNo",
+            "businessName",
+            "businessAddress",
+            "operatorName",
+            "businessOwnerAddress",
+            "businessCompliant",
+            "businessNoObjection",
+            "dateIssued",
+            "validUntil",
+        ],
+        render(data) {
+            return doc3BusinessEndorsement(data, "BUSSINESS RENEWAL");
+        },
+        renderPostSignatures(data) {
+            return validityBlock(data);
+        },
+    },
+    "doc3-business-new-endorsement": {
+        title: "ENDORSEMENT",
+        hideTitle: true,
+        signatures: "captain-right",
+        fields: [
+            "businessPermitNo",
+            "businessName",
+            "businessAddress",
+            "operatorName",
+            "businessOwnerAddress",
+            "businessCompliant",
+            "businessNoObjection",
+            "dateIssued",
+            "validUntil",
+        ],
+        render(data) {
+            return doc3BusinessEndorsement(data, "BUSINESS NEW");
+        },
+        renderPostSignatures(data) {
+            return validityBlock(data);
+        },
+    },
 };
 
 function signatureModeSlots(mode = "captain-right") {
@@ -2084,6 +2959,17 @@ export function getCertificateTemplate(templateKey, certType) {
     const alias = TEMPLATE_ALIASES[normalizeKey(certType)];
     if (alias && TEMPLATES[alias]) return TEMPLATES[alias];
     return TEMPLATES["doc1-barangay-clearance"];
+}
+
+export function getTemplateProofRequirements(templateKey, certType) {
+    const directKey = String(templateKey || "").trim();
+    const alias = TEMPLATE_ALIASES[normalizeKey(certType)];
+    const requirements =
+        TEMPLATE_PROOF_REQUIREMENTS[directKey] ||
+        TEMPLATE_PROOF_REQUIREMENTS[alias] ||
+        [];
+
+    return requirements.map((item) => ({ ...item }));
 }
 
 function buildHeader(settings) {
@@ -2234,6 +3120,108 @@ function baseStyles() {
             display: block;
             font-size: 10pt;
             font-style: italic;
+        }
+        .cf-business-endorsement {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.45;
+            margin-top: -0.06in;
+        }
+        .cf-business-endorsement p {
+            margin: 0 0 0.11in;
+            text-align: left;
+        }
+        .cf-business-heading-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            align-items: start;
+            margin: 0 0 0.24in;
+        }
+        .cf-business-document-type {
+            grid-column: 1;
+            font-size: 11pt;
+            font-weight: 400;
+            padding-left: 0.04in;
+            text-align: left;
+        }
+        .cf-business-heading {
+            grid-column: 2;
+            text-align: center;
+        }
+        .cf-business-heading > div {
+            display: inline-block;
+            border-bottom: 1px solid #000;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 16pt;
+            line-height: 1.05;
+            margin-bottom: 0.02in;
+        }
+        .cf-business-heading small {
+            display: block;
+            font-size: 11pt;
+            line-height: 1.1;
+        }
+        .cf-business-endorse {
+            margin-bottom: 0.14in;
+            text-transform: uppercase;
+        }
+        .cf-business-lines {
+            margin-bottom: 0.20in;
+            font-size: 11pt;
+            line-height: 1.13;
+        }
+        .cf-business-lines div {
+            margin-top: 0.07in;
+        }
+        .cf-business-lines small {
+            font-size: 9pt;
+            font-style: normal;
+        }
+        .cf-business-checks {
+            line-height: 1.45;
+        }
+        .cf-business-checks p {
+            margin-bottom: 0.04in;
+        }
+        .cf-business-check-row {
+            display: grid;
+            grid-template-columns: 0.18in 1fr;
+            gap: 0.04in;
+            margin: 0.03in 0 0.10in;
+            text-align: left;
+        }
+        .cf-business-box {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 12pt;
+            line-height: 1.2;
+        }
+        .cf-business-center {
+            margin-top: 0.10in;
+            text-align: center !important;
+        }
+        section:has(.cf-business-endorsement) .cf-signature-row.captain {
+            margin-top: 0.20in;
+        }
+        .cf-granted-lines {
+            margin-top: -0.03in;
+            margin-bottom: 0.16in;
+        }
+        .cf-centered-lines {
+            text-align: center;
+            font-size: 13pt;
+            font-weight: 700;
+            line-height: 1.45;
+            margin: -0.04in 0 0.18in;
+        }
+        .cf-validity-block {
+            font-size: 11pt;
+            font-weight: 700;
+            line-height: 1.45;
+            margin: 0.04in 0 0;
+            text-align: left;
+        }
+        section:has(.cf-business-endorsement) .cf-validity-block {
+            margin-top: -0.02in;
         }
         .cf-letter-date {
             font-size: 12pt;
@@ -2467,14 +3455,18 @@ export function buildCertificatePrintHtml({
     const titleHtml = template.hideTitle
         ? ""
         : `<h1 class="cf-cert-title">${escapeHtml(title)}</h1>`;
-    const body = template.render({
+    const renderData = {
         ...data,
         extraFields: data?.extraFields || data?.extra_fields || {},
-    });
+    };
+    const body = template.render(renderData);
     const signatures = renderSignatures(
         mergedSettings,
         template.signatures || "captain-right",
     );
+    const postSignatures = template.renderPostSignatures
+        ? template.renderPostSignatures(renderData)
+        : "";
     const printScript = autoPrint
         ? `<script>window.addEventListener("load", () => setTimeout(() => window.print(), 250));</script>`
         : "";
@@ -2494,6 +3486,7 @@ export function buildCertificatePrintHtml({
             ${titleHtml}
             <div class="cf-cert-body">${body}</div>
             ${signatures}
+            ${postSignatures}
         </section>
     </main>
     ${printScript}
@@ -2506,5 +3499,15 @@ export function getTemplateFieldLabels(templateKey, certType) {
     return (template.fields || []).map((field) => ({
         key: field,
         label: FIELD_LABELS[field] || field,
+        type: FIELD_TYPES[field],
+        defaultValue: FIELD_DEFAULTS[field],
+        required: FIELD_REQUIRED[field],
+        adminOnly: Boolean(FIELD_ADMIN_ONLY[field]),
     }));
+}
+
+export function getTemplateAdminFields(templateKey, certType) {
+    return getTemplateFieldLabels(templateKey, certType).filter(
+        (field) => field.adminOnly,
+    );
 }

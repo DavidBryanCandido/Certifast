@@ -7,6 +7,8 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import { ChevronLeft, ChevronRight, Eye, HelpCircle, Menu, Search, X } from "lucide-react";
 import * as settingsService from "../../services/settingsService";
 import { DEFAULT_OFFICE_SCHEDULE } from "../../services/publicBrandingService";
@@ -369,10 +371,42 @@ function sampleValueForTemplateField(key) {
     if (normalized.includes("date") || normalized.includes("dob")) {
         return "2026-05-19";
     }
+    if (normalized.includes("validuntil")) return "2026-12-31";
+    if (normalized.includes("eventname")) {
+        return "Mobile Legends Bang Bang Tournament 2025";
+    }
+    if (normalized.includes("eventorganizer")) {
+        return "Sangguniang Kabataan of Barangay East Tapinac";
+    }
+    if (normalized.includes("eventpartner")) return "Community Heroes";
+    if (normalized.includes("eventtime")) return "10 AM onwards";
+    if (normalized.includes("eventvenue")) {
+        return "Barangay East Tapinac Covered Court";
+    }
+    if (normalized.includes("businesspermitno")) return "ET-BPI-2026-1048";
     if (normalized.includes("age")) return "35";
     if (normalized.includes("gender")) return "Female";
     if (normalized.includes("amount")) return "5000";
     if (normalized.includes("area")) return "24 sqm";
+    if (normalized.includes("monthlyincome")) return "P3,800";
+    if (normalized.includes("occupation")) return "Purok Leader";
+    if (normalized.includes("permittype")) return "Road Damage Permit";
+    if (normalized.includes("businessstatusperiod")) {
+        return "March 2020 to January 2021";
+    }
+    if (normalized.includes("businesspurpose")) return "Renewal Application";
+    if (normalized.includes("businessownername")) return "Juan Dela Cruz";
+    if (normalized.includes("businessname")) return "Dela Cruz Sari-Sari Store";
+    if (normalized.includes("damagecause")) return "Fire Blaze";
+    if (normalized.includes("damagetime")) return "9:30 P.M.";
+    if (normalized.includes("nonresidentnames")) {
+        return "Chaehun Bae\nYunghae Lee\nEunhwan Lee";
+    }
+    if (normalized.includes("companyname")) {
+        return "Subic Water and Sewerage Co. Inc.";
+    }
+    if (normalized.includes("siblingname")) return "Mon-Andrei Monsalud";
+    if (normalized.includes("childname")) return "Gerald Fresnido";
     if (normalized.includes("address")) return "Purok 8, Del Pilar Street";
     if (normalized.includes("business")) return "Dela Cruz Sari-Sari Store";
     if (normalized.includes("relationship")) return "son";
@@ -398,7 +432,12 @@ function sampleValueForTemplateField(key) {
 
 function buildTemplatePreviewData(cert) {
     const fieldEntries = getTemplateFieldLabels(cert?.templateKey, cert?.name).map(
-        (field) => [field.key, sampleValueForTemplateField(field.key)],
+        (field) => [
+            field.key,
+            field.type === "checkbox"
+                ? (field.defaultValue ?? true)
+                : sampleValueForTemplateField(field.key),
+        ],
     );
     const extraFields = {
         ...Object.fromEntries(fieldEntries),
@@ -917,7 +956,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [activePage, setActivePage] = useState("settings");
 
     const handleNavigate = (key) => {
-        setActivePage(key);
+        if (!String(key).startsWith("/")) setActivePage(key);
         if (onNavigate) onNavigate(key);
     };
 
@@ -1527,6 +1566,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             </span>
                         )}
                     </div>
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={onLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Content */}

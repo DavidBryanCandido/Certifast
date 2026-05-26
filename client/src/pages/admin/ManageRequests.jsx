@@ -14,6 +14,8 @@ import {
     Eye,
     Menu,
     AlertCircle,
+    Paperclip,
+    ExternalLink,
 } from "lucide-react";
 
 import {
@@ -22,6 +24,9 @@ import {
 } from "../../components/AdminSidebar";
 import { useSearchParams } from "react-router-dom";
 import AdminQRScannerModal from "../../components/AdminQRScannerModal";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
+import AdminRequestDecisionFields from "../../components/AdminRequestDecisionFields";
 import adminRequestService from "../../services/adminRequestService";
 import * as settingsService from "../../services/settingsService";
 import { buildCertificatePrintHtml } from "../../utils/certificateTemplateEngine";
@@ -177,6 +182,13 @@ const DOT_COLORS = {
     grey:  "#ccc",
 };
 
+function formatAttachmentSize(size = 0) {
+    const bytes = Number(size || 0);
+    if (!bytes) return "";
+    if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function timelineTime(value, fallback = "") {
     if (!value) return fallback;
     const d = new Date(value);
@@ -242,13 +254,6 @@ function buildTimeline(request, status) {
 
 const ITEMS_PER_PAGE = 8;
 
-function formatDateShort() {
-    return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-function formatDate() {
-    return new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-}
-
 // =============================================================
 // RequestDrawer
 // — Row click opens it, approve stays open, print unlocks mark-ready,
@@ -269,6 +274,7 @@ function RequestDrawer({
     const [actionError, setActionError]  = useState("");
     const [currentStatus, setCurrentStatus] = useState(null);
     const [hasPrinted, setHasPrinted]    = useState(false);
+    const [adminExtraFields, setAdminExtraFields] = useState({});
 
     // Reset local state whenever a new request is opened
     useEffect(() => {
@@ -278,6 +284,7 @@ function RequestDrawer({
         setStep("default");
         setRejectReason("");
         setActionError("");
+        setAdminExtraFields({});
     }, [request]);
 
     // Scroll-lock + escape key
@@ -296,6 +303,10 @@ function RequestDrawer({
     const status = currentStatus || request.status;
     const badge  = BADGE_CFG[status] || BADGE_CFG.pending;
     const timeline = buildTimeline(request, status);
+    const mergedExtraFields = {
+        ...(request.extraFields || {}),
+        ...adminExtraFields,
+    };
 
     const handleApiError = (err) => {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -366,7 +377,7 @@ function RequestDrawer({
                                 dateOfBirth: request.dateOfBirth,
                                 civilStatus: request.civil,
                                 nationality: request.nationality,
-                                extraFields: request.extraFields || {},
+                                extraFields: mergedExtraFields,
                                 issuedAt: new Date(),
                         },
                         settings: certificateSettings,
@@ -599,6 +610,79 @@ function RequestDrawer({
                     </div>
 
                     {/* ── Workflow hint (approved only) ── */}
+                    <div className="mr-drawer-section">
+                        <SectionTitle>Submitted Supporting Documents</SectionTitle>
+                        {request.attachments?.length > 0 ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                {request.attachments.map((attachment) => {
+                                    const url = attachment.viewUrl || attachment.fileUrl;
+                                    const isImage = String(attachment.mimeType || "").startsWith("image/");
+                                    return (
+                                        <a
+                                            key={attachment.id || `${attachment.proofKey}-${attachment.fileName}`}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                                display: "flex",
+                                                gap: 10,
+                                                alignItems: "center",
+                                                padding: 10,
+                                                border: "1px solid #e4dfd4",
+                                                borderRadius: 6,
+                                                background: "#fffdf8",
+                                                textDecoration: "none",
+                                            }}
+                                        >
+                                            {isImage && url ? (
+                                                <img
+                                                    src={url}
+                                                    alt=""
+                                                    style={{
+                                                        width: 46,
+                                                        height: 46,
+                                                        objectFit: "cover",
+                                                        borderRadius: 4,
+                                                        border: "1px solid #e4dfd4",
+                                                        flexShrink: 0,
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span style={{ width: 46, height: 46, borderRadius: 4, border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", color: "#0e2554", background: "#f8f6f1", flexShrink: 0 }}>
+                                                    <Paperclip size={16} />
+                                                </span>
+                                            )}
+                                            <span style={{ minWidth: 0, flex: 1 }}>
+                                                <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#0e2554", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                                                    {attachment.label || "Supporting document"}
+                                                </span>
+                                                <span style={{ display: "block", fontSize: 12.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {attachment.fileName || "Uploaded file"}
+                                                </span>
+                                                <span style={{ display: "block", fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
+                                                    {formatAttachmentSize(attachment.fileSize)}
+                                                </span>
+                                            </span>
+                                            <ExternalLink size={13} color="#4a4a6a" />
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div style={{ background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 4, padding: "10px 12px", fontSize: 12, color: "#77708a", lineHeight: 1.6 }}>
+                                No supporting document was uploaded with this request.
+                            </div>
+                        )}
+                    </div>
+
+                    <AdminRequestDecisionFields
+                        request={request}
+                        onChange={setAdminExtraFields}
+                        onLogout={onLogout}
+                        sectionClassName="mr-drawer-section"
+                        titleClassName="mr-section-title"
+                    />
+
                     {status === "approved" && (
                         <div className="mr-drawer-section">
                             <SectionTitle>Workflow</SectionTitle>
@@ -778,6 +862,10 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
         const address = [row.resident_address_house, row.resident_address_street]
             .filter((v) => String(v || "").trim())
             .join(", ");
+        const fallbackAttachments = Array.isArray(row.extra_fields?.proofAttachments)
+            ? row.extra_fields.proofAttachments
+            : [];
+
         return {
             rawId:    row.request_id,
             id:       `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
@@ -801,6 +889,9 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                 row.extra_fields?.templateKey ||
                 row.extra_fields?.template_key ||
                 "",
+            attachments: Array.isArray(row.attachments) && row.attachments.length > 0
+                ? row.attachments
+                : fallbackAttachments,
             rejection_reason: row.rejection_reason || "",
             requestedAtIso:   row.requested_at || null,
             processedAtIso:   row.processed_at || null,
@@ -852,7 +943,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     }, []);
 
     const handleNavigate = (page) => {
-        setActivePage(page);
+        if (!String(page).startsWith("/")) setActivePage(page);
         if (navProp) navProp(page);
     };
 
@@ -965,11 +1056,12 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                         Manage Requests
                         {!isMobile && <span style={{ fontSize: 12, fontFamily: "'Source Serif 4',serif", color: "#9090aa", fontWeight: 400, marginLeft: 10 }}>Review and process certificate requests</span>}
                     </div>
-                    {!isMobile && (
-                        <div style={{ fontSize: 11, color: "#9090aa", background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 4, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            {isTablet ? formatDateShort() : formatDate()}
-                        </div>
-                    )}
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={onLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Page content */}

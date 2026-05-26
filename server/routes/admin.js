@@ -8,6 +8,7 @@ const {
     getRecentRequests,
     approveRequest,
     rejectRequest,
+    updateRequestExtraFields,
     getCertificateTemplates,
     updateCertificateTemplate,
     issueWalkIn,
@@ -57,6 +58,8 @@ router.delete("/accounts/:id", adminAuth, deactivateAccount);
 router.get("/requests", adminAuth, getManageRequests);
 router.post("/requests/:id/approve", adminAuth, approveRequest);
 router.post("/requests/:id/reject", adminAuth, rejectRequest);
+router.put("/requests/:id/extra-fields", adminAuth, updateRequestExtraFields);
+router.post("/requests/:id/extra-fields", adminAuth, updateRequestExtraFields);
 router.post("/requests/:id/mark-ready", adminAuth, markRequestReady);
 router.post("/requests/:id/release", adminAuth, releaseRequest);
 router.get("/certificates/templates", adminAuth, getCertificateTemplates);

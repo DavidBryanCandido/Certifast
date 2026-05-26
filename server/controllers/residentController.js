@@ -152,10 +152,18 @@ async function updateProfile(req, res) {
 }
 
 // POST /api/resident/requests
-// body: { certType, purpose, extraFields, notes, source }
+// body: { certType, purpose, extraFields, attachments, notes, source }
 async function createRequest(req, res) {
     const resident_id = req.resident.id;
-    const { certType, purpose, extraFields, notes, source, templateId } = req.body;
+    const {
+        certType,
+        purpose,
+        extraFields,
+        attachments,
+        notes,
+        source,
+        templateId,
+    } = req.body;
 
     if (!certType || !purpose) {
         return res
@@ -163,14 +171,17 @@ async function createRequest(req, res) {
             .json({ message: "Certificate type and purpose are required" });
     }
 
+    const client = await pool.connect();
     try {
+        await client.query("BEGIN");
+
         const parsedTemplateId = Number.parseInt(templateId, 10);
         const resolvedTemplateId =
             Number.isFinite(parsedTemplateId) && parsedTemplateId > 0
                 ? parsedTemplateId
                 : null;
 
-        const result = await pool.query(
+        const result = await client.query(
             `INSERT INTO requests
         (resident_id, template_id, cert_type, purpose, extra_fields, notes, source, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
@@ -186,6 +197,49 @@ async function createRequest(req, res) {
             ],
         );
 
+        const requestId = result.rows[0].request_id;
+        const proofFiles = (
+            Array.isArray(attachments)
+                ? attachments
+                : Array.isArray(extraFields?.proofAttachments)
+                  ? extraFields.proofAttachments
+                  : []
+        )
+            .filter(Boolean)
+            .slice(0, 8);
+
+        if (proofFiles.length > 0) {
+            const values = [];
+            const params = [];
+
+            proofFiles.forEach((file, index) => {
+                const offset = index * 9;
+                values.push(
+                    `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`,
+                );
+                params.push(
+                    requestId,
+                    resident_id,
+                    String(file.proofKey || "proof").slice(0, 80),
+                    String(file.label || "Supporting proof").slice(0, 160),
+                    String(file.fileName || "uploaded-file").slice(0, 255),
+                    String(file.filePath || "").slice(0, 500),
+                    String(file.fileUrl || "").slice(0, 1000),
+                    String(file.mimeType || "").slice(0, 120),
+                    Number(file.fileSize || 0),
+                );
+            });
+
+            await client.query(
+                `INSERT INTO request_attachments
+                    (request_id, resident_id, proof_key, label, file_name, file_path, file_url, mime_type, file_size)
+                 VALUES ${values.join(", ")}`,
+                params,
+            );
+        }
+
+        await client.query("COMMIT");
+
         await createAuditLog({
             actorId: resident_id,
             actorName:
@@ -200,8 +254,11 @@ async function createRequest(req, res) {
 
         return res.status(201).json({ request: result.rows[0] });
     } catch (err) {
+        await client.query("ROLLBACK").catch(() => {});
         console.error("createRequest error:", err);
         return res.status(500).json({ message: "Server error" });
+    } finally {
+        client.release();
     }
 }
 

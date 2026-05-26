@@ -16,7 +16,6 @@ import {
     ClipboardList,
     FileSpreadsheet,
     FileDown,
-    Calendar,
     CheckCircle,
     Menu,
     AlertCircle,
@@ -27,6 +26,8 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import reportsService from "../../services/reportsService";
 
 // =============================================================
@@ -192,13 +193,6 @@ function formatBadge(fmt) {
     );
 }
 
-function formatDate() {
-    return new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-}
-function formatDateShort() {
-    return new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 // =============================================================
 // Main Component
 // =============================================================
@@ -219,7 +213,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
     const [toast,          setToast]          = useState(null);
     const [recentExports,  setRecentExports]  = useState([]);
 
-    const handleNavigate = (page) => { setActivePage(page); if (navProp) navProp(page); };
+    const handleNavigate = (page) => { if (!String(page).startsWith("/")) setActivePage(page); if (navProp) navProp(page); };
     const handleLogout   = () => { if (onLogout) onLogout(); };
 
     const showToast = (msg, type = "success") => {
@@ -355,11 +349,12 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                         Reports &amp; Exports
                         {!isMobile && <span style={{ fontSize: 12, fontFamily: "'Source Serif 4',serif", color: "#9090aa", fontWeight: 400, marginLeft: 10 }}>Generate and download official barangay reports</span>}
                     </div>
-                    {!isMobile && (
-                        <div style={{ fontSize: 11, color: "#9090aa", background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 4, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
-                            <Calendar size={12} /> {isTablet ? formatDateShort() : formatDate()}
-                        </div>
-                    )}
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={handleLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Page content */}

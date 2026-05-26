@@ -22,10 +22,13 @@ import {
     AlertTriangle,
     User,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import accountService from "../../services/accountService";
 import axios from "axios";
 import authService from "../../services/authService";
@@ -1452,6 +1455,11 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
         .trim()
         .toLowerCase();
     const isSuperAdmin = role === "admin" || role === "superadmin";
+    const [searchParams] = useSearchParams();
+    const requestedTab = String(searchParams.get("tab") || "").toLowerCase();
+    const requestedResidentStatus = String(
+        searchParams.get("residentStatus") || "",
+    ).toLowerCase();
 
     // ── Which tab is active ──
     const [activeTab, setActiveTab] = useState(
@@ -1459,7 +1467,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     ); // "staff" | "residents"
 
     const handleNavigate = (key) => {
-        setActivePage(key);
+        if (!String(key).startsWith("/")) setActivePage(key);
         if (onNavigate) onNavigate(key);
     };
 
@@ -1479,6 +1487,23 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     const [statusFilter, setStatusFilter] = useState("");
     const [resSearch, setResSearch] = useState("");
     const [resStatusFilter, setResStatusFilter] = useState("");
+
+    useEffect(() => {
+        if (
+            requestedTab === "residents" ||
+            (requestedTab === "staff" && isSuperAdmin)
+        ) {
+            setActiveTab(requestedTab);
+        }
+
+        if (
+            ["active", "inactive", "pending_verification"].includes(
+                requestedResidentStatus,
+            )
+        ) {
+            setResStatusFilter(requestedResidentStatus);
+        }
+    }, [isSuperAdmin, requestedResidentStatus, requestedTab]);
 
     // ── Modals ──
     const [modal, setModal] = useState(null); // { mode, account }
@@ -1863,6 +1888,12 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                             <UserPlus size={14} /> New Account
                         </button>
                     )}
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={onLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Content */}

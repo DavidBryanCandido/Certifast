@@ -24,9 +24,11 @@ import {
     ClipboardList,
     FileCheck,
     UserCircle,
+    UploadCloud,
 } from "lucide-react";
 import residentProfileService from "../../services/residentProfileService";
 import requestService from "../../services/requestService";
+import { supabase } from "../../supabaseClient";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
@@ -37,6 +39,7 @@ import {
 import {
     CERTIFICATE_TEMPLATE_OPTIONS,
     getTemplateFieldLabels,
+    getTemplateProofRequirements,
 } from "../../utils/certificateTemplateEngine";
 
 // ─── Styles ───────────────────────────────────────────────────
@@ -126,15 +129,45 @@ function normalizeTemplateField(field, templateKey, name) {
         key,
         label: fieldConfig.label || override?.label || meta?.label || humanizeFieldKey(key),
         placeholder: fieldConfig.placeholder ?? override?.placeholder ?? "",
-        required: fieldConfig.required ?? override?.required ?? true,
+        required: fieldConfig.required ?? override?.required ?? meta?.required ?? true,
         type:
             fieldConfig.type ||
             override?.type ||
+            meta?.type ||
             (key.toLowerCase().includes("date") ||
             key.toLowerCase().includes("dob")
                 ? "date"
                 : "text"),
+        defaultValue:
+            fieldConfig.defaultValue ?? override?.defaultValue ?? meta?.defaultValue,
+        adminOnly: Boolean(
+            fieldConfig.adminOnly ?? override?.adminOnly ?? meta?.adminOnly,
+        ),
     };
+}
+
+const OBSOLETE_PROOF_KEYS = new Set(["valid_id", "address_proof"]);
+
+function normalizeProofRequirements(raw) {
+    let list = raw;
+    if (typeof raw === "string") {
+        try {
+            list = JSON.parse(raw);
+        } catch {
+            list = [];
+        }
+    }
+
+    if (!Array.isArray(list)) return [];
+
+    return list
+        .filter(Boolean)
+        .filter((proof) => !OBSOLETE_PROOF_KEYS.has(String(proof.key || "")))
+        .map((proof) => ({
+            ...proof,
+            required: proof.required !== false,
+            accept: proof.accept || "image/*,.pdf",
+        }));
 }
 
 function normalizeTemplateRows(rows) {
@@ -157,6 +190,9 @@ function normalizeTemplateRows(rows) {
             hasFee: Boolean(row.hasFee ?? row.has_fee),
             desc: row.desc || row.description || "",
             fields: fieldConfigs,
+            proofRequirements: normalizeProofRequirements(
+                row.proofRequirements || row.proof_requirements || [],
+            ),
         });
     });
 }
@@ -431,9 +467,65 @@ function humanizeFieldKey(key) {
 
 function getCertificateFields(cert) {
     if (Array.isArray(cert?.fields) && cert.fields.length > 0) {
-        return cert.fields;
+        return cert.fields.filter((field) => !field.adminOnly);
     }
-    return CERT_EXTRA_FIELDS[cert?.name] || [];
+    return (CERT_EXTRA_FIELDS[cert?.name] || []).filter(
+        (field) => !field.adminOnly,
+    );
+}
+
+function defaultExtraFieldValues(fields = []) {
+    return Object.fromEntries(
+        fields
+            .filter((field) => field?.defaultValue !== undefined)
+            .map((field) => [field.key, field.defaultValue]),
+    );
+}
+
+function fieldValueForDisplay(field, values) {
+    const selected =
+        values[field.key] !== undefined ? values[field.key] : field.defaultValue;
+    if (field.type === "checkbox") {
+        return selected ? "Yes" : "No";
+    }
+    return selected || "—";
+}
+
+function getProofRequirements(cert) {
+    const tableRequirements = normalizeProofRequirements(cert?.proofRequirements);
+    if (tableRequirements.length > 0) {
+        return tableRequirements;
+    }
+    return getTemplateProofRequirements(cert?.templateKey, cert?.name);
+}
+
+function fileExt(name = "") {
+    const ext = String(name).split(".").pop()?.toLowerCase();
+    return ext && ext !== name.toLowerCase() ? ext : "bin";
+}
+
+function safeFilePart(raw = "") {
+    return String(raw)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 42);
+}
+
+function formatFileSize(size = 0) {
+    if (!size) return "0 KB";
+    if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function validateProofFile(file) {
+    if (!file) return "";
+    const maxSize = 6 * 1024 * 1024;
+    const allowed =
+        file.type.startsWith("image/") || file.type === "application/pdf";
+    if (!allowed) return "Supporting document must be an image or PDF file.";
+    if (file.size > maxSize) return "Supporting document must be 6 MB or smaller.";
+    return "";
 }
 
 function FieldGroup({ label, children, required }) {
@@ -544,6 +636,7 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [purpose, setPurpose] = useState("");
     const [customPurpose, setCustomPurpose] = useState("");
     const [extraFields, setExtraFields] = useState({});
+    const [proofFiles, setProofFiles] = useState({});
     const [notes, setNotes] = useState("");
 
     // Submission
@@ -649,6 +742,7 @@ export default function SubmitRequest({ resident, onLogout }) {
     const isMobile = width < 768;
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra = selectedCert ? getCertificateFields(selectedCert) : [];
+    const proofRequirements = selectedCert ? getProofRequirements(selectedCert) : [];
     const activeCerts = certsLoading ? ALL_CERTS : certs;
     const normalizedCertSearch = certSearch.trim().toLowerCase();
     const filteredCerts = normalizedCertSearch
@@ -689,10 +783,81 @@ export default function SubmitRequest({ resident, onLogout }) {
         setExtraFields((prev) => ({ ...prev, [key]: val }));
     }
 
+    function setProofFile(key, file) {
+        const validationError = validateProofFile(file);
+        if (validationError) {
+            setError(validationError);
+            return;
+        }
+        setProofFiles((prev) => ({ ...prev, [key]: file }));
+        setError("");
+    }
+
     // Reset extra fields when cert changes
     useEffect(() => {
-        setExtraFields({});
+        setExtraFields(defaultExtraFieldValues(certExtra));
+        setProofFiles({});
     }, [selectedCert]);
+
+    async function uploadProofFiles() {
+        if (proofRequirements.length === 0) return [];
+
+        const {
+            data: { user },
+            error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user?.id) {
+            throw new Error("Please sign in again before uploading supporting documents.");
+        }
+
+        const uploaded = [];
+        for (const requirement of proofRequirements) {
+            const file = proofFiles[requirement.key];
+            if (!file) continue;
+
+            const unique =
+                typeof crypto !== "undefined" && crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const path = [
+                "request-proofs",
+                user.id,
+                `${Date.now()}-${safeFilePart(requirement.key)}-${unique}.${fileExt(file.name)}`,
+            ].join("/");
+
+            const { error: uploadError } = await supabase.storage
+                .from("certifast-uploads")
+                .upload(path, file, {
+                    cacheControl: "3600",
+                    contentType: file.type || undefined,
+                    upsert: false,
+                });
+
+            if (uploadError) {
+                throw new Error(
+                    uploadError.message ||
+                        `Could not upload ${requirement.label}.`,
+                );
+            }
+
+            const { data: publicData } = supabase.storage
+                .from("certifast-uploads")
+                .getPublicUrl(path);
+
+            uploaded.push({
+                proofKey: requirement.key,
+                label: requirement.label,
+                fileName: file.name,
+                filePath: path,
+                fileUrl: publicData?.publicUrl || "",
+                mimeType: file.type || "",
+                fileSize: file.size || 0,
+            });
+        }
+
+        return uploaded;
+    }
 
     useEffect(() => {
         setCertPage(1);
@@ -713,10 +878,20 @@ export default function SubmitRequest({ resident, onLogout }) {
             }
             // Validate required extra fields
             for (const field of certExtra) {
-                if (field.required && !extraFields[field.key]?.trim()) {
+                if (
+                    field.required &&
+                    field.type !== "checkbox" &&
+                    !String(extraFields[field.key] ?? "").trim()
+                ) {
                     setError(
                         `Please fill in: ${field.label.replace(" (optional)", "")}`,
                     );
+                    return;
+                }
+            }
+            for (const proof of proofRequirements) {
+                if (proof.required && !proofFiles[proof.key]) {
+                    setError(`Please upload: ${proof.label}`);
                     return;
                 }
             }
@@ -734,6 +909,7 @@ export default function SubmitRequest({ resident, onLogout }) {
         setSubmitting(true);
         setError("");
         try {
+            const attachments = await uploadProofFiles();
             const data = await requestService.createRequest({
                 certType: selectedCert.name,
                 templateId: selectedCert.templateId || null,
@@ -741,7 +917,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                 extraFields: {
                     ...extraFields,
                     templateKey: selectedCert.templateKey || "",
+                    proofAttachments: attachments,
                 },
+                attachments,
                 notes,
                 source: "resident",
             });
@@ -1622,29 +1800,182 @@ export default function SubmitRequest({ resident, onLogout }) {
                     >
                         Additional Information Required
                     </div>
-                    {certExtra.map((field) => (
+                    {certExtra.map((field) => {
+                        const checked =
+                            extraFields[field.key] !== undefined
+                                ? Boolean(extraFields[field.key])
+                                : Boolean(field.defaultValue);
+                        return (
                         <FieldGroup
                             key={field.key}
                             label={field.label}
                             required={field.required}
                         >
-                            <input
-                                className="sr-input"
-                                type={field.type || "text"}
-                                placeholder={field.placeholder || ""}
-                                value={extraFields[field.key] || ""}
-                                onChange={(e) => {
-                                    setExtra(field.key, e.target.value);
-                                    setError("");
-                                }}
-                                max={
-                                    field.type === "date"
-                                        ? new Date().toISOString().split("T")[0]
-                                        : undefined
-                                }
-                            />
+                            {field.type === "checkbox" ? (
+                                <label
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                        minHeight: 38,
+                                        padding: "8px 10px",
+                                        border: "1px solid #e4dfd4",
+                                        borderRadius: 6,
+                                        background: "#fffdf8",
+                                        fontSize: 12.5,
+                                        color: "#1a1a2e",
+                                    }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={(e) => {
+                                            setExtra(field.key, e.target.checked);
+                                            setError("");
+                                        }}
+                                    />
+                                    <span>{checked ? "Yes" : "No"}</span>
+                                </label>
+                            ) : (
+                                <input
+                                    className="sr-input"
+                                    type={field.type || "text"}
+                                    placeholder={field.placeholder || ""}
+                                    value={extraFields[field.key] || ""}
+                                    onChange={(e) => {
+                                        setExtra(field.key, e.target.value);
+                                        setError("");
+                                    }}
+                                    max={
+                                        field.type === "date"
+                                            ? new Date()
+                                                  .toISOString()
+                                                  .split("T")[0]
+                                            : undefined
+                                    }
+                                />
+                            )}
                         </FieldGroup>
-                    ))}
+                        );
+                    })}
+                </div>
+            )}
+
+            {proofRequirements.length > 0 && (
+                <div style={{ marginTop: 4, marginBottom: 4 }}>
+                    <div
+                        style={{
+                            height: 1,
+                            background: "#e4dfd4",
+                            margin: "4px 0 18px",
+                        }}
+                    />
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            fontFamily: "'Playfair Display',serif",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "#0e2554",
+                            marginBottom: 6,
+                        }}
+                    >
+                        <UploadCloud size={15} />
+                        Supporting Documents
+                    </div>
+                    <div
+                        style={{
+                            fontSize: 11.5,
+                            color: "#7a7890",
+                            lineHeight: 1.5,
+                            marginBottom: 14,
+                        }}
+                    >
+                        Upload only the document needed for this certificate,
+                        such as a letter, medical paper, business paper, school
+                        paper, or other requirement. Staff will review it before
+                        approving or rejecting the request.
+                    </div>
+                    {proofRequirements.map((proof) => {
+                        const file = proofFiles[proof.key];
+                        return (
+                            <FieldGroup
+                                key={proof.key}
+                                label={proof.label}
+                                required={proof.required}
+                            >
+                                <label
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: 12,
+                                        padding: "11px 12px",
+                                        border: "1.5px dashed #cfc7bb",
+                                        borderRadius: 6,
+                                        background: file ? "#f0faf4" : "#fffdf8",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    <span
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 2,
+                                            minWidth: 0,
+                                        }}
+                                    >
+                                        <strong
+                                            style={{
+                                                fontSize: 12.5,
+                                                color: file
+                                                    ? "#1a7a4a"
+                                                    : "#4a4a6a",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {file ? file.name : "Choose file"}
+                                        </strong>
+                                        <span
+                                            style={{
+                                                fontSize: 10.5,
+                                                color: "#9090aa",
+                                            }}
+                                        >
+                                            {file
+                                                ? formatFileSize(file.size)
+                                                : "Image or PDF, max 6 MB"}
+                                        </span>
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        Browse
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept={proof.accept || "image/*,.pdf"}
+                                        onChange={(e) =>
+                                            setProofFile(
+                                                proof.key,
+                                                e.target.files?.[0] || null,
+                                            )
+                                        }
+                                        style={{ display: "none" }}
+                                    />
+                                </label>
+                            </FieldGroup>
+                        );
+                    })}
                 </div>
             )}
 
@@ -1709,7 +2040,11 @@ export default function SubmitRequest({ resident, onLogout }) {
         // Extra fields in summary
         ...certExtra.map((f) => ({
             label: f.label.replace(" (optional)", ""),
-            value: extraFields[f.key] || "—",
+            value: fieldValueForDisplay(f, extraFields),
+        })),
+        ...proofRequirements.map((proof) => ({
+            label: `Document: ${proof.label}`,
+            value: proofFiles[proof.key]?.name || "—",
         })),
         {
             label: "Fee Required",

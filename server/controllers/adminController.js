@@ -18,6 +18,74 @@ function makeWalkInDocId(certificateId) {
     return `WI-${y}${m}${d}-${String(certificateId).padStart(6, "0")}`;
 }
 
+async function appendRequestAttachments(rows = []) {
+    const ids = rows
+        .map((row) => Number.parseInt(row.request_id, 10))
+        .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (ids.length === 0) return rows;
+
+    try {
+        const result = await pool.query(
+            `SELECT
+                request_attachment_id,
+                request_id,
+                proof_key,
+                label,
+                file_name,
+                file_path,
+                file_url,
+                mime_type,
+                file_size,
+                uploaded_at
+             FROM request_attachments
+             WHERE request_id = ANY($1::int[])
+             ORDER BY uploaded_at ASC, request_attachment_id ASC`,
+            [ids],
+        );
+
+        const grouped = new Map();
+        for (const row of result.rows) {
+            const item = {
+                id: row.request_attachment_id,
+                proofKey: row.proof_key,
+                label: row.label,
+                fileName: row.file_name,
+                filePath: row.file_path,
+                fileUrl: row.file_url,
+                mimeType: row.mime_type,
+                fileSize: row.file_size,
+                uploadedAt: row.uploaded_at,
+            };
+
+            if (supabase && row.file_path) {
+                const { data, error } = await supabase.storage
+                    .from("certifast-uploads")
+                    .createSignedUrl(row.file_path, 60 * 60);
+                if (!error && data?.signedUrl) {
+                    item.viewUrl = data.signedUrl;
+                }
+            }
+
+            if (!item.viewUrl) item.viewUrl = row.file_url;
+
+            const list = grouped.get(row.request_id) || [];
+            list.push(item);
+            grouped.set(row.request_id, list);
+        }
+
+        return rows.map((row) => ({
+            ...row,
+            attachments: grouped.get(row.request_id) || [],
+        }));
+    } catch (err) {
+        if (err?.code === "42P01" || /request_attachments/i.test(err?.message || "")) {
+            return rows.map((row) => ({ ...row, attachments: [] }));
+        }
+        throw err;
+    }
+}
+
 function getPeriodStart(periodRaw) {
     const period = String(periodRaw || "month").toLowerCase();
     const now = new Date();
@@ -170,7 +238,8 @@ async function getRecentRequests(req, res) {
             [limit],
         );
 
-        return res.json({ data: result.rows });
+        const rows = await appendRequestAttachments(result.rows);
+        return res.json({ data: rows });
     } catch (err) {
         console.error("getRecentRequests error:", err);
         return res.status(500).json({ message: "Server error" });
@@ -298,6 +367,69 @@ async function rejectRequest(req, res) {
     }
 }
 
+async function updateRequestExtraFields(req, res) {
+    const requestId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(requestId) || requestId <= 0) {
+        return res.status(400).json({ message: "Invalid request ID" });
+    }
+
+    const incoming = req.body?.extraFields || req.body?.extra_fields || {};
+    const { clean, error } = sanitizeAdminRequestExtraFields(incoming);
+    if (error) {
+        return res.status(400).json({ message: error });
+    }
+    if (!clean || Object.keys(clean).length === 0) {
+        return res.status(400).json({
+            message: "No supported staff review fields were provided",
+        });
+    }
+
+    try {
+        const current = await pool.query(
+            `SELECT request_id, cert_type, extra_fields
+             FROM requests
+             WHERE request_id = $1`,
+            [requestId],
+        );
+
+        if (current.rowCount === 0) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        const merged = {
+            ...(current.rows[0].extra_fields || {}),
+            ...clean,
+        };
+
+        const result = await pool.query(
+            `UPDATE requests
+             SET extra_fields = $2
+             WHERE request_id = $1
+             RETURNING request_id, cert_type, extra_fields`,
+            [requestId, JSON.stringify(merged)],
+        );
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "request_staff_fields_update",
+            targetTable: "requests",
+            targetId: requestId,
+            description: `Updated staff review fields for ${current.rows[0].cert_type}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({
+            message: "Request staff fields updated successfully",
+            data: result.rows[0],
+        });
+    } catch (err) {
+        console.error("updateRequestExtraFields error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
 async function getCertificateTemplates(req, res) {
     try {
         const includeInactive = ["1", "true", "yes"].includes(
@@ -343,6 +475,33 @@ function parseBooleanInput(value) {
         }
     }
     return null;
+}
+
+const ADMIN_REQUEST_EXTRA_FIELDS = {
+    businessPermitNo: "text",
+    dateIssued: "text",
+    validUntil: "text",
+    businessCompliant: "boolean",
+    businessNoObjection: "boolean",
+};
+
+function sanitizeAdminRequestExtraFields(input = {}) {
+    const clean = {};
+    for (const [key, value] of Object.entries(input || {})) {
+        const type = ADMIN_REQUEST_EXTRA_FIELDS[key];
+        if (!type) continue;
+
+        if (type === "boolean") {
+            const parsed = parseBooleanInput(value);
+            if (parsed === null) {
+                return { error: `${key} must be true or false` };
+            }
+            clean[key] = parsed;
+        } else {
+            clean[key] = String(value ?? "").slice(0, 255);
+        }
+    }
+    return { clean };
 }
 
 async function updateCertificateTemplate(req, res) {
@@ -1035,7 +1194,8 @@ async function getResidentRequests(req, res) {
             [residentId],
         );
 
-        return res.json({ data: result.rows });
+        const rows = await appendRequestAttachments(result.rows);
+        return res.json({ data: rows });
     } catch (err) {
         console.error("getResidentRequests error:", err);
         return res.status(500).json({ message: "Server error" });
@@ -1449,7 +1609,8 @@ async function getManageRequests(req, res) {
              ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC`,
         );
 
-        return res.json({ data: result.rows });
+        const rows = await appendRequestAttachments(result.rows);
+        return res.json({ data: rows });
     } catch (err) {
         console.error("getManageRequests error:", err);
         return res.status(500).json({ message: "Server error" });
@@ -2221,6 +2382,7 @@ module.exports = {
     getRecentRequests,
     approveRequest,
     rejectRequest,
+    updateRequestExtraFields,
     getCertificateTemplates,
     updateCertificateTemplate,
     issueWalkIn,

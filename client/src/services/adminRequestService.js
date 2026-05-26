@@ -37,6 +37,18 @@ const adminRequestService = {
         return res.data;
     },
 
+    updateExtraFields: async (requestId, extraFields) => {
+        const url = `${API}/admin/requests/${requestId}/extra-fields`;
+        try {
+            const res = await axios.put(url, { extraFields }, getAdminHeaders());
+            return res.data;
+        } catch (err) {
+            if (err?.response?.status !== 404) throw err;
+            const res = await axios.post(url, { extraFields }, getAdminHeaders());
+            return res.data;
+        }
+    },
+
     markReady: async (requestId) => {
         const res = await axios.post(
             `${API}/admin/requests/${requestId}/mark-ready`,

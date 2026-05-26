@@ -20,6 +20,8 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import logsService from "../../services/logsService";
 
 // =============================================================
@@ -128,14 +130,6 @@ if (!document.head.querySelector("[data-cf-logs]")) {
 // =============================================================
 // Helpers
 // =============================================================
-function formatDate() {
-    return new Date().toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
-}
 function formatDateShort() {
     return new Date().toLocaleDateString("en-US", {
         month: "short",
@@ -677,7 +671,7 @@ export default function LogsAuditTrail({
             .join("");
 
     const handleNavigate = (page) => {
-        setActivePage(page);
+        if (!String(page).startsWith("/")) setActivePage(page);
         if (navProp) navProp(page);
     };
     const handleLogout = () => {
@@ -974,24 +968,12 @@ export default function LogsAuditTrail({
                             </span>
                         )}
                     </div>
-                    {!isMobile && (
-                        <div
-                            style={{
-                                fontSize: 11,
-                                color: "#9090aa",
-                                background: "#f8f6f1",
-                                border: "1px solid #e4dfd4",
-                                borderRadius: 4,
-                                padding: "5px 12px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {isTablet ? formatDateShort() : formatDate()}
-                        </div>
-                    )}
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={handleLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Page content */}

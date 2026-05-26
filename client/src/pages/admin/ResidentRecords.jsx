@@ -25,6 +25,8 @@ import {
     AdminSidebar,
     AdminMobileSidebar,
 } from "../../components/AdminSidebar";
+import AdminDateChip from "../../components/AdminDateChip";
+import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import residentRecordsService from "../../services/residentRecordsService";
 
 // =============================================================
@@ -196,21 +198,6 @@ function initials(name) {
         .join("")
         .slice(0, 2)
         .toUpperCase();
-}
-function formatDate() {
-    return new Date().toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
-}
-function formatDateShort() {
-    return new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
 }
 function calcAge(dob) {
     try {
@@ -660,7 +647,7 @@ export default function ResidentRecords({
     const sidebarWidth = isMobile ? 0 : isTablet ? 60 : 240;
 
     const handleNavigate = (page) => {
-        setActivePage(page);
+        if (!String(page).startsWith("/")) setActivePage(page);
         if (navProp) navProp(page);
         console.log("Navigate to:", page);
     };
@@ -977,24 +964,12 @@ export default function ResidentRecords({
                             </span>
                         )}
                     </div>
-                    {!isMobile && (
-                        <div
-                            style={{
-                                fontSize: 11,
-                                color: "#9090aa",
-                                background: "#f8f6f1",
-                                border: "1px solid #e4dfd4",
-                                borderRadius: 4,
-                                padding: "5px 12px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                whiteSpace: "nowrap",
-                            }}
-                        >
-                            {isTablet ? formatDateShort() : formatDate()}
-                        </div>
-                    )}
+                    <AdminNotificationsBell
+                        admin={admin}
+                        onNavigate={handleNavigate}
+                        onLogout={handleLogout}
+                    />
+                    {!isMobile && <AdminDateChip compact={isTablet} />}
                 </div>
 
                 {/* Page content */}
