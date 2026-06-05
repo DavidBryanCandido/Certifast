@@ -139,7 +139,7 @@ function useAdminNotificationStyles() {
             border: 1px solid #e4dfd4;
             border-radius: 6px;
             background: #fff;
-            color: #0e2554;
+            color: var(--color-primary);
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -196,12 +196,12 @@ function useAdminNotificationStyles() {
             font-family: 'Playfair Display', serif;
             font-size: 14px;
             font-weight: 700;
-            color: #0e2554;
+            color: var(--color-primary);
         }
         .anb-mark {
             border: none;
             background: transparent;
-            color: #0e2554;
+            color: var(--color-primary);
             font-size: 11px;
             font-weight: 700;
             display: inline-flex;
@@ -263,7 +263,7 @@ function useAdminNotificationStyles() {
         }
         .anb-icon.navy {
             background: #edf1f8;
-            color: #0e2554;
+            color: var(--color-primary);
         }
         .anb-copy {
             min-width: 0;
@@ -282,7 +282,7 @@ function useAdminNotificationStyles() {
             width: 7px;
             height: 7px;
             border-radius: 50%;
-            background: #c9a227;
+            background: var(--color-accent);
             flex-shrink: 0;
         }
         .anb-message {

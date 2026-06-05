@@ -124,7 +124,7 @@ function RequestHistoryCard({ request, isLatest = false, onOpen = null }) {
                     <button
                         type="button"
                         onClick={() => onOpen(request)}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#fff", border: "1px solid #d8d2c6", borderRadius: 4, color: "#0e2554", fontFamily: "'Source Serif 4',serif", fontSize: 11.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#fff", border: "1px solid #d8d2c6", borderRadius: 4, color: "var(--color-primary)", fontFamily: "'Source Serif 4',serif", fontSize: 11.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
                     >
                         <FileOutput size={12} /> Open
                     </button>
@@ -407,7 +407,7 @@ export default function AdminQRScannerModal({
             <div style={{ width: modalWidth, borderRadius: modalRadius, background: "#fff", boxShadow: "0 8px 40px rgba(0,0,0,.3)", overflow: "hidden", maxHeight: isMobile ? "92vh" : state === "result" ? "86vh" : "auto", display: "flex", flexDirection: "column", fontFamily: "'Source Serif 4', serif" }}>
 
                 {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: "linear-gradient(135deg, #0e2554, #163066)", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-soft))", flexShrink: 0 }}>
                     <div>
                         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 700, color: "#fff" }}>
                             {onReleaseConfirm ? "Scan to Release" : "Scan Resident QR"}
@@ -418,7 +418,7 @@ export default function AdminQRScannerModal({
                         <X size={16} strokeWidth={2.5} />
                     </button>
                 </div>
-                <div style={{ height: 3, background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)", flexShrink: 0 }} />
+                <div style={{ height: 3, background: "linear-gradient(90deg,var(--color-accent),var(--color-accent-soft),var(--color-accent))", flexShrink: 0 }} />
 
                 {/* Release context banner */}
                 {onReleaseConfirm && state !== "result" && (
@@ -433,17 +433,17 @@ export default function AdminQRScannerModal({
                 {/* ── IDLE ── */}
                 {state === "idle" && (
                     <div className="qr-in" style={{ padding: "36px 28px 32px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-                        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(14,37,84,0.07)", border: "2px solid rgba(14,37,84,0.12)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
-                            <Camera size={30} color="#0e2554" strokeWidth={1.5} />
+                        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(var(--color-primary-rgb),0.07)", border: "2px solid rgba(var(--color-primary-rgb),0.12)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
+                            <Camera size={30} color="var(--color-primary)" strokeWidth={1.5} />
                         </div>
-                        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700, color: "#0e2554", marginBottom: 8 }}>Camera Access Required</div>
+                        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700, color: "var(--color-primary)", marginBottom: 8 }}>Camera Access Required</div>
                         <p style={{ fontSize: 13, color: "#6a6a88", margin: "0 0 24px", lineHeight: 1.7, maxWidth: 320 }}>
                             This scanner needs your camera to read the resident's QR card.
                         </p>
                         <div style={{ background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 8, padding: "14px 18px", marginBottom: 24, width: "100%", textAlign: "left" }}>
                             {[
                                 { icon: <ShieldCheck size={14} color="#1a7a4a" />, text: "Camera is only used for QR scanning — no photos are saved or stored" },
-                                { icon: <Camera size={14} color="#0e2554" />,    text: "Camera turns off automatically when this modal is closed" },
+                                { icon: <Camera size={14} color="var(--color-primary)" />,    text: "Camera turns off automatically when this modal is closed" },
                             ].map(({ icon, text }, i) => (
                                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i === 0 ? 10 : 0 }}>
                                     <div style={{ flexShrink: 0, marginTop: 1 }}>{icon}</div>
@@ -451,7 +451,7 @@ export default function AdminQRScannerModal({
                                 </div>
                             ))}
                         </div>
-                        <button onClick={handleRequestPermission} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 24px", background: "linear-gradient(135deg, #163066, #091a3e)", color: "#fff", border: "none", borderRadius: 6, fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>
+                        <button onClick={handleRequestPermission} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 24px", background: "linear-gradient(135deg, var(--color-primary-soft), var(--color-primary-dark))", color: "#fff", border: "none", borderRadius: 6, fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>
                             <Camera size={15} /> Allow Camera Access
                         </button>
                     </div>
@@ -460,8 +460,8 @@ export default function AdminQRScannerModal({
                 {/* ── GRANTING ── */}
                 {state === "granting" && (
                     <div className="qr-in" style={{ padding: "52px 28px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-                        <div style={{ width: 48, height: 48, border: "3px solid rgba(14,37,84,0.12)", borderTopColor: "#0e2554", borderRadius: "50%", animation: "qr-spin 0.8s linear infinite", marginBottom: 18 }} />
-                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: "#0e2554", marginBottom: 6 }}>Waiting for permission…</div>
+                        <div style={{ width: 48, height: 48, border: "3px solid rgba(var(--color-primary-rgb),0.12)", borderTopColor: "var(--color-primary)", borderRadius: "50%", animation: "qr-spin 0.8s linear infinite", marginBottom: 18 }} />
+                        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: "var(--color-primary)", marginBottom: 6 }}>Waiting for permission…</div>
                         <p style={{ fontSize: 12.5, color: "#9090aa", margin: 0, lineHeight: 1.65 }}>
                             Your browser should show a permission prompt.<br />Click <strong>Allow</strong> to start scanning.
                         </p>
@@ -471,30 +471,30 @@ export default function AdminQRScannerModal({
                 {/* ── SCANNING + LOADING ── */}
                 {(state === "scanning" || state === "loading") && (
                     <div style={{ padding: "18px 20px 20px" }}>
-                        <div style={{ position: "relative", width: "100%", paddingBottom: "72%", borderRadius: 10, overflow: "hidden", background: "#080c14", marginBottom: 14, border: "1px solid rgba(201,162,39,0.2)" }}>
+                        <div style={{ position: "relative", width: "100%", paddingBottom: "72%", borderRadius: 10, overflow: "hidden", background: "#080c14", marginBottom: 14, border: "1px solid rgba(var(--color-accent-rgb),0.2)" }}>
                             <video ref={videoRef} playsInline muted style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                             <canvas ref={canvasRef} style={{ display: "none" }} />
                             {/* Gold corner brackets */}
                             {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v, h]) => (
-                                <div key={v+h} style={{ position: "absolute", [v]: 20, [h]: 20, width: 26, height: 26, [`border${v[0].toUpperCase()+v.slice(1)}`]: "3px solid #c9a227", [`border${h[0].toUpperCase()+h.slice(1)}`]: "3px solid #c9a227", borderRadius: v==="top"&&h==="left"?"3px 0 0 0":v==="top"&&h==="right"?"0 3px 0 0":v==="bottom"&&h==="left"?"0 0 0 3px":"0 0 3px 0", zIndex: 2, pointerEvents: "none" }} />
+                                <div key={v+h} style={{ position: "absolute", [v]: 20, [h]: 20, width: 26, height: 26, [`border${v[0].toUpperCase()+v.slice(1)}`]: "3px solid var(--color-accent)", [`border${h[0].toUpperCase()+h.slice(1)}`]: "3px solid var(--color-accent)", borderRadius: v==="top"&&h==="left"?"3px 0 0 0":v==="top"&&h==="right"?"0 3px 0 0":v==="bottom"&&h==="left"?"0 0 0 3px":"0 0 3px 0", zIndex: 2, pointerEvents: "none" }} />
                             ))}
                             {/* Scan line */}
                             {camReady && state === "scanning" && (
-                                <div style={{ position: "absolute", left: 20, right: 20, height: 2.5, background: "rgba(201,162,39,0.8)", borderRadius: 999, zIndex: 2, pointerEvents: "none", animation: "qr-scan 2s ease-in-out infinite" }} />
+                                <div style={{ position: "absolute", left: 20, right: 20, height: 2.5, background: "rgba(var(--color-accent-rgb),0.8)", borderRadius: 999, zIndex: 2, pointerEvents: "none", animation: "qr-scan 2s ease-in-out infinite" }} />
                             )}
                             {/* Flash */}
                             {flash && <div style={{ position: "absolute", inset: 0, background: "#22c55e", zIndex: 5, pointerEvents: "none", animation: "qr-flash 0.4s ease-out both" }} />}
                             {/* Warming up */}
                             {!camReady && (
                                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
-                                    <div style={{ width: 32, height: 32, border: "3px solid rgba(255,255,255,0.12)", borderTopColor: "#c9a227", borderRadius: "50%", animation: "qr-spin 0.8s linear infinite", marginBottom: 10 }} />
+                                    <div style={{ width: 32, height: 32, border: "3px solid rgba(255,255,255,0.12)", borderTopColor: "var(--color-accent)", borderRadius: "50%", animation: "qr-spin 0.8s linear infinite", marginBottom: 10 }} />
                                     <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Starting camera…</div>
                                 </div>
                             )}
                             {/* Processing overlay */}
                             {state === "loading" && (
                                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(8,12,20,0.75)", zIndex: 4 }}>
-                                    <div style={{ width: 42, height: 42, border: "3px solid rgba(255,255,255,0.15)", borderTopColor: "#c9a227", borderRadius: "50%", animation: "qr-spin 0.8s linear infinite", marginBottom: 12 }} />
+                                    <div style={{ width: 42, height: 42, border: "3px solid rgba(255,255,255,0.15)", borderTopColor: "var(--color-accent)", borderRadius: "50%", animation: "qr-spin 0.8s linear infinite", marginBottom: 12 }} />
                                     <div style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>Identifying resident…</div>
                                 </div>
                             )}
@@ -515,7 +515,7 @@ export default function AdminQRScannerModal({
                         <p style={{ fontSize: 12.5, color: "#9090aa", margin: "0 0 20px", lineHeight: 1.65 }}>
                             {errorMsg || "Camera permission was denied. To enable it, click the camera icon in your browser's address bar and set it to Allow, then try again."}
                         </p>
-                        <button onClick={() => { setErrorMsg(""); setState("idle"); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "linear-gradient(135deg, #163066, #091a3e)", color: "#fff", border: "none", borderRadius: 6, fontFamily: "'Playfair Display',serif", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>
+                        <button onClick={() => { setErrorMsg(""); setState("idle"); }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "12px", background: "linear-gradient(135deg, var(--color-primary-soft), var(--color-primary-dark))", color: "#fff", border: "none", borderRadius: 6, fontFamily: "'Playfair Display',serif", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer" }}>
                             <Camera size={14} /> Try Again
                         </button>
                     </div>
@@ -543,11 +543,11 @@ export default function AdminQRScannerModal({
                     <div className="qr-in" style={{ padding: "20px 24px 24px", overflowY: "auto" }}>
                         {/* Resident identity */}
                         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 8, marginBottom: 16 }}>
-                            <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(14,37,84,0.08)", border: "1.5px solid rgba(14,37,84,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                <User size={18} color="#0e2554" strokeWidth={1.8} />
+                            <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(var(--color-primary-rgb),0.08)", border: "1.5px solid rgba(var(--color-primary-rgb),0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <User size={18} color="var(--color-primary)" strokeWidth={1.8} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: "#0e2554" }}>{scanData.resident.full_name}</div>
+                                <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 700, color: "var(--color-primary)" }}>{scanData.resident.full_name}</div>
                                 <div style={{ fontSize: 11, color: "#9090aa", marginTop: 2 }}>{scanData.resident.resident_id} · {scanData.resident.address}</div>
                             </div>
                             <Check size={18} color="#1a7a4a" strokeWidth={2.5} />
@@ -602,7 +602,7 @@ export default function AdminQRScannerModal({
                                                         key={filter.key}
                                                         type="button"
                                                         onClick={() => setRequestFilter(filter.key)}
-                                                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 20, border: `1.5px solid ${active ? "#0e2554" : "#e4dfd4"}`, background: active ? "#0e2554" : "#fff", color: active ? "#fff" : "#4a4a6a", fontFamily: "'Source Serif 4',serif", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
+                                                        style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 20, border: `1.5px solid ${active ? "var(--color-primary)" : "#e4dfd4"}`, background: active ? "var(--color-primary)" : "#fff", color: active ? "#fff" : "#4a4a6a", fontFamily: "'Source Serif 4',serif", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}
                                                     >
                                                         {filter.label}
                                                         <span style={{ fontSize: 10, opacity: active ? 0.85 : 0.65 }}>{count}</span>
@@ -651,7 +651,7 @@ export default function AdminQRScannerModal({
                                         <button onClick={handleReset} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 14px", background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 4, color: "#4a4a6a", fontFamily: "'Source Serif 4',serif", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                                             <RefreshCw size={12} /> Scan Another
                                         </button>
-                                        <button onClick={() => { onClose(); onNavigate("manageRequests"); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 16px", background: "linear-gradient(135deg,#163066,#091a3e)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer" }}>
+                                        <button onClick={() => { onClose(); onNavigate("manageRequests"); }} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 16px", background: "linear-gradient(135deg,var(--color-primary-soft),var(--color-primary-dark))", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, letterSpacing: 0.5, cursor: "pointer" }}>
                                             <FileOutput size={13} /> Open in Manage Requests
                                         </button>
                                     </div>
@@ -663,7 +663,7 @@ export default function AdminQRScannerModal({
                                     <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
                                         <Clock size={22} color="#c4bfb5" />
                                     </div>
-                                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: 700, color: "#0e2554", marginBottom: 6 }}>No Certificate Requests</div>
+                                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: 700, color: "var(--color-primary)", marginBottom: 6 }}>No Certificate Requests</div>
                                     <p style={{ fontSize: 12.5, color: "#9090aa", margin: "0 0 20px", lineHeight: 1.6 }}>
                                         This resident has no certificate requests on record.
                                     </p>

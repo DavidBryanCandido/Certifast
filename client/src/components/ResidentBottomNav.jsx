@@ -56,8 +56,8 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
         letter-spacing: 0.3px;
         -webkit-tap-highlight-color: transparent;
     }
-    .rbn-item:hover { color: #0e2554; }
-    .rbn-item.active { color: #0e2554; }
+    .rbn-item:hover { color: var(--color-primary); }
+    .rbn-item.active { color: var(--color-primary); }
     .rbn-item svg { opacity: 0.45; transition: opacity 0.15s; }
     .rbn-item:hover svg,
     .rbn-item.active svg { opacity: 1; }
@@ -69,7 +69,7 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
     .rbn-active-dot {
         width: 4px; height: 4px;
         border-radius: 50%;
-        background: #0e2554;
+        background: var(--color-primary);
         margin-top: 2px;
     }
     .rbn-dot-placeholder {
@@ -98,8 +98,8 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
         -webkit-tap-highlight-color: transparent;
     }
     .rbn-fab-wrap:hover .rbn-fab { opacity: 0.88; transform: translateY(-10px) scale(1.05); }
-    .rbn-fab-wrap.active .rbn-fab { background: linear-gradient(135deg, #163066, #091a3e); }
-    .rbn-fab-wrap.active { color: #0e2554; }
+    .rbn-fab-wrap.active .rbn-fab { background: linear-gradient(135deg, var(--color-primary-soft), var(--color-primary-dark)); }
+    .rbn-fab-wrap.active { color: var(--color-primary); }
 
     .rbn-fab-bg {
         width: 62px; height: 62px;
@@ -116,10 +116,10 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
     }
     .rbn-fab {
         width: 52px; height: 52px;
-        background: linear-gradient(135deg, #c9a227, #9a7515);
+        background: linear-gradient(135deg, var(--color-accent), #9a7515);
         border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 4px 18px rgba(201,162,39,0.45), 0 2px 6px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 18px rgba(var(--color-accent-rgb),0.45), 0 2px 6px rgba(0,0,0,0.15);
         transform: translateY(-12px);
         transition: all 0.2s ease;
         flex-shrink: 0;
@@ -132,7 +132,7 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
         position: absolute;
         top: 0; left: 0; right: 0;
         height: 2px;
-        background: linear-gradient(90deg, transparent, #0e2554, transparent);
+        background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
         opacity: 0;
         transition: opacity 0.2s;
         z-index: 0;

@@ -618,6 +618,17 @@ export default function ResidentLogin({ onLogin }) {
                         </div>
 
                         {/* Forgot password link */}
+                        <div style={{ textAlign: "right", marginBottom: 6 }}>
+                            <span
+                                style={{
+                                    fontSize: 11.5,
+                                    color: "#9090aa",
+                                    fontFamily: "'Source Serif 4', serif",
+                                }}
+                            >
+                                Forgot password?
+                            </span>
+                        </div>
                         <div style={{ textAlign: "right", marginBottom: 22 }}>
                             <span
                                 style={{
@@ -626,7 +637,7 @@ export default function ResidentLogin({ onLogin }) {
                                     fontFamily: "'Source Serif 4', serif",
                                 }}
                             >
-                                Forgot password? Visit the{" "}
+                                Visit the{" "}
                                 <strong style={{ color: "#0e2554" }}>
                                     Barangay Office
                                 </strong>

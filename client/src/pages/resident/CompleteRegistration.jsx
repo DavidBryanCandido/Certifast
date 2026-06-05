@@ -38,6 +38,7 @@ export default function CompleteRegistration() {
                 v != null && String(v).trim() !== ""
                     ? String(v).trim()
                     : null;
+            const bool = (v) => v === true || String(v).toLowerCase() === "true";
 
             if (!str(meta.first_name) || !str(meta.last_name)) {
                 throw new Error(
@@ -93,6 +94,9 @@ export default function CompleteRegistration() {
                     nationality: str(meta.nationality) || "Filipino",
                     id_type: str(meta.id_type),
                     id_image_path: idImagePath,
+                    is_renter: bool(meta.is_renter),
+                    agreed_to_terms: bool(meta.agreed_to_terms),
+                    terms_agreed_at: str(meta.terms_agreed_at),
                 },
                 {
                     headers: {

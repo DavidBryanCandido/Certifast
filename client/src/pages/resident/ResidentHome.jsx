@@ -42,8 +42,8 @@ if (!document.head.querySelector("[data-resident-home]")) {
     }
     /* TOPBAR */
     .rh-topbar {
-        background: linear-gradient(135deg, #0e2554 0%, #163066 100%);
-        border-bottom: 1px solid rgba(201,162,39,0.2);
+        background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
+        border-bottom: 1px solid rgba(var(--color-accent-rgb),0.2);
         position: sticky; top: 0; z-index: 100;
     }
     .rh-topbar-inner {
@@ -70,7 +70,7 @@ if (!document.head.querySelector("[data-resident-home]")) {
     }
     .rh-panel-title {
         font-family: 'Playfair Display', serif; font-size: 14px;
-        font-weight: 700; color: #0e2554;
+        font-weight: 700; color: var(--color-primary);
     }
     /* REQUEST ROWS */
     .rh-req-row {
@@ -88,8 +88,8 @@ if (!document.head.querySelector("[data-resident-home]")) {
         cursor: pointer; transition: all 0.15s; flex: 1;
         font-family: 'Source Serif 4', serif;
     }
-    .rh-action-btn:hover { border-color: #0e2554; box-shadow: 0 4px 16px rgba(14,37,84,0.1); transform: translateY(-1px); }
-    .rh-action-btn.primary { background: linear-gradient(135deg, #163066, #091a3e); border-color: transparent; color: #fff; }
+    .rh-action-btn:hover { border-color: var(--color-primary); box-shadow: 0 4px 16px rgba(var(--color-primary-rgb),0.1); transform: translateY(-1px); }
+    .rh-action-btn.primary { background: linear-gradient(135deg, var(--color-primary-soft), var(--color-primary-dark)); border-color: transparent; color: #fff; }
     .rh-action-btn.primary:hover { opacity: 0.92; transform: translateY(-1px); }
     /* BADGE */
     .rh-badge-pending  { font-size: 10px; background: #fff7e6; color: #b86800; border: 1px solid #f5d78e; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
@@ -302,7 +302,7 @@ export default function ResidentHome({ resident, onLogout }) {
                         className="rh-fadein"
                         style={{
                             background:
-                                "linear-gradient(135deg, #0e2554 0%, #163066 60%, #1a3a7a 100%)",
+                                "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 60%, var(--color-primary-dark) 100%)",
                             borderRadius: 10,
                             padding: isMobile ? "22px 20px" : "26px 32px",
                             marginBottom: 22,
@@ -315,7 +315,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                 position: "absolute",
                                 inset: 0,
                                 backgroundImage:
-                                    "linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px)",
+                                    "linear-gradient(rgba(var(--color-accent-rgb),.08) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--color-accent-rgb),.08) 1px, transparent 1px)",
                                 backgroundSize: "32px 32px",
                                 pointerEvents: "none",
                             }}
@@ -328,8 +328,8 @@ export default function ResidentHome({ resident, onLogout }) {
                                 width: 120,
                                 height: 120,
                                 borderRadius: "50%",
-                                background: "rgba(201,162,39,0.06)",
-                                border: "1px solid rgba(201,162,39,0.1)",
+                                background: "rgba(var(--color-accent-rgb),0.10)",
+                                border: "1px solid rgba(var(--color-accent-rgb),0.16)",
                             }}
                         />
                         <div
@@ -347,7 +347,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                 <p
                                     style={{
                                         fontSize: 11,
-                                        color: "rgba(201,162,39,0.8)",
+                                        color: "rgba(var(--color-accent-rgb),0.9)",
                                         letterSpacing: "1.5px",
                                         textTransform: "uppercase",
                                         fontFamily: "'Source Serif 4', serif",
@@ -387,7 +387,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                         gap: 8,
                                         padding: "10px 22px",
                                         background:
-                                            "linear-gradient(135deg, #c9a227, #9a7515)",
+                                            "linear-gradient(135deg, var(--color-accent), var(--color-accent-soft))",
                                         color: "#fff",
                                         border: "none",
                                         borderRadius: 4,
@@ -408,7 +408,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                 style={{
                                     flexShrink: 0,
                                     background: "rgba(255,255,255,0.06)",
-                                    border: "1px solid rgba(201,162,39,0.2)",
+                                    border: "1px solid rgba(var(--color-accent-rgb),0.25)",
                                     borderRadius: 8,
                                     padding: "14px 18px",
                                     minWidth: isMobile ? "100%" : 210,
@@ -422,12 +422,12 @@ export default function ResidentHome({ resident, onLogout }) {
                                         marginBottom: 10,
                                     }}
                                 >
-                                    <Bell size={12} color="#c9a227" />
+                                    <Bell size={12} color="var(--color-accent)" />
                                     <span
                                         style={{
                                             fontSize: 10,
                                             fontWeight: 700,
-                                            color: "#c9a227",
+                                            color: "var(--color-accent)",
                                             letterSpacing: "1.2px",
                                             textTransform: "uppercase",
                                         }}
@@ -465,7 +465,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                         marginTop: 10,
                                         paddingTop: 10,
                                         borderTop:
-                                            "1px solid rgba(201,162,39,0.15)",
+                                            "1px solid rgba(var(--color-accent-rgb),0.18)",
                                         fontSize: 10.5,
                                         color: "rgba(255,255,255,0.38)",
                                         lineHeight: 1.5,
@@ -494,8 +494,8 @@ export default function ResidentHome({ resident, onLogout }) {
                                 icon: FileText,
                                 label: "Total Requests",
                                 value: stats.total,
-                                accent: "#0e2554",
-                                bg: "rgba(14,37,84,0.08)",
+                                accent: "var(--color-primary)",
+                                bg: "rgba(var(--color-primary-rgb),0.08)",
                             },
                             {
                                 icon: Clock,
@@ -543,7 +543,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                         style={{
                                             fontSize: 22,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary)",
                                             fontFamily:
                                                 "'Playfair Display', serif",
                                             lineHeight: 1,
@@ -593,7 +593,7 @@ export default function ResidentHome({ resident, onLogout }) {
                                         gap: 4,
                                         background: "none",
                                         border: "none",
-                                        color: "#163066",
+                                        color: "var(--color-primary-soft)",
                                         fontSize: 12,
                                         fontFamily: "'Source Serif 4', serif",
                                         cursor: "pointer",

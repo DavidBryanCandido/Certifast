@@ -89,9 +89,9 @@ function useAdminSidebarStyles() {
         .rep-nav-item.active,
         .lg-nav-item.active,
         .wi-nav-item.active {
-            background: rgba(201, 162, 39, 0.12);
+            background: rgba(var(--color-accent-rgb), 0.12);
             color: #fff;
-            border-left-color: #c9a227;
+            border-left-color: var(--color-accent);
         }
         .admin-nav-item.active svg,
         .cf-nav-item.active svg,
@@ -138,9 +138,9 @@ function useAdminSidebarStyles() {
         .rep-nav-item-icon.active,
         .lg-nav-item-icon.active,
         .wi-nav-item-icon.active {
-            background: rgba(201, 162, 39, 0.12);
+            background: rgba(var(--color-accent-rgb), 0.12);
             color: #fff;
-            border-left-color: #c9a227;
+            border-left-color: var(--color-accent);
         }
         .admin-logout-btn,
         .cf-logout-btn,
@@ -233,7 +233,8 @@ function useWindowSize() {
 const sd = {
     sidebar: {
         minHeight: "100vh",
-        background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",
+        background:
+            "linear-gradient(180deg,var(--color-primary) 0%,var(--color-primary-dark) 100%)",
         display: "flex",
         flexDirection: "column",
         position: "fixed",
@@ -241,12 +242,12 @@ const sd = {
         left: 0,
         bottom: 0,
         zIndex: 100,
-        borderRight: "1px solid rgba(201,162,39,0.15)",
+        borderRight: "1px solid rgba(var(--color-accent-rgb),0.15)",
         transition: "width 0.2s",
     },
     brand: {
         padding: "24px 20px 16px",
-        borderBottom: "1px solid rgba(201,162,39,0.18)",
+        borderBottom: "1px solid rgba(var(--color-accent-rgb),0.18)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -258,8 +259,8 @@ const sd = {
         width: 100,
         height: 100,
         borderRadius: "50%",
-        border: "1.5px solid rgba(201,162,39,0.5)",
-        background: "rgba(201,162,39,0.1)",
+        border: "1.5px solid rgba(var(--color-accent-rgb),0.5)",
+        background: "rgba(var(--color-accent-rgb),0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -275,7 +276,7 @@ const sd = {
     },
     brandSub: {
         fontSize: 10,
-        color: "rgba(201,162,39,0.85)",
+        color: "rgba(var(--color-accent-rgb),0.85)",
         letterSpacing: "1px",
         textTransform: "uppercase",
         marginTop: 2,
@@ -289,12 +290,13 @@ const sd = {
     },
     goldBar: {
         height: 3,
-        background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+        background:
+            "linear-gradient(90deg,var(--color-accent),var(--color-accent-soft),var(--color-accent))",
         flexShrink: 0,
     },
     sectionLabel: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.5)",
+        color: "rgba(var(--color-accent-rgb),0.5)",
         letterSpacing: "2px",
         textTransform: "uppercase",
         padding: "18px 20px 8px",
@@ -302,8 +304,8 @@ const sd = {
     },
     navBadge: {
         marginLeft: "auto",
-        background: "#c9a227",
-        color: "#091a3e",
+        background: "var(--color-accent)",
+        color: "var(--color-primary-dark)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -312,8 +314,8 @@ const sd = {
     },
     navBadgeSA: {
         marginLeft: "auto",
-        background: "rgba(201,162,39,0.25)",
-        color: "#c9a227",
+        background: "rgba(var(--color-accent-rgb),0.25)",
+        color: "var(--color-accent)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -321,13 +323,13 @@ const sd = {
     },
     superAdminSection: {
         marginTop: "auto",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb),0.15)",
         paddingTop: 8,
         paddingBottom: 8,
     },
     userRow: {
         padding: "14px 20px",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb),0.15)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -336,13 +338,13 @@ const sd = {
         width: 32,
         height: 32,
         borderRadius: "50%",
-        background: "rgba(201,162,39,0.15)",
-        border: "1.5px solid rgba(201,162,39,0.4)",
+        background: "rgba(var(--color-accent-rgb),0.15)",
+        border: "1.5px solid rgba(var(--color-accent-rgb),0.4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 12,
-        color: "#c9a227",
+        color: "var(--color-accent)",
         fontWeight: 700,
         flexShrink: 0,
     },
@@ -357,7 +359,7 @@ const sd = {
     },
     userRole: {
         fontSize: 9.5,
-        color: "#c9a227",
+        color: "var(--color-accent)",
         letterSpacing: "1px",
         textTransform: "uppercase",
         marginTop: 1,
@@ -575,7 +577,7 @@ export function AdminSidebar({
                                         fontFamily: "'Playfair Display', serif",
                                         fontSize: 16,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary)",
                                     }}
                                 >
                                     Log Out
@@ -615,7 +617,10 @@ export function AdminSidebar({
                             </button>
                             <button
                                 className="admin-modal-btn"
-                                style={{ background: "#0e2554", color: "#fff" }}
+                                style={{
+                                    background: "var(--color-primary)",
+                                    color: "#fff",
+                                }}
                                 onClick={() => {
                                     setShowLogoutModal(false);
                                     onLogout?.();
@@ -860,7 +865,7 @@ export function AdminMobileSidebar({
                                                 "'Playfair Display', serif",
                                             fontSize: 16,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary)",
                                         }}
                                     >
                                         Log Out
@@ -902,7 +907,7 @@ export function AdminMobileSidebar({
                                 <button
                                     className="admin-mobile-modal-btn"
                                     style={{
-                                        background: "#0e2554",
+                                        background: "var(--color-primary)",
                                         color: "#fff",
                                     }}
                                     onClick={() => {

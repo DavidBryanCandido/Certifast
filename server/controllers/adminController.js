@@ -3,6 +3,11 @@ const pool = require("../db/pool");
 const bcrypt = require("bcrypt");
 const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
+const {
+    sendStatusEmail,
+    sendAccountActivatedEmail,
+    sendPasswordChangedEmail,
+} = require("../utils/mailer");
 
 const supabase = (() => {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -160,6 +165,62 @@ async function createNotification({
     }
 }
 
+async function sendRequestStatusEmailAfterUpdate(requestId, status, rejectionReason = "") {
+    try {
+        const result = await pool.query(
+            `SELECT
+                r.cert_type,
+                res.email AS resident_email,
+                res.full_name AS resident_name
+             FROM requests r
+             LEFT JOIN residents res ON res.resident_id = r.resident_id
+             WHERE r.request_id = $1
+             LIMIT 1`,
+            [requestId],
+        );
+        const row = result.rows[0];
+        if (!row?.resident_email) return;
+
+        await sendStatusEmail(
+            row.resident_email,
+            row.resident_name,
+            row.cert_type,
+            status,
+            rejectionReason,
+        );
+    } catch (err) {
+        console.error("sendRequestStatusEmailAfterUpdate error:", err.message || err);
+    }
+}
+
+async function sendAccountActivatedEmailAfterUpdate(residentEmail, residentName) {
+    try {
+        if (!residentEmail) return;
+        await sendAccountActivatedEmail(residentEmail, residentName);
+    } catch (err) {
+        console.error(
+            "sendAccountActivatedEmailAfterUpdate error:",
+            err.message || err,
+        );
+    }
+}
+
+async function sendPasswordChangedEmailAfterUpdate(
+    residentEmail,
+    residentName,
+    changedBy,
+) {
+    try {
+        if (!residentEmail) return;
+        await sendPasswordChangedEmail(residentEmail, residentName, changedBy);
+    } catch (err) {
+        console.error(
+            "sendPasswordChangedEmailAfterUpdate error:",
+            err.message || err,
+        );
+    }
+}
+
 async function getDashboardStats(req, res) {
     try {
         const result = await pool.query(
@@ -273,6 +334,7 @@ async function approveRequest(req, res) {
 
         // Create notification for resident
         const request = result.rows[0];
+        await sendRequestStatusEmailAfterUpdate(request.request_id, "approved");
         await createNotification({
             residentId: request.resident_id,
             type: "request_update",
@@ -338,6 +400,11 @@ async function rejectRequest(req, res) {
 
         // Create notification for resident
         const request = result.rows[0];
+        await sendRequestStatusEmailAfterUpdate(
+            request.request_id,
+            "rejected",
+            reason,
+        );
         await createNotification({
             residentId: request.resident_id,
             type: "request_update",
@@ -915,6 +982,7 @@ async function getResidents(req, res) {
                     res.id_type,
                     res.id_image_url,
                     res.rejection_comment,
+                    res.is_renter,
                     res.address_house,
                     res.address_street,
                     res.date_of_birth,
@@ -948,6 +1016,7 @@ async function getResidents(req, res) {
                     NULL::text AS id_type,
                     NULL::text AS id_image_url,
                     NULL::text AS rejection_comment,
+                    false AS is_renter,
                     res.address_house,
                     res.address_street,
                     res.date_of_birth,
@@ -1003,6 +1072,7 @@ async function getResidentById(req, res) {
                     res.date_of_birth,
                     res.civil_status,
                     res.rejection_comment,
+                    res.is_renter,
                     res.status,
                     res.created_at,
                     COALESCE(req.request_count, 0)::int AS request_count
@@ -1030,6 +1100,7 @@ async function getResidentById(req, res) {
                     res.date_of_birth,
                     res.civil_status,
                     NULL::text AS rejection_comment,
+                    false AS is_renter,
                     res.status,
                     res.created_at,
                     COALESCE(req.request_count, 0)::int AS request_count
@@ -1223,7 +1294,7 @@ async function resetResidentPassword(req, res) {
             `UPDATE residents
              SET password_hash = $2
              WHERE resident_id = $1
-             RETURNING resident_id, full_name`,
+             RETURNING resident_id, full_name, email`,
             [residentId, hash],
         );
 
@@ -1232,6 +1303,11 @@ async function resetResidentPassword(req, res) {
         }
 
         const updated = result.rows[0];
+        await sendPasswordChangedEmailAfterUpdate(
+            updated.email,
+            updated.full_name,
+            "admin",
+        );
         await createAuditLog({
             actorId: req.admin.id,
             actorName: req.admin.username,
@@ -1286,6 +1362,7 @@ async function updateResidentStatus(req, res) {
             prevStatus === "pending_verification" && nextStatus === "inactive";
         const approvingPending =
             prevStatus === "pending_verification" && nextStatus === "active";
+        const activatingAccount = prevStatus !== "active" && nextStatus === "active";
 
         if (denyingPending && !reason) {
             return res.status(400).json({
@@ -1358,6 +1435,13 @@ async function updateResidentStatus(req, res) {
 
         void (async () => {
             try {
+                if (activatingAccount) {
+                    await sendAccountActivatedEmailAfterUpdate(
+                        existingResident.email,
+                        updated.full_name,
+                    );
+                }
+
                 if (approvingPending) {
                     await createNotification({
                         residentId: updated.resident_id,
@@ -1643,6 +1727,7 @@ async function markRequestReady(req, res) {
 
         // Create notification for resident
         const request = result.rows[0];
+        await sendRequestStatusEmailAfterUpdate(request.request_id, "ready");
         await createNotification({
             residentId: request.resident_id,
             type: "request_update",
@@ -2347,6 +2432,20 @@ async function updateBarangaySettings(req, res) {
                 key: String(key).toLowerCase(),
                 value: value === null ? null : String(value),
             });
+        }
+
+        const themeUpdate = updates.find((item) => item.key === "system_theme");
+        if (themeUpdate) {
+            if (req.admin?.role !== "admin") {
+                return res.status(403).json({
+                    message: "Admin access only",
+                });
+            }
+            if (!["default", "green_orange"].includes(themeUpdate.value)) {
+                return res.status(400).json({
+                    message: "Invalid system_theme value",
+                });
+            }
         }
 
         for (const { key, value } of updates) {

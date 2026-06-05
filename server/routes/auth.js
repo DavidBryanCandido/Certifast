@@ -40,6 +40,7 @@ const PUBLIC_BRANDING_KEYS = [
     "office_schedule_line_2_time",
     "office_schedule_line_3_label",
     "office_schedule_line_3_time",
+    "system_theme",
 ];
 
 // Public endpoint for resident-facing branding details

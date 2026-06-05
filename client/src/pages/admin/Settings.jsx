@@ -9,9 +9,25 @@ import {
 } from "../../components/AdminSidebar";
 import AdminDateChip from "../../components/AdminDateChip";
 import AdminNotificationsBell from "../../components/AdminNotificationsBell";
-import { ChevronLeft, ChevronRight, Eye, HelpCircle, Menu, Search, X } from "lucide-react";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    Eye,
+    HelpCircle,
+    Menu,
+    QrCode,
+    Search,
+    X,
+} from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import * as settingsService from "../../services/settingsService";
 import { DEFAULT_OFFICE_SCHEDULE } from "../../services/publicBrandingService";
+import {
+    SYSTEM_THEMES,
+    applySystemTheme,
+    normalizeSystemTheme,
+} from "../../theme";
 import {
     CERTIFICATE_TEMPLATE_OPTIONS,
     buildCertificatePrintHtml,
@@ -43,8 +59,8 @@ function useSettingsStyles() {
             cursor:pointer; display:flex; align-items:center; gap:8px;
             transition:all .15s;
         }
-        .st-tab-btn:hover { color:#0e2554; }
-        .st-tab-btn.active { color:#0e2554; border-bottom-color:#0e2554; }
+        .st-tab-btn:hover { color:var(--color-primary); }
+        .st-tab-btn.active { color:var(--color-primary); border-bottom-color:var(--color-primary); }
         .st-tab-btn svg { opacity:.6; }
         .st-tab-btn.active svg { opacity:1; }
 
@@ -55,7 +71,7 @@ function useSettingsStyles() {
             display:flex; align-items:center; justify-content:space-between;
             background:#f8f6f1;
         }
-        .st-panel-title { font-family:'Playfair Display',serif; font-size:14px; font-weight:700; color:#0e2554; }
+        .st-panel-title { font-family:'Playfair Display',serif; font-size:14px; font-weight:700; color:var(--color-primary); }
         .st-panel-desc  { font-size:11px; color:#9090aa; margin-top:2px; }
         .st-panel-body  { padding:24px; }
 
@@ -67,7 +83,7 @@ function useSettingsStyles() {
         .st-field label .req { color:#b02020; margin-left:2px; }
         .st-label-with-help { display:flex; align-items:center; gap:7px; }
         .st-help-btn { width:18px; height:18px; border:1px solid #d8cfbd; border-radius:50%; background:#fff; color:#4a4a6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
-        .st-help-btn:hover { border-color:#0e2554; color:#0e2554; background:#edf1fa; }
+        .st-help-btn:hover { border-color:var(--color-primary); color:var(--color-primary); background:#edf1fa; }
         .st-field input, .st-field textarea, .st-field select {
             width:100%; padding:10px 14px;
             border:1.5px solid #e4dfd4; border-radius:4px;
@@ -76,7 +92,7 @@ function useSettingsStyles() {
             transition:border-color .15s, background .15s;
         }
         .st-field input:focus, .st-field textarea:focus, .st-field select:focus {
-            border-color:#0e2554; background:#f0f3ff;
+            border-color:var(--color-primary); background:#f0f3ff;
         }
         .st-field textarea { resize:vertical; min-height:80px; line-height:1.6; }
         .st-field .hint { font-size:10.5px; color:#9090aa; line-height:1.5; }
@@ -90,7 +106,7 @@ function useSettingsStyles() {
         .st-btn-save {
             display:inline-flex; align-items:center; gap:8px;
             padding:9px 24px;
-            background:linear-gradient(135deg,#163066,#091a3e);
+            background:linear-gradient(135deg,var(--color-primary-soft),var(--color-primary-dark));
             color:#fff; border:none; border-radius:4px;
             font-family:'Playfair Display',serif; font-size:12px; font-weight:700;
             letter-spacing:1.5px; text-transform:uppercase; cursor:pointer;
@@ -112,7 +128,7 @@ function useSettingsStyles() {
         .st-logo-preview img { width:96px; height:96px; border-radius:50%; object-fit:cover; }
         .st-upload-btn {
             display:inline-flex; align-items:center; gap:8px; padding:8px 18px;
-            background:#0e2554; color:#fff; border:none; border-radius:4px;
+            background:var(--color-primary); color:#fff; border:none; border-radius:4px;
             font-family:'Source Serif 4',serif; font-size:12px; font-weight:600;
             cursor:pointer;
         }
@@ -134,7 +150,7 @@ function useSettingsStyles() {
             align-items:center; justify-content:center; gap:6px;
             position:relative; overflow:hidden; cursor:crosshair;
         }
-        .st-esig-wrap.has-sig { border-style:solid; border-color:#0e2554; background:#fff; cursor:default; }
+        .st-esig-wrap.has-sig { border-style:solid; border-color:var(--color-primary); background:#fff; cursor:default; }
         .st-esig-wrap img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:8px; }
         .st-esig-actions { display:flex; gap:6px; flex-wrap:wrap; }
         .st-esig-btn {
@@ -142,25 +158,25 @@ function useSettingsStyles() {
             font-family:'Source Serif 4',serif; font-size:11px; font-weight:600;
             border-radius:3px; cursor:pointer; transition:all .15s;
         }
-        .st-esig-btn.draw   { background:#0e2554; color:#fff; border:none; }
-        .st-esig-btn.upload { background:none; color:#0e2554; border:1.5px solid #0e2554; }
+        .st-esig-btn.draw   { background:var(--color-primary); color:#fff; border:none; }
+        .st-esig-btn.upload { background:none; color:var(--color-primary); border:1.5px solid var(--color-primary); }
         .st-esig-btn.clear  { background:none; color:#b02020; border:1.5px solid rgba(176,32,32,.3); }
         .st-esig-status { display:inline-flex; align-items:center; gap:5px; font-size:10px; padding:3px 10px; border-radius:20px; font-weight:600; margin-left:6px; }
         .st-esig-status.set    { background:#e8f5ee; color:#1a7a4a; }
         .st-esig-status.notset { background:#f0f0f0; color:#9090aa; }
 
         /* DRAW MODAL */
-        .st-modal-overlay { display:none; position:fixed; inset:0; background:rgba(9,26,62,.6); z-index:200; align-items:center; justify-content:center; }
+        .st-modal-overlay { display:none; position:fixed; inset:0; background:rgba(9,26,62,.6); z-index:600; align-items:center; justify-content:center; }
         .st-modal-overlay.open { display:flex; }
         .st-modal { background:#fff; border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.3); width:520px; overflow:hidden; }
-        .st-modal-header { padding:16px 24px; background:#0e2554; display:flex; align-items:center; justify-content:space-between; }
+        .st-modal-header { padding:16px 24px; background:var(--color-primary); display:flex; align-items:center; justify-content:space-between; }
         .st-modal-title { font-family:'Playfair Display',serif; font-size:15px; color:#fff; font-weight:700; }
         .st-modal-close { background:none; border:none; cursor:pointer; color:rgba(255,255,255,.6); }
         .st-modal-body { padding:20px 24px; }
         .st-usage-summary { font-size:12px; color:#4a4a6a; line-height:1.55; margin-bottom:12px; }
         .st-usage-list { display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto; padding-right:4px; }
         .st-usage-item { border:1px solid #eee7da; border-radius:5px; padding:10px 12px; background:#fbfaf7; }
-        .st-usage-name { font-size:12.5px; font-weight:700; color:#0e2554; }
+        .st-usage-name { font-size:12.5px; font-weight:700; color:var(--color-primary); }
         .st-usage-desc { font-size:10.8px; color:#77758d; margin-top:2px; line-height:1.4; }
         .st-usage-key { font-family:'Courier New',monospace; font-size:10px; color:#9090aa; margin-top:5px; }
         .st-modal-canvas { width:100%; height:180px; border:1.5px solid #e4dfd4; border-radius:4px; background:#fff; cursor:crosshair; display:block; touch-action:none; }
@@ -176,14 +192,14 @@ function useSettingsStyles() {
         .st-badge-inactive { font-size:10.5px; background:#f0ece4; color:#9090aa; border-radius:10px; padding:2px 10px; font-weight:700; display:inline-block; width:fit-content; }
         .st-toggle-btn { background:none; border:1px solid #e4dfd4; border-radius:4px; padding:5px 14px; font-size:10.5px; cursor:pointer; font-family:inherit; color:#9090aa; }
         .st-toggle-btn:disabled { opacity:.45; cursor:not-allowed; }
-        .st-view-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#fff; border:1px solid rgba(14,37,84,.22); border-radius:4px; padding:5px 12px; font-size:10.5px; cursor:pointer; font-family:inherit; color:#0e2554; white-space:nowrap; }
-        .st-view-btn:hover { background:#edf1fa; border-color:#0e2554; }
+        .st-view-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#fff; border:1px solid rgba(var(--color-primary-rgb),.22); border-radius:4px; padding:5px 12px; font-size:10.5px; cursor:pointer; font-family:inherit; color:var(--color-primary); white-space:nowrap; }
+        .st-view-btn:hover { background:#edf1fa; border-color:var(--color-primary); }
         .st-cert-actions { display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:wrap; }
         .st-cert-toolbar { padding:14px 22px; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid #e4dfd4; background:#fff; flex-wrap:wrap; }
         .st-cert-search { position:relative; flex:1; min-width:240px; max-width:420px; }
         .st-cert-search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#9090aa; }
         .st-cert-search input { width:100%; padding:9px 12px 9px 34px; border:1.5px solid #e4dfd4; border-radius:4px; font-family:'Source Serif 4',serif; font-size:12.5px; background:#f8f6f1; color:#1a1a2e; outline:none; }
-        .st-cert-search input:focus { border-color:#0e2554; background:#f0f3ff; }
+        .st-cert-search input:focus { border-color:var(--color-primary); background:#f0f3ff; }
         .st-fee-btn { background:#fff; border:1px solid #e4dfd4; border-radius:4px; padding:5px 12px; font-size:10.5px; font-weight:700; cursor:pointer; font-family:inherit; color:#9090aa; min-width:78px; }
         .st-fee-btn.fee { border-color:rgba(184,104,0,.35); background:#fff8ed; color:#b86800; }
         .st-fee-btn.free { border-color:rgba(26,122,74,.25); background:#f2fbf6; color:#1a7a4a; }
@@ -197,9 +213,8 @@ function useSettingsStyles() {
         /* CERT CHIP SELECTOR */
         .st-cert-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:22px; }
         .st-cert-chip { padding:7px 16px; border-radius:20px; font-size:11.5px; font-weight:600; cursor:pointer; border:1.5px solid #e4dfd4; color:#4a4a6a; background:#fff; transition:all .15s; }
-        .st-cert-chip:hover { border-color:#0e2554; color:#0e2554; }
-        .st-cert-chip.active { background:#0e2554; color:#fff; border-color:#0e2554; }
-
+        .st-cert-chip:hover { border-color:var(--color-primary); color:var(--color-primary); }
+        .st-cert-chip.active { background:var(--color-primary); color:#fff; border-color:var(--color-primary); }
 
         @media (max-width:767px) {
             .st-form-grid-2  { grid-template-columns:1fr; }
@@ -217,6 +232,15 @@ function useSettingsStyles() {
 
 const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
 const CERT_TYPES_PER_PAGE = 8;
+
+function getResidentPortalLoginUrl() {
+    const raw =
+        import.meta.env.VITE_APP_URL?.trim() ||
+        "https://certifast-two.vercel.app";
+    const base = raw.replace(/\/+$/, "");
+    if (/\/resident\/login$/i.test(base)) return base;
+    return `${base}/resident/login`;
+}
 
 const SIGNATORY_HELP_META = {
     captain: {
@@ -511,7 +535,7 @@ function TemplatePreviewModal({ cert, settings, onClose }) {
                 <div
                     style={{
                         padding: "14px 18px",
-                        background: "#0e2554",
+                        background: "var(--color-primary)",
                         color: "#fff",
                         display: "flex",
                         justifyContent: "space-between",
@@ -913,7 +937,7 @@ function DrawModal({ open, onClose, onSave }) {
                             style={{
                                 padding: "8px 22px",
                                 background:
-                                    "linear-gradient(135deg,#163066,#091a3e)",
+                                    "linear-gradient(135deg,var(--color-primary-soft),var(--color-primary-dark))",
                                 color: "#fff",
                                 border: "none",
                                 borderRadius: 4,
@@ -941,6 +965,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         .trim()
         .toLowerCase();
     const isSuperAdmin = role === "admin" || role === "superadmin";
+    const canManageSystemTheme = role === "admin";
 
     // layout
     const [width, setWidth] = useState(window.innerWidth);
@@ -962,12 +987,15 @@ export default function Settings({ admin, onNavigate, onLogout }) {
 
     // tabs
     const [activeTab, setActiveTab] = useState("branding");
+    const [systemTheme, setSystemTheme] = useState("default");
 
     // branding – logos
     const [brgyLogo, setBrgyLogo] = useState(null);
     const [cityLogo, setCityLogo] = useState(null);
     const brgyFileRef = useRef();
     const cityFileRef = useRef();
+    const publicPortalQrRef = useRef(null);
+    const residentPortalLoginUrl = getResidentPortalLoginUrl();
 
     const handleLogoUpload = async (e, setter) => {
         const file = e.target.files[0];
@@ -1011,6 +1039,14 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 rowIndex === index ? { ...row, [key]: value } : row,
             ),
         );
+    };
+    const handleDownloadPublicPortalQr = () => {
+        const canvas = publicPortalQrRef.current?.querySelector("canvas");
+        if (!canvas) return;
+        const link = document.createElement("a");
+        link.download = "CertiFast Resident Portal QR.png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
     };
 
     // branding – footer
@@ -1138,6 +1174,10 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 const data = await settingsService.getBarangaySettings(token);
 
                 // Map DB settings to UI state
+                const loadedTheme = normalizeSystemTheme(data.system_theme);
+                setSystemTheme(loadedTheme);
+                applySystemTheme(loadedTheme);
+
                 if (data.brgy_name)
                     setBrgyInfo((prev) => ({ ...prev, name: data.brgy_name }));
                 if (data.brgy_city)
@@ -1370,6 +1410,32 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         }
     };
 
+    const handleSaveTheme = async () => {
+        setLoading(true);
+        setMessage({ text: "", type: "success" });
+        try {
+            const token = localStorage.getItem("adminToken");
+            const nextTheme = normalizeSystemTheme(systemTheme);
+            await settingsService.updateBarangaySettings(
+                { system_theme: nextTheme },
+                token,
+            );
+            applySystemTheme(nextTheme);
+            setSystemTheme(nextTheme);
+            setMessage({
+                text: "System theme updated successfully!",
+                type: "success",
+            });
+        } catch (err) {
+            setMessage({
+                text: err.message || "Failed to save system theme",
+                type: "error",
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Save footer settings
     const handleSaveFooter = async () => {
         setLoading(true);
@@ -1461,7 +1527,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             margin: 0,
                             fontFamily: "'Playfair Display',serif",
                             fontSize: 20,
-                            color: "#0e2554",
+                            color: "var(--color-primary)",
                         }}
                     >
                         Restricted Access
@@ -1547,7 +1613,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             fontFamily: "'Playfair Display',serif",
                             fontSize: isMobile ? 16 : 18,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary)",
                             flex: 1,
                         }}
                     >
@@ -1652,6 +1718,297 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                     {/* ══ TAB: BRANDING ══ */}
                     {activeTab === "branding" && (
                         <>
+                            {canManageSystemTheme && (
+                                <div className="st-panel">
+                                    <div className="st-panel-header">
+                                        <div>
+                                            <div className="st-panel-title">
+                                                System Theme
+                                            </div>
+                                            <div className="st-panel-desc">
+                                                Select the primary and accent
+                                                colors used across CertiFast.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="st-panel-body">
+                                        <div
+                                            style={{
+                                                display: "grid",
+                                                gridTemplateColumns: isMobile
+                                                    ? "1fr"
+                                                    : "1fr 1fr",
+                                                gap: 14,
+                                            }}
+                                        >
+                                            {Object.entries(SYSTEM_THEMES).map(
+                                                ([key, theme]) => {
+                                                    const active =
+                                                        systemTheme === key;
+                                                    return (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setSystemTheme(
+                                                                    key,
+                                                                )
+                                                            }
+                                                            style={{
+                                                                textAlign:
+                                                                    "left",
+                                                                border: active
+                                                                    ? "2px solid var(--color-primary)"
+                                                                    : "1px solid #e4dfd4",
+                                                                borderRadius: 6,
+                                                                background:
+                                                                    active
+                                                                        ? "rgba(var(--color-primary-rgb),0.06)"
+                                                                        : "#fff",
+                                                                padding: 16,
+                                                                cursor: "pointer",
+                                                                fontFamily:
+                                                                    "'Source Serif 4',serif",
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    display:
+                                                                        "flex",
+                                                                    alignItems:
+                                                                        "center",
+                                                                    justifyContent:
+                                                                        "space-between",
+                                                                    gap: 12,
+                                                                    marginBottom: 12,
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    style={{
+                                                                        fontFamily:
+                                                                            "'Playfair Display',serif",
+                                                                        fontSize: 14,
+                                                                        fontWeight: 700,
+                                                                        color: "var(--color-primary)",
+                                                                    }}
+                                                                >
+                                                                    {theme.label}
+                                                                </div>
+                                                                <span
+                                                                    style={{
+                                                                        width: 18,
+                                                                        height: 18,
+                                                                        borderRadius:
+                                                                            "50%",
+                                                                        border: active
+                                                                            ? "5px solid var(--color-primary)"
+                                                                            : "2px solid #d8cfbd",
+                                                                        background:
+                                                                            "#fff",
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div
+                                                                style={{
+                                                                    display:
+                                                                        "flex",
+                                                                    gap: 8,
+                                                                    alignItems:
+                                                                        "center",
+                                                                    marginBottom: 8,
+                                                                }}
+                                                            >
+                                                                <span
+                                                                    style={{
+                                                                        width: 34,
+                                                                        height: 24,
+                                                                        borderRadius: 4,
+                                                                        background:
+                                                                            theme.primary,
+                                                                        border: "1px solid rgba(0,0,0,0.08)",
+                                                                    }}
+                                                                />
+                                                                <span
+                                                                    style={{
+                                                                        width: 34,
+                                                                        height: 24,
+                                                                        borderRadius: 4,
+                                                                        background:
+                                                                            theme.accent,
+                                                                        border: "1px solid rgba(0,0,0,0.08)",
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <div
+                                                                style={{
+                                                                    fontSize: 11.5,
+                                                                    color: "#4a4a6a",
+                                                                }}
+                                                            >
+                                                                Primary{" "}
+                                                                {theme.primary}{" "}
+                                                                + Accent{" "}
+                                                                {theme.accent}
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="st-save-bar">
+                                        <p>
+                                            <strong>Note:</strong> Theme changes
+                                            apply to the main admin and resident
+                                            navigation surfaces.
+                                        </p>
+                                        <div>
+                                            <button
+                                                className="st-btn-save"
+                                                onClick={handleSaveTheme}
+                                                disabled={loading}
+                                            >
+                                                Save Theme
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="st-panel">
+                                <div className="st-panel-header">
+                                    <div>
+                                        <div className="st-panel-title">
+                                            Public Resident Portal QR
+                                        </div>
+                                        <div className="st-panel-desc">
+                                            Save this QR as a PNG for barangay
+                                            lobby signage so residents can scan
+                                            and open the CertiFast login page.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="st-panel-body">
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: isMobile
+                                                ? "1fr"
+                                                : "240px 1fr",
+                                            gap: 20,
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <div
+                                            ref={publicPortalQrRef}
+                                            style={{
+                                                background: "#fff",
+                                                border: "1px solid #e4dfd4",
+                                                borderRadius: 8,
+                                                padding: 18,
+                                                display: "flex",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <QRCodeCanvas
+                                                value={residentPortalLoginUrl}
+                                                size={190}
+                                                level="H"
+                                                includeMargin
+                                                fgColor="#0e2554"
+                                                bgColor="#ffffff"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 10,
+                                                    marginBottom: 10,
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        width: 38,
+                                                        height: 38,
+                                                        borderRadius: 8,
+                                                        background:
+                                                            "rgba(var(--color-primary-rgb),0.08)",
+                                                        border: "1px solid rgba(var(--color-primary-rgb),0.16)",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent:
+                                                            "center",
+                                                    }}
+                                                >
+                                                    <QrCode
+                                                        size={19}
+                                                        color="var(--color-primary)"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div
+                                                        style={{
+                                                            fontFamily:
+                                                                "'Playfair Display',serif",
+                                                            fontSize: 15,
+                                                            fontWeight: 700,
+                                                            color: "var(--color-primary)",
+                                                        }}
+                                                    >
+                                                        Resident Login Page
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: 11,
+                                                            color: "#9090aa",
+                                                            wordBreak:
+                                                                "break-all",
+                                                        }}
+                                                    >
+                                                        {residentPortalLoginUrl}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p
+                                                style={{
+                                                    fontSize: 12.5,
+                                                    color: "#4a4a6a",
+                                                    lineHeight: 1.6,
+                                                    margin: "0 0 14px",
+                                                }}
+                                            >
+                                                This QR is not a resident
+                                                identity code and is not used by
+                                                the admin scanner. It is for
+                                                public display so people can
+                                                discover and open CertiFast.
+                                            </p>
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    gap: 10,
+                                                    flexWrap: "wrap",
+                                                }}
+                                            >
+                                                <button
+                                                    type="button"
+                                                    className="st-btn-save"
+                                                    onClick={
+                                                        handleDownloadPublicPortalQr
+                                                    }
+                                                    style={{ marginRight: 0 }}
+                                                >
+                                                    <Download size={13} /> Save
+                                                    PNG
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* SEALS & LOGOS */}
                             <div className="st-panel">
                                 <div className="st-panel-header">
@@ -1706,7 +2063,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     display: "inline-block",
                                                     width: 10,
                                                     height: 10,
-                                                    background: "#c9a227",
+                                                    background:
+                                                        "var(--color-accent)",
                                                     borderRadius: 2,
                                                 }}
                                             />
@@ -1881,7 +2239,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     display: "inline-block",
                                                     width: 10,
                                                     height: 10,
-                                                    background: "#0e2554",
+                                                    background:
+                                                        "var(--color-primary)",
                                                     borderRadius: 2,
                                                 }}
                                             />
@@ -2155,7 +2514,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                             "'Playfair Display',serif",
                                                         fontSize: 14,
                                                         fontWeight: 700,
-                                                        color: "#0e2554",
+                                                        color: "var(--color-primary)",
                                                         lineHeight: 1.2,
                                                     }}
                                                 >
@@ -2246,7 +2605,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         <div
                                             style={{
                                                 height: 2,
-                                                background: "#c9a227",
+                                                background:
+                                                    "var(--color-accent)",
                                             }}
                                         />
                                         <div
@@ -2273,7 +2633,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         <div
                                             style={{
                                                 height: 2,
-                                                background: "#c9a227",
+                                                background:
+                                                    "var(--color-accent)",
                                             }}
                                         />
                                         <div
@@ -3114,9 +3475,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                         fontSize: 9,
                                                         fontWeight: 700,
                                                         background:
-                                                            "rgba(201,162,39,.2)",
-                                                        color: "#c9a227",
-                                                        border: "1px solid rgba(201,162,39,.35)",
+                                                            "rgba(var(--color-accent-rgb),.2)",
+                                                        color: "var(--color-accent)",
+                                                        border: "1px solid rgba(var(--color-accent-rgb),.35)",
                                                         borderRadius: 10,
                                                         padding: "1px 8px",
                                                         letterSpacing: 1,

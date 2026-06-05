@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom"; // Fixed: Added for PDF rendering
 import { useNavigate } from "react-router-dom";
-import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import {
     FileText,
     AlertCircle,
@@ -193,7 +193,7 @@ function WalletCard({ name, formattedId, qrValue, logoSrc }) {
                 <div className="wc-name">{name}</div>
                 <div className="wc-id">{formattedId}</div>
                 <div className="wc-qr">
-                    <QRCodeSVG
+                    <QRCodeCanvas
                         value={qrValue}
                         size={108}
                         level="H"
@@ -669,7 +669,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                     }}
                                                 />
                                             ))}
-                                            <QRCodeSVG
+                                            <QRCodeCanvas
                                                 value={qrValue}
                                                 size={qrSize}
                                                 level="H"

@@ -1,4 +1,5 @@
 import { getApiBase } from "../apiBase";
+import { normalizeSystemTheme } from "../theme";
 
 const API_URL = getApiBase();
 
@@ -17,6 +18,7 @@ export const DEFAULT_PUBLIC_BRANDING = {
     brgyLogoUrl: null,
     cityLogoUrl: null,
     officeSchedule: DEFAULT_OFFICE_SCHEDULE,
+    systemTheme: "default",
 };
 
 function clean(value, fallback = "") {
@@ -45,6 +47,7 @@ export function normalizePublicBranding(payload = {}) {
         brgyLogoUrl: clean(data.brgy_logo_url || payload.logo_url, ""),
         cityLogoUrl: clean(data.city_logo_url, ""),
         officeSchedule: getOfficeScheduleRows(data),
+        systemTheme: normalizeSystemTheme(data.system_theme),
     };
 }
 

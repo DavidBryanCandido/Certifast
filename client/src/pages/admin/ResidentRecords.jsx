@@ -63,7 +63,7 @@ if (!document.head.querySelector("[data-cf-rr]")) {
       width:100%; text-align:left; font-family:'Source Serif 4',serif;
     }
     .rr-nav-item:hover { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.9); }
-    .rr-nav-item.active { background:rgba(201,162,39,0.12); color:#fff; border-left-color:#c9a227; }
+    .rr-nav-item.active { background:rgba(var(--color-accent-rgb),0.12); color:#fff; border-left-color:var(--color-accent); }
     .rr-nav-item-icon {
       display:flex; align-items:center; justify-content:center; padding:10px 0;
       color:rgba(255,255,255,0.65); cursor:pointer; border-left:3px solid transparent;
@@ -71,7 +71,7 @@ if (!document.head.querySelector("[data-cf-rr]")) {
       width:100%; font-family:'Source Serif 4',serif;
     }
     .rr-nav-item-icon:hover { background:rgba(255,255,255,0.06); }
-    .rr-nav-item-icon.active { background:rgba(201,162,39,0.12); color:#fff; border-left-color:#c9a227; }
+    .rr-nav-item-icon.active { background:rgba(var(--color-accent-rgb),0.12); color:#fff; border-left-color:var(--color-accent); }
     /* Table rows */
     .rr-res-row {
   display: grid;
@@ -91,19 +91,19 @@ if (!document.head.querySelector("[data-cf-rr]")) {
       display:inline-flex; align-items:center; justify-content:center;
       transition:all .15s;
     }
-    .rr-pg-btn:hover:not(:disabled) { background:#f8f6f1; border-color:#0e2554; color:#0e2554; }
-    .rr-pg-btn.active { background:#0e2554; color:#fff; border-color:#0e2554; font-weight:700; }
+    .rr-pg-btn:hover:not(:disabled) { background:#f8f6f1; border-color:var(--color-primary); color:var(--color-primary); }
+    .rr-pg-btn.active { background:var(--color-primary); color:#fff; border-color:var(--color-primary); font-weight:700; }
     .rr-pg-btn:disabled { opacity:.35; cursor:not-allowed; }
     /* Drawer */
     .rr-drawer {
       position:fixed; top:0; right:0; bottom:0; width:520px;
-      background:#fff; z-index:501; display:flex; flex-direction:column;
+      background:#fff; z-index:500; display:flex; flex-direction:column;
       box-shadow:-8px 0 32px rgba(0,0,0,.14);
       animation:drawerSlideIn .25s cubic-bezier(.4,0,.2,1) both;
     }
     .rr-drawer-mobile {
       position:fixed; left:0; right:0; bottom:0; max-height:92vh;
-      background:#fff; z-index:501; display:flex; flex-direction:column;
+      background:#fff; z-index:500; display:flex; flex-direction:column;
       box-shadow:0 -8px 32px rgba(0,0,0,.14); border-radius:16px 16px 0 0;
       animation:drawerSlideUp .25s cubic-bezier(.4,0,.2,1) both;
     }
@@ -118,7 +118,7 @@ if (!document.head.querySelector("[data-cf-rr]")) {
       font-family:'Source Serif 4',serif;
     }
     .rr-dtab:hover { color:#1a1a2e; }
-    .rr-dtab.active { color:#0e2554; border-bottom-color:#0e2554; }
+    .rr-dtab.active { color:var(--color-primary); border-bottom-color:var(--color-primary); }
     /* Profile fields */
     .rr-pf-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 20px; margin-bottom:20px; }
     .rr-pf-field label { font-size:9.5px; font-weight:600; color:#9090aa; letter-spacing:1px; text-transform:uppercase; display:block; margin-bottom:4px; font-family:'Source Serif 4',serif; }
@@ -134,24 +134,24 @@ if (!document.head.querySelector("[data-cf-rr]")) {
       border-radius:4px; font-family:'Source Serif 4',serif; font-size:12.5px;
       color:#1a1a2e; outline:none; transition:border-color .15s; background:#fff;
     }
-    .rr-search-input:focus { border-color:#0e2554; }
+    .rr-search-input:focus { border-color:var(--color-primary); }
     .rr-select {
       padding:8px 12px; border:1.5px solid #e4dfd4; border-radius:4px;
       font-family:'Source Serif 4',serif; font-size:12px; color:#1a1a2e;
       background:#fff; outline:none; cursor:pointer;
     }
-    .rr-select:focus { border-color:#0e2554; }
+    .rr-select:focus { border-color:var(--color-primary); }
     /* View btn */
     .rr-view-btn {
       background:none; border:1px solid #e4dfd4; border-radius:4px;
-      padding:5px 12px; font-size:10.5px; color:#0e2554; cursor:pointer;
+      padding:5px 12px; font-size:10.5px; color:var(--color-primary); cursor:pointer;
       font-family:'Source Serif 4',serif; transition:all .15s;
     }
-    .rr-view-btn:hover { background:#0e2554; color:#fff; border-color:#0e2554; }
+    .rr-view-btn:hover { background:var(--color-primary); color:#fff; border-color:var(--color-primary); }
     /* Print card btn */
     .rr-print-card-btn {
       display:inline-flex; align-items:center; gap:7px; padding:10px 18px;
-      background:linear-gradient(135deg,#163066,#091a3e); color:#fff; border:none; border-radius:4px;
+      background:linear-gradient(135deg,var(--color-primary-soft),var(--color-primary-dark)); color:#fff; border:none; border-radius:4px;
       font-size:12px; font-weight:700; cursor:pointer; font-family:'Playfair Display',serif;
       letter-spacing:1px; text-transform:uppercase; transition:opacity .15s;
     }
@@ -251,7 +251,7 @@ function ResidentDrawer({
                     position: "fixed",
                     inset: 0,
                     background: "rgba(9,26,62,.45)",
-                    zIndex: 500,
+                    zIndex: 499,
                 }}
                 onClick={onClose}
             />
@@ -285,7 +285,7 @@ function ResidentDrawer({
                             width: 44,
                             height: 44,
                             borderRadius: "50%",
-                            background: "#0e2554",
+                            background: "var(--color-primary)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -304,7 +304,7 @@ function ResidentDrawer({
                                 fontFamily: "'Playfair Display',serif",
                                 fontSize: 16,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary)",
                             }}
                         >
                             {resident.name}
@@ -342,6 +342,23 @@ function ResidentDrawer({
                             >
                                 {resident.status}
                             </span>
+                            {resident.isRenter && (
+                                <span
+                                    style={{
+                                        display: "inline-block",
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        padding: "2px 9px",
+                                        borderRadius: 20,
+                                        textTransform: "uppercase",
+                                        background: "#fff7e6",
+                                        color: "#9a5a00",
+                                        border: "1px solid #f5d78e",
+                                    }}
+                                >
+                                    Renter / Non-matching ID
+                                </span>
+                            )}
                         </div>
                     </div>
                     <button
@@ -386,6 +403,25 @@ function ResidentDrawer({
                     {/* Profile tab */}
                     {activeTab === "profile" && (
                         <>
+                            {resident.isRenter && (
+                                <div
+                                    style={{
+                                        background: "#fff7e6",
+                                        border: "1px solid #f5d78e",
+                                        borderRadius: 6,
+                                        padding: "10px 12px",
+                                        marginBottom: 16,
+                                        color: "#7a4800",
+                                        fontSize: 12,
+                                        lineHeight: 1.55,
+                                    }}
+                                >
+                                    <strong>Renter / Non-matching ID:</strong>{" "}
+                                    Request a supporting physical document
+                                    during verification, such as a contract of
+                                    lease or landlord certification.
+                                </div>
+                            )}
                             <div className="rr-pf-grid">
                                 <div className="rr-pf-field">
                                     <label>Full Name</label>
@@ -521,7 +557,7 @@ function ResidentDrawer({
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: 15,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary)",
                                     }}
                                 >
                                     {history.length} requests
@@ -688,6 +724,7 @@ export default function ResidentRecords({
             civil: row.civil_status || "N/A",
             nationality: "Filipino",
             email: row.email || "N/A",
+            isRenter: row.is_renter === true,
             qr: `QR-ET-${new Date().getFullYear()}-${String(row.resident_id || "").padStart(4, "0")}`,
         };
     }, []);
@@ -850,9 +887,9 @@ export default function ResidentRecords({
         },
     ];
     const statTopColor = {
-        navy: "linear-gradient(90deg,#0e2554,#163066)",
+        navy: "linear-gradient(90deg,var(--color-primary),var(--color-primary-soft))",
         green: "linear-gradient(90deg,#1a7a4a,#2da866)",
-        gold: "linear-gradient(90deg,#c9a227,#e8c54a)",
+        gold: "linear-gradient(90deg,var(--color-accent),var(--color-accent-soft))",
         blue: "linear-gradient(90deg,#1a4a8a,#3a6abf)",
     };
 
@@ -945,7 +982,7 @@ export default function ResidentRecords({
                             fontFamily: "'Playfair Display',serif",
                             fontSize: isMobile ? 16 : 18,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary)",
                             flex: 1,
                         }}
                     >
@@ -1047,7 +1084,7 @@ export default function ResidentRecords({
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: isMobile ? 22 : 26,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary)",
                                         lineHeight: 1,
                                     }}
                                 >
@@ -1309,7 +1346,7 @@ export default function ResidentRecords({
                                                         "'Playfair Display',serif",
                                                     fontSize: 15,
                                                     fontWeight: 700,
-                                                    color: "#0e2554",
+                                                    color: "var(--color-primary)",
                                                 }}
                                             >
                                                 {r.requests}
@@ -1578,7 +1615,8 @@ export default function ResidentRecords({
 const _SD = {
     sidebar: {
         minHeight: "100vh",
-        background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",
+        background:
+            "linear-gradient(180deg,var(--color-primary) 0%,var(--color-primary-dark) 100%)",
         display: "flex",
         flexDirection: "column",
         position: "fixed",
@@ -1586,12 +1624,12 @@ const _SD = {
         left: 0,
         bottom: 0,
         zIndex: 100,
-        borderRight: "1px solid rgba(201,162,39,0.15)",
+        borderRight: "1px solid rgba(var(--color-accent-rgb),0.15)",
         transition: "width 0.2s",
     },
     brand: {
         padding: "20px 20px 16px",
-        borderBottom: "1px solid rgba(201,162,39,0.18)",
+        borderBottom: "1px solid rgba(var(--color-accent-rgb),0.18)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -1600,8 +1638,8 @@ const _SD = {
         width: 38,
         height: 38,
         borderRadius: "50%",
-        border: "1.5px solid rgba(201,162,39,0.5)",
-        background: "rgba(201,162,39,0.1)",
+        border: "1.5px solid rgba(var(--color-accent-rgb),0.5)",
+        background: "rgba(var(--color-accent-rgb),0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1616,19 +1654,20 @@ const _SD = {
     },
     brandSub: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.7)",
+        color: "rgba(var(--color-accent-rgb),0.7)",
         letterSpacing: "1.5px",
         textTransform: "uppercase",
         marginTop: 1,
     },
     goldBar: {
         height: 3,
-        background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+        background:
+            "linear-gradient(90deg,var(--color-accent),var(--color-accent-soft),var(--color-accent))",
         flexShrink: 0,
     },
     sectionLabel: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.5)",
+        color: "rgba(var(--color-accent-rgb),0.5)",
         letterSpacing: "2px",
         textTransform: "uppercase",
         padding: "18px 20px 8px",
@@ -1636,8 +1675,8 @@ const _SD = {
     },
     navBadge: {
         marginLeft: "auto",
-        background: "#c9a227",
-        color: "#091a3e",
+        background: "var(--color-accent)",
+        color: "var(--color-primary-dark)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -1646,8 +1685,8 @@ const _SD = {
     },
     navBadgeSA: {
         marginLeft: "auto",
-        background: "rgba(201,162,39,0.25)",
-        color: "#c9a227",
+        background: "rgba(var(--color-accent-rgb),0.25)",
+        color: "var(--color-accent)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -1655,13 +1694,13 @@ const _SD = {
     },
     superAdminSection: {
         marginTop: "auto",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb),0.15)",
         paddingTop: 8,
         paddingBottom: 8,
     },
     userRow: {
         padding: "14px 20px",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb),0.15)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -1670,13 +1709,13 @@ const _SD = {
         width: 32,
         height: 32,
         borderRadius: "50%",
-        background: "rgba(201,162,39,0.15)",
-        border: "1.5px solid rgba(201,162,39,0.4)",
+        background: "rgba(var(--color-accent-rgb),0.15)",
+        border: "1.5px solid rgba(var(--color-accent-rgb),0.4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 12,
-        color: "#c9a227",
+        color: "var(--color-accent)",
         fontWeight: 700,
         flexShrink: 0,
     },
@@ -1691,7 +1730,7 @@ const _SD = {
     },
     userRole: {
         fontSize: 9.5,
-        color: "#c9a227",
+        color: "var(--color-accent)",
         letterSpacing: "1px",
         textTransform: "uppercase",
         marginTop: 1,

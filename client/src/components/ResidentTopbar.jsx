@@ -19,11 +19,11 @@ if (!document.head.querySelector("[data-resident-topbar]")) {
     s.setAttribute("data-resident-topbar", "true");
     s.innerText = `
     .rtb-wrap {
-        background: linear-gradient(135deg, #0e2554 0%, #163066 100%);
-        border-bottom: 1px solid rgba(201,162,39,0.2);
+        background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
+        border-bottom: 1px solid rgba(var(--color-accent-rgb),0.2);
         position: sticky;
         top: 0;
-        z-index: 100;
+        z-index: 50;
         flex-shrink: 0;
     }
     .rtb-inner {
@@ -35,7 +35,7 @@ if (!document.head.querySelector("[data-resident-topbar]")) {
     }
     .rtb-gold-line {
         height: 2px;
-        background: linear-gradient(90deg, #c9a227, #f0d060, #c9a227);
+        background: linear-gradient(90deg, var(--color-accent), var(--color-accent-soft), var(--color-accent));
     }
 
     /* Notification bell */
@@ -55,15 +55,15 @@ if (!document.head.querySelector("[data-resident-topbar]")) {
         position: absolute;
         top: -4px; right: -4px;
         min-width: 16px; height: 16px;
-        background: #c9a227;
-        color: #091a3e;
+        background: var(--color-accent);
+        color: var(--color-primary-dark);
         font-size: 9px;
         font-weight: 800;
         border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
         padding: 0 4px;
         font-family: 'Source Serif 4', serif;
-        border: 1.5px solid #0e2554;
+        border: 1.5px solid var(--color-primary);
     }
 
     /* Notification dropdown */
@@ -117,7 +117,7 @@ const NOTIF_COLORS = {
     request_approved: { bg: "#e8eef8", color: "#1a4a8a", dot: "#1a4a8a" },
     request_ready: { bg: "#e8f5ee", color: "#1a7a4a", dot: "#1a7a4a" },
     request_rejected: { bg: "#fdecea", color: "#b02020", dot: "#b02020" },
-    request_released: { bg: "#e8f5ee", color: "#1a7a4a", dot: "#c9a227" },
+    request_released: { bg: "#e8f5ee", color: "#1a7a4a", dot: "var(--color-accent)" },
     default: { bg: "#f8f6f1", color: "#4a4a6a", dot: "#9090aa" },
 };
 
@@ -229,7 +229,7 @@ export default function ResidentTopbar({
                                 width: 34,
                                 height: 34,
                                 borderRadius: "50%",
-                                border: "1.5px solid rgba(201,162,39,0.5)",
+                                border: "1.5px solid rgba(var(--color-accent-rgb),0.5)",
                                 overflow: "hidden",
                                 flexShrink: 0,
                             }}
@@ -259,7 +259,7 @@ export default function ResidentTopbar({
                             <div
                                 style={{
                                     fontSize: 9,
-                                    color: "rgba(201,162,39,0.7)",
+                                    color: "rgba(var(--color-accent-rgb),0.7)",
                                     letterSpacing: "1.5px",
                                     textTransform: "uppercase",
                                 }}
@@ -319,7 +319,7 @@ export default function ResidentTopbar({
                                         fontFamily: "'Playfair Display', serif",
                                         fontSize: 14,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary)",
                                     }}
                                 >
                                     Notifications
@@ -331,7 +331,8 @@ export default function ResidentTopbar({
                                                 marginLeft: 8,
                                                 padding: "2px 8px",
                                                 borderRadius: 10,
-                                                background: "#0e2554",
+                                                background:
+                                                    "var(--color-primary)",
                                                 color: "#fff",
                                             }}
                                         >
@@ -354,7 +355,7 @@ export default function ResidentTopbar({
                                                 background: "none",
                                                 border: "none",
                                                 cursor: "pointer",
-                                                color: "#0e2554",
+                                                color: "var(--color-primary)",
                                                 fontSize: 11,
                                                 fontFamily:
                                                     "'Source Serif 4', serif",
@@ -540,7 +541,7 @@ export default function ResidentTopbar({
                                             background: "none",
                                             border: "none",
                                             cursor: "pointer",
-                                            color: "#0e2554",
+                                            color: "var(--color-primary)",
                                             fontSize: 12,
                                             fontFamily:
                                                 "'Source Serif 4', serif",

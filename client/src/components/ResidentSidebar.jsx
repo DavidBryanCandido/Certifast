@@ -27,15 +27,15 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
     .rsb-wrap {
         width: 240px;
         flex-shrink: 0;
-        background: linear-gradient(180deg, #0e2554 0%, #091a3e 100%);
+        background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
         min-height: 100vh;
         height: 100vh;
         position: sticky;
         top: 0;
         display: flex;
         flex-direction: column;
-        border-right: 1px solid rgba(201,162,39,0.15);
-        z-index: 50;
+        border-right: 1px solid rgba(var(--color-accent-rgb),0.15);
+        z-index: 100;
         overflow: hidden;
         transition: width 0.2s ease;
     }
@@ -76,7 +76,7 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
         padding: 10px 0;
         min-width: 0;
         border-left-width: 0;
-        border-bottom: 3px solid #c9a227;
+        border-bottom: 3px solid var(--color-accent);
         margin: 4px 9px;
         width: calc(100% - 18px);
         border-radius: 6px;
@@ -91,7 +91,7 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
     }
     .rsb-brand {
         padding: 20px 16px 18px;
-        border-bottom: 1px solid rgba(201,162,39,0.15);
+        border-bottom: 1px solid rgba(var(--color-accent-rgb),0.15);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -107,7 +107,7 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
     .rsb-section-label {
         font-size: 9px;
         font-weight: 700;
-        color: rgba(201,162,39,0.45);
+        color: rgba(var(--color-accent-rgb),0.45);
         letter-spacing: 2px;
         text-transform: uppercase;
         padding: 14px 18px 6px;
@@ -130,7 +130,7 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
         transition: all 0.15s;
     }
     .rsb-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
-    .rsb-item.rsb-active { background: rgba(201,162,39,0.12); color: #fff; border-left-color: #c9a227; font-weight: 600; }
+    .rsb-item.rsb-active { background: rgba(var(--color-accent-rgb),0.12); color: #fff; border-left-color: var(--color-accent); font-weight: 600; }
     .rsb-item svg { opacity: 0.55; flex-shrink: 0; transition: opacity 0.15s; }
     .rsb-item.rsb-active svg { opacity: 1; }
     .rsb-item:hover svg { opacity: 0.85; }
@@ -144,16 +144,16 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
         font-weight: 600;
         cursor: pointer;
         border: none;
-        border-left: 3px solid #c9a227;
-        background: linear-gradient(135deg, rgba(201,162,39,0.18), rgba(201,162,39,0.06));
-        color: #f0d060;
+        border-left: 3px solid var(--color-accent);
+        background: linear-gradient(135deg, rgba(var(--color-accent-rgb),0.18), rgba(var(--color-accent-rgb),0.06));
+        color: var(--color-accent-soft);
         font-family: 'Source Serif 4', serif;
         text-align: left;
         transition: all 0.15s;
         margin: 4px 0;
     }
-    .rsb-request-btn:hover { background: rgba(201,162,39,0.25); color: #fff; }
-    .rsb-request-btn.rsb-active { background: rgba(201,162,39,0.28); color: #fff; }
+    .rsb-request-btn:hover { background: rgba(var(--color-accent-rgb),0.25); color: #fff; }
+    .rsb-request-btn.rsb-active { background: rgba(var(--color-accent-rgb),0.28); color: #fff; }
     .rsb-request-btn svg { opacity: 1; flex-shrink: 0; }
     .rsb-bottom {
         flex-shrink: 0;
@@ -165,13 +165,13 @@ if (!document.head.querySelector("[data-resident-sidebar]")) {
         gap: 9px;
         padding: 12px 18px 14px;
         cursor: pointer;
-        border-top: 1px solid rgba(201,162,39,0.12);
+        border-top: 1px solid rgba(var(--color-accent-rgb),0.12);
         transition: background 0.15s;
     }
     .rsb-profile-row:hover { background: rgba(255,255,255,0.04); }
     .rsb-profile-row.rsb-active {
-        background: rgba(201,162,39,0.12);
-        border-left: 3px solid #c9a227;
+        background: rgba(var(--color-accent-rgb),0.12);
+        border-left: 3px solid var(--color-accent);
     }
     .rsb-logout {
         display: flex;
@@ -292,7 +292,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                             width: 100,
                             height: 100,
                             borderRadius: "50%",
-                            border: "2.5px solid rgba(201,162,39,0.6)",
+                            border: "2.5px solid rgba(var(--color-accent-rgb),0.6)",
                             overflow: "hidden",
                             flexShrink: 0,
                         }}
@@ -326,7 +326,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                         <div
                             style={{
                                 fontSize: 12,
-                                color: "rgba(201,162,39,0.75)",
+                                color: "rgba(var(--color-accent-rgb),0.75)",
                                 letterSpacing: "0.5px",
                                 marginTop: 4,
                             }}
@@ -388,14 +388,14 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                                 width: 30,
                                 height: 30,
                                 borderRadius: "50%",
-                                background: "rgba(201,162,39,0.15)",
-                                border: "1.5px solid rgba(201,162,39,0.35)",
+                                background: "rgba(var(--color-accent-rgb),0.15)",
+                                border: "1.5px solid rgba(var(--color-accent-rgb),0.35)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 fontSize: 11,
                                 fontWeight: 700,
-                                color: "#c9a227",
+                                color: "var(--color-accent)",
                                 flexShrink: 0,
                             }}
                         >
@@ -481,7 +481,7 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                                         fontFamily: "'Playfair Display', serif",
                                         fontSize: 16,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary)",
                                     }}
                                 >
                                     Log Out
@@ -521,7 +521,10 @@ export default function ResidentSidebar({ active, resident, onLogout }) {
                             </button>
                             <button
                                 className="rsb-modal-btn"
-                                style={{ background: "#0e2554", color: "#fff" }}
+                                style={{
+                                    background: "var(--color-primary)",
+                                    color: "#fff",
+                                }}
                                 onClick={handleLogoutConfirm}
                             >
                                 Yes, Log Out

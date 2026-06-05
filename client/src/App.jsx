@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -19,6 +19,8 @@ import MyRequests from "./pages/resident/MyRequests";
 import MyQRCode from "./pages/resident/MyQRCode";
 import ResidentProfile from "./pages/resident/ResidentProfile";
 import ResidentNotifications from "./pages/resident/ResidentNotifications";
+import { getPublicBrandingSettings } from "./services/publicBrandingService";
+import { applySystemTheme } from "./theme";
 
 const ADMIN_KEY_TO_ROUTE = {
     dashboard: "/admin/dashboard",
@@ -153,6 +155,23 @@ function ResidentNotificationsRoute() {
 }
 
 export default function App() {
+    useEffect(() => {
+        let mounted = true;
+        applySystemTheme("default");
+
+        getPublicBrandingSettings()
+            .then((branding) => {
+                if (mounted) applySystemTheme(branding.systemTheme);
+            })
+            .catch(() => {
+                if (mounted) applySystemTheme("default");
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     return (
         <Routes>
             <Route

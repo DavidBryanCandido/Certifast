@@ -3,6 +3,7 @@
 // =============================================================
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
     Eye,
@@ -80,6 +81,23 @@ const ID_TYPES = [
     "Other valid ID",
 ];
 const MAX_ID_IMAGE_BYTES = 2 * 1024 * 1024;
+const MIN_REGISTRATION_AGE = 18;
+
+function calculateAge(dateString) {
+    if (!dateString) return null;
+    const birth = new Date(`${dateString}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+        age -= 1;
+    }
+    return age;
+}
 
 function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
@@ -435,12 +453,16 @@ export default function ResidentRegister({ onSuccess }) {
     const [idType, setIdType] = useState("");
     const [idFile, setIdFile] = useState(null);
     const [idPreview, setIdPreview] = useState(null);
+    const [isRenter, setIsRenter] = useState(false);
     // Step 3 — password
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
     const [showPw, setShowPw] = useState(false);
     const [showCf, setShowCf] = useState(false);
     const [declared, setDeclared] = useState(false);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
+    const [ageModalOpen, setAgeModalOpen] = useState(false);
 
     const set = (k, v) => {
         setError("");
@@ -462,6 +484,23 @@ export default function ResidentRegister({ onSuccess }) {
     const selectedPurok = puroks.find(
         (p) => String(p.purok_id) === String(form.purok_id),
     );
+    const applicantAge = calculateAge(form.date_of_birth);
+    const isApplicantUnderage =
+        applicantAge !== null && applicantAge < MIN_REGISTRATION_AGE;
+
+    const handleDateOfBirthChange = (value) => {
+        set("date_of_birth", value);
+        const nextAge = calculateAge(value);
+        if (nextAge !== null && nextAge < MIN_REGISTRATION_AGE) {
+            setAgeModalOpen(true);
+        }
+    };
+
+    const closeAgeModal = () => {
+        setAgeModalOpen(false);
+        setError("");
+        setForm((prev) => ({ ...prev, date_of_birth: "" }));
+    };
 
     const handleFilePick = async (e) => {
         const rawFile = e.target.files?.[0];
@@ -504,6 +543,8 @@ export default function ResidentRegister({ onSuccess }) {
             if (!form.contact_number.trim())
                 return "Contact number is required.";
             if (!form.date_of_birth) return "Date of birth is required.";
+            if (isApplicantUnderage)
+                return "You must be at least 18 years old to register.";
             if (!form.civil_status) return "Civil status is required.";
             if (!form.house_no.trim())
                 return "House / Unit number is required.";
@@ -525,6 +566,8 @@ export default function ResidentRegister({ onSuccess }) {
             if (!/[0-9]/.test(password)) return "Include at least one number.";
             if (password !== confirm) return "Passwords do not match.";
             if (!declared) return "Please confirm your residency declaration.";
+            if (!agreedToTerms)
+                return "Please agree to the Terms and Conditions.";
         }
         return null;
     };
@@ -580,6 +623,11 @@ export default function ResidentRegister({ onSuccess }) {
                             civil_status: form.civil_status || null,
                             nationality: form.nationality || "Filipino",
                             id_type: idType || null,
+                            is_renter: isRenter,
+                            agreed_to_terms: agreedToTerms,
+                            terms_agreed_at: agreedToTerms
+                                ? new Date().toISOString()
+                                : null,
                         },
                     },
                 });
@@ -899,7 +947,7 @@ export default function ResidentRegister({ onSuccess }) {
                             type="date"
                             value={form.date_of_birth}
                             onChange={(e) =>
-                                set("date_of_birth", e.target.value)
+                                handleDateOfBirthChange(e.target.value)
                             }
                             max={new Date().toISOString().split("T")[0]}
                             style={{ paddingLeft: 40 }}
@@ -1252,6 +1300,62 @@ export default function ResidentRegister({ onSuccess }) {
                         </div>
                     )}
                 </FieldGroup>
+
+                <div
+                    style={{
+                        marginTop: 14,
+                        background: "#f8f6f1",
+                        border: "1px solid #e4dfd4",
+                        borderRadius: 7,
+                        padding: "12px 14px",
+                    }}
+                >
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 10,
+                            cursor: "pointer",
+                            userSelect: "none",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={isRenter}
+                            onChange={(e) => setIsRenter(e.target.checked)}
+                            style={{ marginTop: 3, accentColor: "#0e2554" }}
+                        />
+                        <span
+                            style={{
+                                fontSize: 12.2,
+                                color: "#4a4a6a",
+                                lineHeight: 1.55,
+                            }}
+                        >
+                            My ID address does not match my current Barangay
+                            East Tapinac address (e.g., I am a renter/boarder).
+                        </span>
+                    </label>
+                    {isRenter && (
+                        <div
+                            style={{
+                                marginTop: 9,
+                                padding: "9px 11px",
+                                borderRadius: 5,
+                                background: "#fff7e6",
+                                border: "1px solid #f5d78e",
+                                color: "#7a4800",
+                                fontSize: 11.8,
+                                lineHeight: 1.55,
+                            }}
+                        >
+                            Please bring a supporting document to the barangay
+                            office, such as a contract of lease or certification
+                            from your landlord. This note does not block your
+                            online registration.
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* DIVIDER */}
@@ -1554,7 +1658,7 @@ export default function ResidentRegister({ onSuccess }) {
                     border: "1px solid #e4dfd4",
                     borderRadius: 7,
                     padding: "13px 16px",
-                    marginBottom: 18,
+                    marginBottom: 12,
                 }}
             >
                 <label
@@ -1590,6 +1694,67 @@ export default function ResidentRegister({ onSuccess }) {
                         and that all information I provided is true and
                         accurate. I understand that false information may result
                         in account denial.
+                    </p>
+                </label>
+            </div>
+
+            <div
+                style={{
+                    background: "#f8f6f1",
+                    border: "1px solid #e4dfd4",
+                    borderRadius: 7,
+                    padding: "13px 16px",
+                    marginBottom: 18,
+                }}
+            >
+                <label
+                    style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 11,
+                        cursor: "pointer",
+                        userSelect: "none",
+                    }}
+                >
+                    <input
+                        type="checkbox"
+                        checked={agreedToTerms}
+                        onChange={(e) => {
+                            setAgreedToTerms(e.target.checked);
+                            setError("");
+                        }}
+                        style={{ marginTop: 4, accentColor: "#0e2554" }}
+                    />
+                    <p
+                        style={{
+                            fontSize: 12.5,
+                            color: "#4a4a6a",
+                            lineHeight: 1.65,
+                            margin: 0,
+                        }}
+                    >
+                        I have read and agree to the{" "}
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                setShowTerms(true);
+                            }}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                color: "#0e2554",
+                                cursor: "pointer",
+                                fontFamily: "'Source Serif 4',serif",
+                                fontSize: 12.5,
+                                fontWeight: 700,
+                                padding: 0,
+                                textDecoration: "underline",
+                            }}
+                        >
+                            Terms and Conditions
+                        </button>
+                        .
                     </p>
                 </label>
             </div>
@@ -1637,6 +1802,12 @@ export default function ResidentRegister({ onSuccess }) {
                     { label: "Civil Status", value: form.civil_status },
                     { label: "Nationality", value: form.nationality },
                     { label: "ID Type", value: idType },
+                    {
+                        label: "ID Note",
+                        value: isRenter
+                            ? "Renter / non-matching ID address"
+                            : "No address mismatch declared",
+                    },
                 ].map(({ label, value }) => (
                     <div
                         key={label}
@@ -1672,6 +1843,209 @@ export default function ResidentRegister({ onSuccess }) {
 
     // ── Main render ───────────────────────────────────────────
     return (
+        <>
+            {ageModalOpen &&
+                createPortal(
+                    <div
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 600,
+                            background: "rgba(9,26,62,0.62)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 18,
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: "100%",
+                                maxWidth: 420,
+                                background: "#fff",
+                                borderRadius: 8,
+                                overflow: "hidden",
+                                boxShadow:
+                                    "0 24px 60px rgba(0,0,0,0.35)",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    padding: "16px 22px",
+                                    background:
+                                        "linear-gradient(135deg,#7a0a0a,#b02020)",
+                                    color: "#fff",
+                                    fontFamily:
+                                        "'Playfair Display',serif",
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                }}
+                            >
+                                Age Requirement Not Met
+                            </div>
+                            <div style={{ padding: 22 }}>
+                                <p
+                                    style={{
+                                        margin: "0 0 18px",
+                                        color: "#1a1a2e",
+                                        fontSize: 14,
+                                        lineHeight: 1.6,
+                                    }}
+                                >
+                                    You must be at least 18 years old to
+                                    register for a CertiFast account. For
+                                    certificate requests on behalf of a minor,
+                                    please visit the Barangay East Tapinac
+                                    office in person.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={closeAgeModal}
+                                    className="reg-btn-primary"
+                                    style={{
+                                        width: "100%",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body,
+                )}
+
+            {showTerms &&
+                createPortal(
+                    <div
+                        onClick={() => setShowTerms(false)}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 600,
+                            background: "rgba(9,26,62,0.62)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            padding: 18,
+                        }}
+                    >
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                width: "100%",
+                                maxWidth: 560,
+                                maxHeight: "82vh",
+                                background: "#fff",
+                                borderRadius: 8,
+                                overflow: "hidden",
+                                boxShadow:
+                                    "0 24px 60px rgba(0,0,0,0.35)",
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                        >
+                            <div
+                                style={{
+                                    padding: "16px 22px",
+                                    background:
+                                        "linear-gradient(135deg,#0e2554,#163066)",
+                                    color: "#fff",
+                                    fontFamily:
+                                        "'Playfair Display',serif",
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: 12,
+                                }}
+                            >
+                                <span>Terms and Conditions</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTerms(false)}
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        color: "rgba(255,255,255,0.8)",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        padding: 2,
+                                    }}
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div
+                                style={{
+                                    padding: "20px 24px",
+                                    overflowY: "auto",
+                                    color: "#1a1a2e",
+                                    fontSize: 13,
+                                    lineHeight: 1.7,
+                                }}
+                            >
+                                <p style={{ margin: "0 0 12px" }}>
+                                    By creating a CertiFast account, you consent
+                                    to Barangay East Tapinac collecting,
+                                    processing, and storing the personal
+                                    information and documents you submit for
+                                    identity verification, account review,
+                                    certificate processing, notifications, audit
+                                    logs, and related barangay services.
+                                </p>
+                                <p style={{ margin: "0 0 12px" }}>
+                                    You certify that the information you provide
+                                    is complete, accurate, and your own. False,
+                                    misleading, or incomplete information may
+                                    result in registration denial, account
+                                    suspension, certificate cancellation, or
+                                    referral to the barangay office for manual
+                                    review.
+                                </p>
+                                <p style={{ margin: "0 0 12px" }}>
+                                    Certificates requested through CertiFast
+                                    must be used only for lawful and legitimate
+                                    purposes. You are responsible for ensuring
+                                    that any certificate issued to you is not
+                                    altered, misrepresented, sold, transferred,
+                                    or used for fraudulent activity.
+                                </p>
+                                <p style={{ margin: 0 }}>
+                                    Barangay East Tapinac may deny, revoke, or
+                                    limit access to CertiFast when required for
+                                    verification, security, data privacy,
+                                    compliance, or lawful barangay operations.
+                                    You may contact the barangay office to ask
+                                    about corrections, account status, or data
+                                    privacy concerns.
+                                </p>
+                            </div>
+                            <div
+                                style={{
+                                    padding: "14px 22px",
+                                    borderTop: "1px solid #e4dfd4",
+                                    background: "#f8f6f1",
+                                }}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTerms(false)}
+                                    className="reg-btn-primary"
+                                    style={{
+                                        width: "100%",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body,
+                )}
+
         <div
             className="reg-root"
             style={{
@@ -1839,6 +2213,7 @@ export default function ResidentRegister({ onSuccess }) {
                             <button
                                 className="reg-btn-primary"
                                 onClick={handleNext}
+                                disabled={step === 1 && isApplicantUnderage}
                             >
                                 Continue <ChevronRight size={14} />
                             </button>
@@ -1846,7 +2221,9 @@ export default function ResidentRegister({ onSuccess }) {
                             <button
                                 className="reg-btn-primary"
                                 onClick={handleSubmit}
-                                disabled={isLoading}
+                                disabled={
+                                    isLoading || !declared || !agreedToTerms
+                                }
                             >
                                 {isLoading ? (
                                     <>
@@ -1905,5 +2282,6 @@ export default function ResidentRegister({ onSuccess }) {
                 </div>
             </div>
         </div>
+        </>
     );
 }

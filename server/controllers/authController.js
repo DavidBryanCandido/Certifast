@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
+const { sendPasswordChangedEmail } = require("../utils/mailer");
 
 // Supabase client — optional at startup so the server can still boot without it.
 const supabaseUrl =
@@ -13,6 +14,39 @@ const supabase =
     supabaseUrl && supabaseServiceRoleKey
         ? createClient(supabaseUrl, supabaseServiceRoleKey)
         : null;
+
+async function sendPasswordChangedEmailAfterUpdate(
+    residentEmail,
+    residentName,
+    changedBy,
+) {
+    try {
+        if (!residentEmail) return;
+        await sendPasswordChangedEmail(residentEmail, residentName, changedBy);
+    } catch (err) {
+        console.error(
+            "sendPasswordChangedEmailAfterUpdate error:",
+            err.message || err,
+        );
+    }
+}
+
+function parseBoolean(value) {
+    return value === true || String(value).toLowerCase() === "true";
+}
+
+function calculateAge(dateString) {
+    if (!dateString) return null;
+    const birth = new Date(`${dateString}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age -= 1;
+    }
+    return age;
+}
 
 /** Legacy columns address_house / address_street — mirror structured fields for older reports/UI. */
 async function legacyAddressFields(pool, {
@@ -93,10 +127,26 @@ async function completeResidentRegistration(req, res) {
         nationality,
         id_type,
         id_image_path,
+        is_renter,
+        agreed_to_terms,
     } = req.body;
 
     if (!supabase_uid || !email || !first_name || !last_name) {
         return res.status(400).json({ message: "Missing required fields" });
+    }
+    if (!parseBoolean(agreed_to_terms)) {
+        return res.status(400).json({
+            message: "Terms and Conditions agreement is required.",
+        });
+    }
+    const applicantAge = calculateAge(date_of_birth);
+    if (applicantAge === null) {
+        return res.status(400).json({ message: "Date of birth is required." });
+    }
+    if (applicantAge < 18) {
+        return res
+            .status(400)
+            .json({ message: "Applicant must be at least 18 years old." });
     }
     if (!supabase) {
         return res.status(500).json({
@@ -156,14 +206,16 @@ async function completeResidentRegistration(req, res) {
                 contact_number, address_house, address_street,
                 date_of_birth, house_number,
                 purok_id, street_id, street_other,
-                id_type, id_image_url, civil_status, nationality, status
+                id_type, id_image_url, civil_status, nationality, status,
+                is_renter, agreed_to_terms, terms_agreed_at
             ) VALUES (
                 $1, $2, $3, $4,
                 $5, $6,
                 $7, $8, $9,
                 $10, $11,
                 $12, $13, $14,
-                $15, $16, $17, $18, 'pending_verification'
+                $15, $16, $17, $18, 'pending_verification',
+                $19, TRUE, NOW()
             ) RETURNING resident_id, full_name, email, status`,
             [
                 full_name,
@@ -184,6 +236,7 @@ async function completeResidentRegistration(req, res) {
                 id_image_url,
                 civil_status || null,
                 nationality || "Filipino",
+                parseBoolean(is_renter),
             ],
         );
 
@@ -292,7 +345,7 @@ async function residentChangePassword(req, res) {
 
     try {
         const result = await pool.query(
-            "SELECT password_hash FROM residents WHERE resident_id = $1",
+            "SELECT password_hash, email, full_name FROM residents WHERE resident_id = $1",
             [resident_id],
         );
 
@@ -315,6 +368,12 @@ async function residentChangePassword(req, res) {
         await pool.query(
             "UPDATE residents SET password_hash = $1 WHERE resident_id = $2",
             [newHash, resident_id],
+        );
+
+        await sendPasswordChangedEmailAfterUpdate(
+            resident.email,
+            resident.full_name,
+            "resident",
         );
 
         await createAuditLog({

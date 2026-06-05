@@ -9,6 +9,16 @@
     padding: 0;
 }
 
+:root {
+    --color-primary: #0e2554;
+    --color-primary-dark: #091a3e;
+    --color-primary-soft: #163066;
+    --color-primary-rgb: 14, 37, 84;
+    --color-accent: #c9a227;
+    --color-accent-soft: #f0d060;
+    --color-accent-rgb: 201, 162, 39;
+}
+
 body {
     font-family:
         system-ui,
