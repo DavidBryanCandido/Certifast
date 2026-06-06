@@ -503,7 +503,7 @@ async function getCertificateTemplates(req, res) {
             String(req.query.includeInactive || "").toLowerCase(),
         );
         const result = await pool.query(
-            `SELECT template_id, name, template_key, has_fee, description, required_fields, is_active, display_order
+            `SELECT template_id, name, template_key, has_fee, fee_amount, description, required_fields, is_active, display_order
              FROM certificate_templates
              ${includeInactive ? "" : "WHERE is_active = TRUE"}
              ORDER BY COALESCE(display_order, 0), name ASC`,
@@ -515,6 +515,10 @@ async function getCertificateTemplates(req, res) {
                 name: row.name,
                 templateKey: row.template_key || "",
                 hasFee: Boolean(row.has_fee),
+                feeAmount:
+                    row.fee_amount === null || row.fee_amount === undefined
+                        ? null
+                        : Number(row.fee_amount),
                 desc: row.description || "",
                 isActive: row.is_active !== false,
                 displayOrder: row.display_order ?? null,
@@ -542,6 +546,27 @@ function parseBooleanInput(value) {
         }
     }
     return null;
+}
+
+function parseFeeAmountInput(value) {
+    if (value === null || value === undefined || value === "") {
+        return { value: null };
+    }
+
+    const parsed =
+        typeof value === "number"
+            ? value
+            : Number.parseFloat(String(value).replace(/,/g, "").trim());
+
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return { error: "feeAmount must be a non-negative number" };
+    }
+
+    if (parsed > 99999999.99) {
+        return { error: "feeAmount is too large" };
+    }
+
+    return { value: Math.round(parsed * 100) / 100 };
 }
 
 const ADMIN_REQUEST_EXTRA_FIELDS = {
@@ -585,6 +610,9 @@ async function updateCertificateTemplate(req, res) {
         const isActiveProvided =
             Object.prototype.hasOwnProperty.call(body, "isActive") ||
             Object.prototype.hasOwnProperty.call(body, "is_active");
+        const feeAmountProvided =
+            Object.prototype.hasOwnProperty.call(body, "feeAmount") ||
+            Object.prototype.hasOwnProperty.call(body, "fee_amount");
 
         const updates = [];
         const values = [];
@@ -602,6 +630,19 @@ async function updateCertificateTemplate(req, res) {
             }
             values.push(parsed);
             updates.push(`has_fee = $${values.length}`);
+        }
+
+        if (feeAmountProvided) {
+            const parsed = parseFeeAmountInput(
+                Object.prototype.hasOwnProperty.call(body, "feeAmount")
+                    ? body.feeAmount
+                    : body.fee_amount,
+            );
+            if (parsed.error) {
+                return res.status(400).json({ message: parsed.error });
+            }
+            values.push(parsed.value);
+            updates.push(`fee_amount = $${values.length}`);
         }
 
         if (isActiveProvided) {
@@ -630,7 +671,7 @@ async function updateCertificateTemplate(req, res) {
             `UPDATE certificate_templates
              SET ${updates.join(", ")}
              WHERE template_id = $${values.length}
-             RETURNING template_id, name, template_key, has_fee, description, required_fields, is_active, display_order`,
+             RETURNING template_id, name, template_key, has_fee, fee_amount, description, required_fields, is_active, display_order`,
             values,
         );
 
@@ -657,6 +698,10 @@ async function updateCertificateTemplate(req, res) {
                 name: row.name,
                 templateKey: row.template_key || "",
                 hasFee: Boolean(row.has_fee),
+                feeAmount:
+                    row.fee_amount === null || row.fee_amount === undefined
+                        ? null
+                        : Number(row.fee_amount),
                 desc: row.description || "",
                 isActive: row.is_active !== false,
                 displayOrder: row.display_order ?? null,

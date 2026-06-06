@@ -10,14 +10,17 @@ import {
 import AdminDateChip from "../../components/AdminDateChip";
 import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import {
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Download,
     Eye,
     HelpCircle,
     Menu,
+    Palette,
     QrCode,
     Search,
+    Upload,
     X,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -49,7 +52,7 @@ function useSettingsStyles() {
         .st-body { font-family: 'Source Serif 4', serif; }
 
         /* TABS */
-        .st-tabs { display:flex; gap:0; border-bottom:2px solid #e4dfd4; margin-bottom:28px; }
+        .st-tabs { display:flex; gap:0; border-bottom:2px solid #e4dfd4; margin-bottom:28px; overflow-x:auto; }
         .st-tab-btn {
             padding:10px 24px;
             font-family:'Source Serif 4',serif;
@@ -57,6 +60,7 @@ function useSettingsStyles() {
             color:#9090aa; background:none; border:none;
             border-bottom:2px solid transparent; margin-bottom:-2px;
             cursor:pointer; display:flex; align-items:center; gap:8px;
+            white-space:nowrap;
             transition:all .15s;
         }
         .st-tab-btn:hover { color:var(--color-primary); }
@@ -116,6 +120,203 @@ function useSettingsStyles() {
             padding:9px 20px; background:none; color:#4a4a6a;
             border:1px solid #e4dfd4; border-radius:4px;
             font-family:'Source Serif 4',serif; font-size:12px; cursor:pointer; margin-right:8px;
+        }
+
+        /* BRANDING OVERVIEW */
+        .st-branding-overview .st-panel-body { padding:20px; }
+        .st-branding-overview-grid {
+            display:grid;
+            grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);
+            gap:18px;
+            align-items:stretch;
+        }
+        .st-branding-overview-grid.single {
+            grid-template-columns:minmax(0,540px);
+        }
+        .st-config-card {
+            min-width:0;
+            border:1px solid #eee7da;
+            border-radius:8px;
+            background:#fff;
+            display:flex;
+            flex-direction:column;
+            overflow:hidden;
+        }
+        .st-config-card-header {
+            padding:16px 18px;
+            background:#fbfaf7;
+            border-bottom:1px solid #eee7da;
+            display:flex;
+            align-items:flex-start;
+            gap:12px;
+        }
+        .st-config-icon {
+            width:34px;
+            height:34px;
+            border-radius:7px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:var(--color-primary);
+            background:rgba(var(--color-primary-rgb),.08);
+            border:1px solid rgba(var(--color-primary-rgb),.14);
+            flex:0 0 auto;
+        }
+        .st-config-title {
+            font-family:'Playfair Display',serif;
+            font-size:14px;
+            font-weight:700;
+            color:var(--color-primary);
+            line-height:1.2;
+        }
+        .st-config-desc {
+            font-size:11.5px;
+            color:#77758d;
+            line-height:1.45;
+            margin-top:3px;
+        }
+        .st-theme-list {
+            padding:16px;
+            display:flex;
+            flex-direction:column;
+            gap:10px;
+        }
+        .st-theme-choice {
+            width:100%;
+            min-height:58px;
+            border:1px solid #e4dfd4;
+            border-radius:7px;
+            background:#fff;
+            display:grid;
+            grid-template-columns:minmax(0,1fr) auto auto;
+            align-items:center;
+            gap:12px;
+            padding:12px 14px;
+            text-align:left;
+            cursor:pointer;
+            font-family:'Source Serif 4',serif;
+            transition:border-color .15s, background .15s, box-shadow .15s;
+        }
+        .st-theme-choice:hover {
+            border-color:rgba(var(--color-primary-rgb),.4);
+            background:#fbfaf7;
+        }
+        .st-theme-choice.active {
+            border-color:var(--color-primary);
+            background:rgba(var(--color-primary-rgb),.06);
+            box-shadow:0 0 0 1px rgba(var(--color-primary-rgb),.25) inset;
+        }
+        .st-theme-name {
+            display:block;
+            font-size:13px;
+            font-weight:700;
+            color:#1a1a2e;
+        }
+        .st-theme-meta {
+            display:block;
+            margin-top:2px;
+            font-size:10.5px;
+            color:#77758d;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+        .st-theme-swatches {
+            display:flex;
+            align-items:center;
+            gap:5px;
+        }
+        .st-theme-swatch {
+            width:30px;
+            height:22px;
+            border-radius:5px;
+            border:1px solid rgba(0,0,0,.1);
+        }
+        .st-theme-check {
+            width:18px;
+            height:18px;
+            color:var(--color-primary);
+            opacity:0;
+        }
+        .st-theme-choice.active .st-theme-check { opacity:1; }
+        .st-config-footer {
+            margin-top:auto;
+            padding:12px 16px;
+            background:#fbfaf7;
+            border-top:1px solid #eee7da;
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            flex-wrap:wrap;
+        }
+        .st-config-footer-note {
+            font-size:11.5px;
+            color:#77758d;
+            line-height:1.4;
+        }
+        .st-btn-save-compact {
+            padding:8px 16px;
+            font-size:11px;
+            letter-spacing:0;
+            white-space:nowrap;
+        }
+        .st-secondary-action {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            min-height:34px;
+            padding:8px 14px;
+            background:#fff;
+            color:var(--color-primary);
+            border:1px solid rgba(var(--color-primary-rgb),.24);
+            border-radius:6px;
+            font-family:'Source Serif 4',serif;
+            font-size:12px;
+            font-weight:700;
+            cursor:pointer;
+            white-space:nowrap;
+        }
+        .st-secondary-action:hover {
+            background:rgba(var(--color-primary-rgb),.06);
+            border-color:rgba(var(--color-primary-rgb),.4);
+        }
+        .st-qr-content {
+            padding:16px;
+            display:grid;
+            grid-template-columns:178px minmax(0,1fr);
+            gap:16px;
+            align-items:center;
+        }
+        .st-qr-preview {
+            width:100%;
+            min-height:188px;
+            padding:10px;
+            background:#fff;
+            border:1px solid #e4dfd4;
+            border-radius:8px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        .st-url-chip {
+            width:100%;
+            padding:9px 10px;
+            border:1px solid #e4dfd4;
+            border-radius:6px;
+            background:#f8f6f1;
+            color:#4a4a6a;
+            font-family:'Courier New',monospace;
+            font-size:10.5px;
+            line-height:1.4;
+            word-break:break-all;
+        }
+        .st-qr-note {
+            margin-top:10px;
+            font-size:11.5px;
+            color:#77758d;
+            line-height:1.5;
         }
 
         /* LOGO UPLOAD */
@@ -184,7 +385,7 @@ function useSettingsStyles() {
         .st-modal-footer { padding:14px 24px; border-top:1px solid #e4dfd4; display:flex; justify-content:space-between; align-items:center; background:#f8f6f1; }
 
         /* CERT TYPES TABLE */
-        .st-cert-row { display:grid; grid-template-columns:minmax(220px,1fr) 110px 100px 210px; align-items:center; padding:12px 22px; border-bottom:1px solid #f0ece4; gap:10px; }
+        .st-cert-row { display:grid; grid-template-columns:minmax(220px,1fr) 190px 100px 210px; align-items:center; padding:12px 22px; border-bottom:1px solid #f0ece4; gap:10px; }
         .st-cert-row:last-child { border-bottom:none; }
         .st-cert-name { font-size:12.5px; font-weight:600; }
         .st-cert-desc { font-size:10.5px; color:#9090aa; margin-top:1px; }
@@ -204,6 +405,14 @@ function useSettingsStyles() {
         .st-fee-btn.fee { border-color:rgba(184,104,0,.35); background:#fff8ed; color:#b86800; }
         .st-fee-btn.free { border-color:rgba(26,122,74,.25); background:#f2fbf6; color:#1a7a4a; }
         .st-fee-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .st-fee-cell { display:flex; flex-direction:column; align-items:flex-start; gap:7px; min-width:0; }
+        .st-fee-amount-control { display:flex; align-items:center; gap:6px; width:100%; max-width:180px; }
+        .st-fee-prefix { height:28px; min-width:24px; padding:0 7px; display:flex; align-items:center; justify-content:center; border:1px solid #e4dfd4; border-radius:4px; background:#f8f6f1; color:#7a6530; font-size:11px; font-weight:700; }
+        .st-fee-amount-input { min-width:0; width:82px; height:28px; padding:5px 8px; border:1.5px solid #e4dfd4; border-radius:4px; font-family:'Source Serif 4',serif; font-size:11.5px; color:#1a1a2e; background:#fff; outline:none; }
+        .st-fee-amount-input:focus { border-color:var(--color-primary); background:#f0f3ff; }
+        .st-fee-save-btn { height:28px; padding:0 9px; border:1px solid rgba(var(--color-primary-rgb),.24); border-radius:4px; background:#fff; color:var(--color-primary); font-family:'Source Serif 4',serif; font-size:10.5px; font-weight:700; cursor:pointer; }
+        .st-fee-save-btn:disabled { opacity:.45; cursor:not-allowed; }
+        .st-fee-amount-hint { font-size:10px; color:#9090aa; line-height:1.35; }
         .st-cert-pager { padding:10px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#f8f6f1; border-top:1px solid #e4dfd4; font-size:11px; color:#9090aa; flex-wrap:wrap; }
         .st-cert-pager-actions { display:flex; align-items:center; gap:8px; }
         .st-cert-page-btn { width:28px; height:28px; border:1px solid #e4dfd4; background:#fff; color:#4a4a6a; border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -217,9 +426,19 @@ function useSettingsStyles() {
         .st-cert-chip.active { background:var(--color-primary); color:#fff; border-color:var(--color-primary); }
 
         @media (max-width:767px) {
+            .st-tabs { margin-bottom:22px; }
+            .st-tab-btn { padding:10px 14px; }
+            .st-branding-overview .st-panel-body { padding:16px; }
+            .st-branding-overview-grid, .st-branding-overview-grid.single { grid-template-columns:1fr; }
+            .st-theme-choice { grid-template-columns:minmax(0,1fr) auto; }
+            .st-theme-check { display:none; }
+            .st-theme-meta { white-space:normal; }
+            .st-qr-content { grid-template-columns:1fr; }
+            .st-qr-preview { min-height:auto; }
             .st-form-grid-2  { grid-template-columns:1fr; }
             .st-esig-grid    { grid-template-columns:1fr; }
             .st-cert-row     { grid-template-columns:1fr auto; gap:8px; }
+            .st-fee-amount-control { max-width:100%; }
             .st-cert-row > span:first-of-type, .st-cert-row > span:last-of-type { grid-column: auto; }
             .st-cert-toolbar { align-items:stretch; }
             .st-cert-search { min-width:100%; max-width:none; }
@@ -344,6 +563,7 @@ const INITIAL_CERT_TYPES = CERTIFICATE_TEMPLATE_OPTIONS.map((cert, index) => ({
     name: cert.name,
     desc: cert.desc,
     fee: cert.hasFee,
+    feeAmount: normalizeFeeAmount(cert.feeAmount),
     active: true,
 }));
 
@@ -355,8 +575,48 @@ function mapCertificateTemplate(template, index) {
         name: template.name || "Certificate Template",
         desc: template.desc || template.description || "",
         fee: Boolean(template.hasFee ?? template.has_fee),
+        feeAmount: normalizeFeeAmount(template.feeAmount ?? template.fee_amount),
         active: template.isActive !== false && template.is_active !== false,
     };
+}
+
+function normalizeFeeAmount(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed =
+        typeof value === "number"
+            ? value
+            : Number.parseFloat(String(value).replace(/,/g, "").trim());
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.round(parsed * 100) / 100;
+}
+
+function parseFeeAmountDraft(value) {
+    if (value === null || value === undefined || value === "") {
+        return { value: null };
+    }
+    const parsed = Number.parseFloat(String(value).replace(/,/g, "").trim());
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return { error: "Enter a valid non-negative fee amount." };
+    }
+    if (parsed > 99999999.99) {
+        return { error: "Fee amount is too large." };
+    }
+    return { value: Math.round(parsed * 100) / 100 };
+}
+
+function formatFeeAmount(value) {
+    const amount = normalizeFeeAmount(value);
+    if (amount === null) return "";
+    return amount.toFixed(2);
+}
+
+function formatPesoAmount(value) {
+    const amount = normalizeFeeAmount(value);
+    if (amount === null) return "";
+    return `PHP ${amount.toLocaleString("en-PH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
 }
 
 const TEMPLATE_PREVIEW_BASE_DATA = {
@@ -655,6 +915,84 @@ function SignatoryUsageModal({ slot, usage, onClose }) {
                             ))
                         )}
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function TemplateActionConfirmModal({ action, cert, onCancel, onConfirm }) {
+    if (!action || !cert) return null;
+
+    const isDisable = action.type === "disable";
+    const title = isDisable
+        ? "Disable Template?"
+        : action.nextFee
+          ? "Mark as With Fee?"
+          : "Mark as Free?";
+    const body = isDisable
+        ? `${cert.name} will be hidden from resident certificate requests. Existing requests are not changed.`
+        : action.nextFee
+          ? `${cert.name} will tell residents that payment is required when claiming. You can set the exact amount after confirming.`
+          : `${cert.name} will no longer show as fee-required to residents. Any saved amount is kept but hidden while the template is free.`;
+    const confirmText = isDisable
+        ? "Disable Template"
+        : action.nextFee
+          ? "Mark With Fee"
+          : "Mark Free";
+
+    return (
+        <div className="st-modal-overlay open" style={{ zIndex: 3300 }}>
+            <div className="st-modal" style={{ width: 460, maxWidth: "95vw" }}>
+                <div className="st-modal-header">
+                    <div className="st-modal-title">{title}</div>
+                    <button className="st-modal-close" onClick={onCancel}>
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="st-modal-body">
+                    <div
+                        style={{
+                            fontSize: 13,
+                            color: "#1a1a2e",
+                            lineHeight: 1.65,
+                        }}
+                    >
+                        {body}
+                    </div>
+                    {action.type === "fee" && action.nextFee && !cert.feeAmount && (
+                        <div
+                            style={{
+                                marginTop: 12,
+                                padding: "10px 12px",
+                                border: "1px solid #f5d78e",
+                                background: "#fff8ed",
+                                borderRadius: 5,
+                                color: "#8a5200",
+                                fontSize: 11.5,
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            Tip: set the amount after confirming so residents
+                            know exactly how much money to bring.
+                        </div>
+                    )}
+                </div>
+                <div className="st-modal-footer">
+                    <button className="st-btn-cancel" onClick={onCancel}>
+                        Cancel
+                    </button>
+                    <button
+                        className="st-btn-save"
+                        onClick={onConfirm}
+                        style={{
+                            background: isDisable
+                                ? "linear-gradient(135deg,#b02020,#7a0a0a)"
+                                : undefined,
+                        }}
+                    >
+                        {confirmText}
+                    </button>
                 </div>
             </div>
         </div>
@@ -1110,6 +1448,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [certPage, setCertPage] = useState(1);
     const [certTemplatesLoading, setCertTemplatesLoading] = useState(false);
     const [savingTemplateId, setSavingTemplateId] = useState(null);
+    const [templateAction, setTemplateAction] = useState(null);
 
     const updateCertType = async (id, changes) => {
         const current = certTypes.find((c) => c.id === id);
@@ -1125,9 +1464,19 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         setSavingTemplateId(id);
         try {
             const token = localStorage.getItem("adminToken");
+            const payload = {};
+            if (Object.prototype.hasOwnProperty.call(changes, "fee")) {
+                payload.hasFee = next.fee;
+            }
+            if (Object.prototype.hasOwnProperty.call(changes, "active")) {
+                payload.isActive = next.active;
+            }
+            if (Object.prototype.hasOwnProperty.call(changes, "feeAmount")) {
+                payload.feeAmount = normalizeFeeAmount(next.feeAmount);
+            }
             await settingsService.updateCertificateTemplate(
                 current.templateId,
-                { hasFee: next.fee, isActive: next.active },
+                payload,
                 token,
             );
             setMessage({
@@ -1150,13 +1499,54 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const toggleCert = (id) => {
         const current = certTypes.find((c) => c.id === id);
         if (!current) return;
+        if (current.active) {
+            setTemplateAction({ type: "disable", certId: id });
+            return;
+        }
         updateCertType(id, { active: !current.active });
     };
 
     const toggleCertFee = (id) => {
         const current = certTypes.find((c) => c.id === id);
         if (!current) return;
-        updateCertType(id, { fee: !current.fee });
+        setTemplateAction({ type: "fee", certId: id, nextFee: !current.fee });
+    };
+
+    const confirmTemplateAction = () => {
+        const action = templateAction;
+        setTemplateAction(null);
+        if (!action) return;
+
+        if (action.type === "disable") {
+            updateCertType(action.certId, { active: false });
+        }
+        if (action.type === "fee") {
+            updateCertType(action.certId, { fee: action.nextFee });
+        }
+    };
+
+    const updateFeeAmountDraft = (id, value) => {
+        setCertTypes((prev) =>
+            prev.map((cert) =>
+                cert.id === id ? { ...cert, feeAmountDraft: value } : cert,
+            ),
+        );
+    };
+
+    const saveFeeAmount = (id) => {
+        const current = certTypes.find((cert) => cert.id === id);
+        if (!current) return;
+        const parsed = parseFeeAmountDraft(
+            current.feeAmountDraft ?? current.feeAmount,
+        );
+        if (parsed.error) {
+            setMessage({ text: parsed.error, type: "error" });
+            return;
+        }
+        updateCertType(id, {
+            feeAmount: parsed.value,
+            feeAmountDraft: undefined,
+        });
     };
 
     // loading, errors, and messages
@@ -1337,6 +1727,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 cert.desc,
                 cert.templateKey,
                 cert.fee ? "fee with fee paid" : "free no fee",
+                cert.feeAmount ? formatPesoAmount(cert.feeAmount) : "",
                 cert.active ? "active enabled" : "inactive disabled",
             ]
                 .filter(Boolean)
@@ -1503,6 +1894,10 @@ export default function Settings({ admin, onNavigate, onLogout }) {
 
     // cert template editor
 
+    const templateActionCert = templateAction
+        ? certTypes.find((cert) => cert.id === templateAction.certId)
+        : null;
+
     if (!isSuperAdmin) {
         return (
             <div
@@ -1667,6 +2062,13 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             Barangay Branding
                         </button>
                         <button
+                            className={`st-tab-btn${activeTab === "publicExperience" ? " active" : ""}`}
+                            onClick={() => setActiveTab("publicExperience")}
+                        >
+                            <Palette size={13} />
+                            Public Experience
+                        </button>
+                        <button
                             className={`st-tab-btn${activeTab === "templates" ? " active" : ""}`}
                             onClick={() => setActiveTab("templates")}
                         >
@@ -1716,298 +2118,197 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                     )}
 
                     {/* ══ TAB: BRANDING ══ */}
-                    {activeTab === "branding" && (
+                    {activeTab === "publicExperience" && (
                         <>
-                            {canManageSystemTheme && (
-                                <div className="st-panel">
-                                    <div className="st-panel-header">
-                                        <div>
-                                            <div className="st-panel-title">
-                                                System Theme
-                                            </div>
-                                            <div className="st-panel-desc">
-                                                Select the primary and accent
-                                                colors used across CertiFast.
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="st-panel-body">
-                                        <div
-                                            style={{
-                                                display: "grid",
-                                                gridTemplateColumns: isMobile
-                                                    ? "1fr"
-                                                    : "1fr 1fr",
-                                                gap: 14,
-                                            }}
-                                        >
-                                            {Object.entries(SYSTEM_THEMES).map(
-                                                ([key, theme]) => {
-                                                    const active =
-                                                        systemTheme === key;
-                                                    return (
-                                                        <button
-                                                            key={key}
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setSystemTheme(
-                                                                    key,
-                                                                )
-                                                            }
-                                                            style={{
-                                                                textAlign:
-                                                                    "left",
-                                                                border: active
-                                                                    ? "2px solid var(--color-primary)"
-                                                                    : "1px solid #e4dfd4",
-                                                                borderRadius: 6,
-                                                                background:
-                                                                    active
-                                                                        ? "rgba(var(--color-primary-rgb),0.06)"
-                                                                        : "#fff",
-                                                                padding: 16,
-                                                                cursor: "pointer",
-                                                                fontFamily:
-                                                                    "'Source Serif 4',serif",
-                                                            }}
-                                                        >
-                                                            <div
-                                                                style={{
-                                                                    display:
-                                                                        "flex",
-                                                                    alignItems:
-                                                                        "center",
-                                                                    justifyContent:
-                                                                        "space-between",
-                                                                    gap: 12,
-                                                                    marginBottom: 12,
-                                                                }}
-                                                            >
-                                                                <div
-                                                                    style={{
-                                                                        fontFamily:
-                                                                            "'Playfair Display',serif",
-                                                                        fontSize: 14,
-                                                                        fontWeight: 700,
-                                                                        color: "var(--color-primary)",
-                                                                    }}
-                                                                >
-                                                                    {theme.label}
-                                                                </div>
-                                                                <span
-                                                                    style={{
-                                                                        width: 18,
-                                                                        height: 18,
-                                                                        borderRadius:
-                                                                            "50%",
-                                                                        border: active
-                                                                            ? "5px solid var(--color-primary)"
-                                                                            : "2px solid #d8cfbd",
-                                                                        background:
-                                                                            "#fff",
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div
-                                                                style={{
-                                                                    display:
-                                                                        "flex",
-                                                                    gap: 8,
-                                                                    alignItems:
-                                                                        "center",
-                                                                    marginBottom: 8,
-                                                                }}
-                                                            >
-                                                                <span
-                                                                    style={{
-                                                                        width: 34,
-                                                                        height: 24,
-                                                                        borderRadius: 4,
-                                                                        background:
-                                                                            theme.primary,
-                                                                        border: "1px solid rgba(0,0,0,0.08)",
-                                                                    }}
-                                                                />
-                                                                <span
-                                                                    style={{
-                                                                        width: 34,
-                                                                        height: 24,
-                                                                        borderRadius: 4,
-                                                                        background:
-                                                                            theme.accent,
-                                                                        border: "1px solid rgba(0,0,0,0.08)",
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div
-                                                                style={{
-                                                                    fontSize: 11.5,
-                                                                    color: "#4a4a6a",
-                                                                }}
-                                                            >
-                                                                Primary{" "}
-                                                                {theme.primary}{" "}
-                                                                + Accent{" "}
-                                                                {theme.accent}
-                                                            </div>
-                                                        </button>
-                                                    );
-                                                },
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="st-save-bar">
-                                        <p>
-                                            <strong>Note:</strong> Theme changes
-                                            apply to the main admin and resident
-                                            navigation surfaces.
-                                        </p>
-                                        <div>
-                                            <button
-                                                className="st-btn-save"
-                                                onClick={handleSaveTheme}
-                                                disabled={loading}
-                                            >
-                                                Save Theme
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="st-panel">
+                            <div className="st-panel st-branding-overview">
                                 <div className="st-panel-header">
                                     <div>
                                         <div className="st-panel-title">
-                                            Public Resident Portal QR
+                                            Public Experience
                                         </div>
                                         <div className="st-panel-desc">
-                                            Save this QR as a PNG for barangay
-                                            lobby signage so residents can scan
-                                            and open the CertiFast login page.
+                                            App colors and resident portal access
+                                            used by the public-facing CertiFast
+                                            surfaces.
                                         </div>
                                     </div>
                                 </div>
                                 <div className="st-panel-body">
                                     <div
-                                        style={{
-                                            display: "grid",
-                                            gridTemplateColumns: isMobile
-                                                ? "1fr"
-                                                : "240px 1fr",
-                                            gap: 20,
-                                            alignItems: "center",
-                                        }}
+                                        className={`st-branding-overview-grid${
+                                            canManageSystemTheme ? "" : " single"
+                                        }`}
                                     >
-                                        <div
-                                            ref={publicPortalQrRef}
-                                            style={{
-                                                background: "#fff",
-                                                border: "1px solid #e4dfd4",
-                                                borderRadius: 8,
-                                                padding: 18,
-                                                display: "flex",
-                                                justifyContent: "center",
-                                            }}
-                                        >
-                                            <QRCodeCanvas
-                                                value={residentPortalLoginUrl}
-                                                size={190}
-                                                level="H"
-                                                includeMargin
-                                                fgColor="#0e2554"
-                                                bgColor="#ffffff"
-                                            />
-                                        </div>
-                                        <div>
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: 10,
-                                                    marginBottom: 10,
-                                                }}
-                                            >
+                                        {canManageSystemTheme && (
+                                            <section className="st-config-card">
+                                                <div className="st-config-card-header">
+                                                    <div className="st-config-icon">
+                                                        <Palette size={17} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="st-config-title">
+                                                            System Theme
+                                                        </div>
+                                                        <div className="st-config-desc">
+                                                            Choose the color pair
+                                                            used across admin and
+                                                            resident navigation.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="st-theme-list">
+                                                    {Object.entries(
+                                                        SYSTEM_THEMES,
+                                                    ).map(([key, theme]) => {
+                                                        const active =
+                                                            systemTheme === key;
+                                                        return (
+                                                            <button
+                                                                key={key}
+                                                                type="button"
+                                                                className={`st-theme-choice${
+                                                                    active
+                                                                        ? " active"
+                                                                        : ""
+                                                                }`}
+                                                                aria-pressed={
+                                                                    active
+                                                                }
+                                                                onClick={() =>
+                                                                    setSystemTheme(
+                                                                        key,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <span>
+                                                                    <span className="st-theme-name">
+                                                                        {
+                                                                            theme.label
+                                                                        }
+                                                                    </span>
+                                                                    <span className="st-theme-meta">
+                                                                        {
+                                                                            theme.primary
+                                                                        }{" "}
+                                                                        /{" "}
+                                                                        {
+                                                                            theme.accent
+                                                                        }
+                                                                    </span>
+                                                                </span>
+                                                                <span className="st-theme-swatches">
+                                                                    <span
+                                                                        className="st-theme-swatch"
+                                                                        style={{
+                                                                            background:
+                                                                                theme.primary,
+                                                                        }}
+                                                                    />
+                                                                    <span
+                                                                        className="st-theme-swatch"
+                                                                        style={{
+                                                                            background:
+                                                                                theme.accent,
+                                                                        }}
+                                                                    />
+                                                                </span>
+                                                                <CheckCircle2 className="st-theme-check" />
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="st-config-footer">
+                                                    <span className="st-config-footer-note">
+                                                        Theme updates after save.
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        className="st-btn-save st-btn-save-compact"
+                                                        onClick={
+                                                            handleSaveTheme
+                                                        }
+                                                        disabled={loading}
+                                                    >
+                                                        {loading
+                                                            ? "Saving..."
+                                                            : "Save Theme"}
+                                                    </button>
+                                                </div>
+                                            </section>
+                                        )}
+
+                                        <section className="st-config-card">
+                                            <div className="st-config-card-header">
+                                                <div className="st-config-icon">
+                                                    <QrCode size={18} />
+                                                </div>
+                                                <div>
+                                                    <div className="st-config-title">
+                                                        Resident Login Page
+                                                    </div>
+                                                    <div className="st-config-desc">
+                                                        Downloadable QR for
+                                                        public signage and lobby
+                                                        posters.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="st-qr-content">
                                                 <div
-                                                    style={{
-                                                        width: 38,
-                                                        height: 38,
-                                                        borderRadius: 8,
-                                                        background:
-                                                            "rgba(var(--color-primary-rgb),0.08)",
-                                                        border: "1px solid rgba(var(--color-primary-rgb),0.16)",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent:
-                                                            "center",
-                                                    }}
+                                                    ref={publicPortalQrRef}
+                                                    className="st-qr-preview"
                                                 >
-                                                    <QrCode
-                                                        size={19}
-                                                        color="var(--color-primary)"
+                                                    <QRCodeCanvas
+                                                        value={
+                                                            residentPortalLoginUrl
+                                                        }
+                                                        size={
+                                                            isMobile ? 160 : 176
+                                                        }
+                                                        level="H"
+                                                        includeMargin
+                                                        fgColor="#0e2554"
+                                                        bgColor="#ffffff"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <div
-                                                        style={{
-                                                            fontFamily:
-                                                                "'Playfair Display',serif",
-                                                            fontSize: 15,
-                                                            fontWeight: 700,
-                                                            color: "var(--color-primary)",
-                                                        }}
-                                                    >
-                                                        Resident Login Page
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            fontSize: 11,
-                                                            color: "#9090aa",
-                                                            wordBreak:
-                                                                "break-all",
-                                                        }}
-                                                    >
+                                                    <div className="st-url-chip">
                                                         {residentPortalLoginUrl}
+                                                    </div>
+                                                    <div className="st-qr-note">
+                                                        Public login shortcut
+                                                        only. Resident identity
+                                                        QR codes remain separate.
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p
-                                                style={{
-                                                    fontSize: 12.5,
-                                                    color: "#4a4a6a",
-                                                    lineHeight: 1.6,
-                                                    margin: "0 0 14px",
-                                                }}
-                                            >
-                                                This QR is not a resident
-                                                identity code and is not used by
-                                                the admin scanner. It is for
-                                                public display so people can
-                                                discover and open CertiFast.
-                                            </p>
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    gap: 10,
-                                                    flexWrap: "wrap",
-                                                }}
-                                            >
+                                            <div className="st-config-footer">
+                                                <span className="st-config-footer-note">
+                                                    Ready for print or digital
+                                                    display.
+                                                </span>
                                                 <button
                                                     type="button"
-                                                    className="st-btn-save"
+                                                    className="st-secondary-action"
                                                     onClick={
                                                         handleDownloadPublicPortalQr
                                                     }
-                                                    style={{ marginRight: 0 }}
                                                 >
-                                                    <Download size={13} /> Save
-                                                    PNG
+                                                    <Download size={14} />
+                                                    Save PNG
                                                 </button>
                                             </div>
-                                        </div>
+                                        </section>
                                     </div>
                                 </div>
                             </div>
+
+                        </>
+                    )}
+
+                    {/* TAB: BRANDING */}
+                    {activeTab === "branding" && (
+                        <>
 
                             {/* SEALS & LOGOS */}
                             <div className="st-panel">
@@ -2169,23 +2470,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                             cityFileRef.current.click()
                                                         }
                                                     >
-                                                        <svg
-                                                            width="13"
-                                                            height="13"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2"
-                                                        >
-                                                            <polyline points="16 16 12 12 8 16" />
-                                                            <line
-                                                                x1="12"
-                                                                y1="12"
-                                                                x2="12"
-                                                                y2="21"
-                                                            />
-                                                            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                                                        </svg>
+                                                        <Upload size={13} />
                                                         Upload
                                                     </button>
                                                     {cityLogo && (
@@ -2352,23 +2637,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                             brgyFileRef.current.click()
                                                         }
                                                     >
-                                                        <svg
-                                                            width="13"
-                                                            height="13"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            strokeWidth="2"
-                                                        >
-                                                            <polyline points="16 16 12 12 8 16" />
-                                                            <line
-                                                                x1="12"
-                                                                y1="12"
-                                                                x2="12"
-                                                                y2="21"
-                                                            />
-                                                            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                                                        </svg>
+                                                        <Upload size={13} />
                                                         Upload
                                                     </button>
                                                     {brgyLogo && (
@@ -2514,7 +2783,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                             "'Playfair Display',serif",
                                                         fontSize: 14,
                                                         fontWeight: 700,
-                                                        color: "var(--color-primary)",
+                                                        color: "#0e2554",
                                                         lineHeight: 1.2,
                                                     }}
                                                 >
@@ -3495,7 +3764,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             >
                                                 Templates are loaded from
                                                 Supabase. Set which certificates
-                                                are free or fee-based here.
+                                                are free, fee-based, and how
+                                                much residents should bring.
                                             </div>
                                         </div>
                                     </div>
@@ -3532,7 +3802,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         style={{
                                             display: "grid",
                                             gridTemplateColumns:
-                                                "minmax(220px,1fr) 110px 100px 210px",
+                                                "minmax(220px,1fr) 190px 100px 210px",
                                             gap: 10,
                                             background: "#f8f6f1",
                                             borderBottom: "1px solid #e4dfd4",
@@ -3541,7 +3811,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                     >
                                         {[
                                             "Certificate / Permit Name",
-                                            "Fee",
+                                            "Fee / Amount",
                                             "Status",
                                             "Action",
                                         ].map((h) => (
@@ -3587,24 +3857,93 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     {ct.desc}
                                                 </div>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className={`st-fee-btn ${
-                                                    ct.fee ? "fee" : "free"
-                                                }`}
-                                                onClick={() =>
-                                                    toggleCertFee(ct.id)
-                                                }
-                                                disabled={
-                                                    savingTemplateId === ct.id
-                                                }
-                                            >
-                                                {savingTemplateId === ct.id
-                                                    ? "Saving"
-                                                    : ct.fee
-                                                      ? "With fee"
-                                                      : "Free"}
-                                            </button>
+                                            <div className="st-fee-cell">
+                                                <button
+                                                    type="button"
+                                                    className={`st-fee-btn ${
+                                                        ct.fee ? "fee" : "free"
+                                                    }`}
+                                                    onClick={() =>
+                                                        toggleCertFee(ct.id)
+                                                    }
+                                                    disabled={
+                                                        savingTemplateId ===
+                                                        ct.id
+                                                    }
+                                                >
+                                                    {savingTemplateId === ct.id
+                                                        ? "Saving"
+                                                        : ct.fee
+                                                          ? "With fee"
+                                                          : "Free"}
+                                                </button>
+                                                {ct.fee && (
+                                                    <>
+                                                        <div className="st-fee-amount-control">
+                                                            <span className="st-fee-prefix">
+                                                                PHP
+                                                            </span>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                className="st-fee-amount-input"
+                                                                value={
+                                                                    ct.feeAmountDraft ??
+                                                                    formatFeeAmount(
+                                                                        ct.feeAmount,
+                                                                    )
+                                                                }
+                                                                onChange={(e) =>
+                                                                    updateFeeAmountDraft(
+                                                                        ct.id,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                onKeyDown={(e) => {
+                                                                    if (
+                                                                        e.key ===
+                                                                        "Enter"
+                                                                    ) {
+                                                                        e.preventDefault();
+                                                                        saveFeeAmount(
+                                                                            ct.id,
+                                                                        );
+                                                                    }
+                                                                }}
+                                                                disabled={
+                                                                    savingTemplateId ===
+                                                                    ct.id
+                                                                }
+                                                                aria-label={`${ct.name} fee amount`}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="st-fee-save-btn"
+                                                                onClick={() =>
+                                                                    saveFeeAmount(
+                                                                        ct.id,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    savingTemplateId ===
+                                                                    ct.id
+                                                                }
+                                                            >
+                                                                Save
+                                                            </button>
+                                                        </div>
+                                                        <div className="st-fee-amount-hint">
+                                                            {ct.feeAmount
+                                                                ? `${formatPesoAmount(
+                                                                      ct.feeAmount,
+                                                                  )} shown to residents`
+                                                                : "Set amount residents should bring"}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
                                             <span
                                                 className={
                                                     ct.active
@@ -3657,7 +3996,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         Showing {certShowingStart}-
                                         {certShowingEnd} of{" "}
                                         {filteredCertTypes.length} templates.
-                                        Fee and active status save to Supabase.
+                                        Fee, amount, and active status save to
+                                        Supabase.
                                     </span>
                                     <div className="st-cert-pager-actions">
                                         <button
@@ -3720,6 +4060,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 slot={signatoryHelpSlot}
                 usage={signatoryUsage[signatoryHelpSlot] || []}
                 onClose={() => setSignatoryHelpSlot(null)}
+            />
+            <TemplateActionConfirmModal
+                action={templateAction}
+                cert={templateActionCert}
+                onCancel={() => setTemplateAction(null)}
+                onConfirm={confirmTemplateAction}
             />
         </div>
     );

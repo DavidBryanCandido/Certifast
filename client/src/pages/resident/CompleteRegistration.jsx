@@ -198,7 +198,7 @@ export default function CompleteRegistration() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "#0e2554",
+                    background: "var(--color-primary)",
                 }}
             >
                 <div style={{ textAlign: "center", color: "#fff" }}>
@@ -207,7 +207,7 @@ export default function CompleteRegistration() {
                             width: 40,
                             height: 40,
                             border: "3px solid rgba(255,255,255,0.3)",
-                            borderTopColor: "#c9a227",
+                            borderTopColor: "var(--color-accent)",
                             borderRadius: "50%",
                             animation: "spin 0.8s linear infinite",
                             margin: "0 auto 16px",
@@ -234,7 +234,7 @@ export default function CompleteRegistration() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "#0e2554",
+                    background: "var(--color-primary)",
                 }}
             >
                 <div
@@ -263,7 +263,7 @@ export default function CompleteRegistration() {
                         style={{
                             marginTop: 16,
                             padding: "10px 24px",
-                            background: "#0e2554",
+                            background: "var(--color-primary)",
                             color: "#fff",
                             border: "none",
                             borderRadius: 4,
@@ -284,7 +284,7 @@ export default function CompleteRegistration() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#0e2554",
+                background: "var(--color-primary)",
             }}
         >
             <div
@@ -316,7 +316,7 @@ export default function CompleteRegistration() {
                         fontFamily: "'Playfair Display',serif",
                         fontSize: 22,
                         fontWeight: 700,
-                        color: "#0e2554",
+                        color: "var(--color-primary)",
                     }}
                 >
                     Email Verified!
@@ -332,7 +332,7 @@ export default function CompleteRegistration() {
                     style={{
                         marginTop: 20,
                         padding: "12px 28px",
-                        background: "#0e2554",
+                        background: "var(--color-primary)",
                         color: "#fff",
                         border: "none",
                         borderRadius: 4,

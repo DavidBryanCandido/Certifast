@@ -57,6 +57,7 @@ Tables: 10
 | 9 | doc_source | text | YES | 'doc1'::text |
 | 10 | display_order | integer | YES | 0 |
 | 11 | required_fields | jsonb | YES | '[]'::jsonb |
+| 12 | fee_amount | numeric(10,2) | YES |  |
 
 ## public.issued_certificates
 
@@ -162,4 +163,3 @@ Tables: 10
 | 3 | is_active | boolean | NO | true |
 | 4 | sort_order | smallint | NO | 0 |
 | 5 | created_at | timestamp without time zone | NO | now() |
-

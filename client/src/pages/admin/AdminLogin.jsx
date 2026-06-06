@@ -50,9 +50,9 @@ if (!document.head.querySelector("[data-certifast-login]")) {
     .cf-root {
       min-height: 100vh;
       background:
-        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(201,162,39,.10) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 85% 85%, rgba(22,48,102,.60) 0%, transparent 60%),
-        linear-gradient(145deg, #091a3e 0%, #0e2554 50%, #091a3e 100%);
+        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(var(--color-accent-rgb),.10) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 85% 85%, rgba(var(--color-primary-rgb),.60) 0%, transparent 60%),
+        linear-gradient(145deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, var(--color-primary-dark) 100%);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -64,15 +64,15 @@ if (!document.head.querySelector("[data-certifast-login]")) {
       content: '';
       position: fixed; inset: 0;
       background-image:
-        linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px);
+        linear-gradient(rgba(var(--color-accent-rgb),.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(var(--color-accent-rgb),.04) 1px, transparent 1px);
       background-size: 40px 40px;
       pointer-events: none;
     }
     .cf-bracket {
       position: fixed;
       width: 48px; height: 48px;
-      border-color: rgba(201,162,39,.25);
+      border-color: rgba(var(--color-accent-rgb),.25);
       border-style: solid;
       border-width: 0;
     }
@@ -96,7 +96,7 @@ if (!document.head.querySelector("[data-certifast-login]")) {
       box-sizing: border-box;
     }
     .cf-input:focus {
-      border-color: #0e2554;
+      border-color: var(--color-primary);
       background: #f0f3ff;
     }
     .cf-input::placeholder { color: #9090aa; font-size: 13px; }
@@ -112,7 +112,7 @@ if (!document.head.querySelector("[data-certifast-login]")) {
     .cf-btn-login {
       width: 100%;
       padding: 13px;
-      background: linear-gradient(135deg, #163066 0%, #091a3e 100%);
+      background: linear-gradient(135deg, var(--color-primary-soft) 0%, var(--color-primary-dark) 100%);
       color: #ffffff;
       border: none;
       border-radius: 4px;
@@ -129,7 +129,7 @@ if (!document.head.querySelector("[data-certifast-login]")) {
     .cf-btn-login::after {
       content: '';
       position: absolute; inset: 0;
-      background: linear-gradient(90deg, transparent 30%, rgba(201,162,39,.18) 50%, transparent 70%);
+      background: linear-gradient(90deg, transparent 30%, rgba(var(--color-accent-rgb),.18) 50%, transparent 70%);
       transform: translateX(-100%);
       transition: transform .45s ease;
     }
@@ -139,8 +139,8 @@ if (!document.head.querySelector("[data-certifast-login]")) {
     .cf-modal-got-it {
       width: 100%;
       padding: 13px;
-      background: linear-gradient(135deg, #c9a227 0%, #9a7515 100%);
-      color: #0e2554;
+      background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-soft) 100%);
+      color: var(--color-primary);
       border: none;
       border-radius: 4px;
       font-family: 'Playfair Display', serif;
@@ -184,7 +184,7 @@ function ForgotPasswordModal({ onClose }) {
                         <div style={m.iconWrap}>
                             <KeyRound
                                 size={18}
-                                color="#c9a227"
+                                color="var(--color-accent)"
                                 strokeWidth={2}
                             />
                         </div>
@@ -269,7 +269,7 @@ function ForgotPasswordModal({ onClose }) {
                         temporary credentials. Only emails sent from registered
                         barangay accounts will be processed. Otherwise, proceed
                         to the{" "}
-                        <strong style={{ color: "#0e2554" }}>
+                        <strong style={{ color: "var(--color-primary)" }}>
                             Barangay Office
                         </strong>{" "}
                         in person.
@@ -281,7 +281,7 @@ function ForgotPasswordModal({ onClose }) {
                             width: "100%",
                             padding: "13px",
                             background:
-                                "linear-gradient(135deg, #c9a227 0%, #9a7515 100%)",
+                                "linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-soft) 100%)",
                             color: "#fff",
                             border: "none",
                             borderRadius: "4px",
@@ -444,7 +444,7 @@ export default function AdminLogin() {
                                 <span style={s.inputIcon}>
                                     <User
                                         size={15}
-                                        color="#0e2554"
+                                        color="var(--color-primary)"
                                         strokeWidth={2}
                                     />
                                 </span>
@@ -470,7 +470,7 @@ export default function AdminLogin() {
                                 <span style={s.inputIcon}>
                                     <Lock
                                         size={15}
-                                        color="#0e2554"
+                                        color="var(--color-primary)"
                                         strokeWidth={2}
                                     />
                                 </span>
@@ -580,22 +580,22 @@ const s = {
         background: "#ffffff",
         borderRadius: "6px",
         boxShadow:
-            "0 32px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(201,162,39,.20)",
+            "0 32px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(var(--color-accent-rgb),.20)",
         overflow: "hidden",
     },
     barTop: {
         height: "5px",
         background:
-            "linear-gradient(90deg, #9a7515, #c9a227, #f0d060, #c9a227, #9a7515)",
+            "linear-gradient(90deg, var(--color-accent), var(--color-accent-soft), var(--color-accent))",
     },
     barBottom: {
         height: "4px",
         background:
-            "linear-gradient(90deg, #9a7515, #c9a227, #f0d060, #c9a227, #9a7515)",
+            "linear-gradient(90deg, var(--color-accent), var(--color-accent-soft), var(--color-accent))",
     },
     cardHeader: {
         background:
-            "linear-gradient(160deg, #163066 0%, #0e2554 60%, #091a3e 100%)",
+            "linear-gradient(160deg, var(--color-primary-soft) 0%, var(--color-primary) 60%, var(--color-primary-dark) 100%)",
         padding: "36px 44px 30px",
         textAlign: "center",
         position: "relative",
@@ -605,8 +605,8 @@ const s = {
         height: "92px",
         margin: "0 auto 18px",
         borderRadius: "50%",
-        border: "2.5px solid rgba(201,162,39,.55)",
-        background: "rgba(201,162,39,.08)",
+        border: "2.5px solid rgba(var(--color-accent-rgb),.55)",
+        background: "rgba(var(--color-accent-rgb),.08)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -614,7 +614,7 @@ const s = {
     },
     republicLabel: {
         fontSize: "10.5px",
-        color: "#c9a227",
+        color: "var(--color-accent)",
         letterSpacing: "2.5px",
         textTransform: "uppercase",
         fontWeight: 600,
@@ -661,7 +661,7 @@ const s = {
     formHeading: {
         fontFamily: "'Playfair Display', serif",
         fontSize: "17px",
-        color: "#0e2554",
+        color: "var(--color-primary)",
         fontWeight: 700,
         marginBottom: "4px",
     },
@@ -723,7 +723,7 @@ const s = {
         background: "none",
         border: "none",
         fontSize: "11.5px",
-        color: "#163066",
+        color: "var(--color-primary-soft)",
         textDecoration: "underline",
         cursor: "pointer",
         fontFamily: "'Source Serif 4', serif",
@@ -797,16 +797,16 @@ const m = {
         width: "100%",
         maxWidth: "460px",
         boxShadow:
-            "0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,162,39,0.2)",
+            "0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--color-accent-rgb),0.2)",
         overflow: "hidden",
     },
     header: {
-        background: "linear-gradient(135deg, #163066 0%, #0e2554 100%)",
+        background: "linear-gradient(135deg, var(--color-primary-soft) 0%, var(--color-primary) 100%)",
         padding: "16px 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        borderBottom: "1px solid rgba(201,162,39,0.25)",
+        borderBottom: "1px solid rgba(var(--color-accent-rgb),0.25)",
     },
     headerLeft: {
         display: "flex",
@@ -817,8 +817,8 @@ const m = {
         width: "36px",
         height: "36px",
         borderRadius: "50%",
-        background: "rgba(201,162,39,0.12)",
-        border: "1px solid rgba(201,162,39,0.3)",
+        background: "rgba(var(--color-accent-rgb),0.12)",
+        border: "1px solid rgba(var(--color-accent-rgb),0.3)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -864,7 +864,7 @@ const m = {
         margin: 0,
     },
     emailLink: {
-        color: "#0e2554",
+        color: "var(--color-primary)",
         fontWeight: 600,
         textDecoration: "underline",
         textUnderlineOffset: "2px",
@@ -872,7 +872,7 @@ const m = {
     formatBox: {
         background: "#f9f7f2",
         border: "1px solid #ddd8cc",
-        borderLeft: "3px solid #c9a227",
+        borderLeft: "3px solid var(--color-accent)",
         borderRadius: "4px",
         padding: "14px 16px",
         display: "flex",
@@ -884,7 +884,7 @@ const m = {
         fontWeight: 700,
         letterSpacing: "1.5px",
         textTransform: "uppercase",
-        color: "#c9a227",
+        color: "var(--color-accent)",
         marginBottom: "4px",
         fontFamily: "'Source Serif 4', serif",
     },
@@ -903,7 +903,7 @@ const m = {
         color: "#4a4a6a",
     },
     formatValHighlight: {
-        color: "#163066",
+        color: "var(--color-primary-soft)",
         fontStyle: "italic",
     },
     warningBox: {

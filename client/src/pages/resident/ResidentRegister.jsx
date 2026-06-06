@@ -177,9 +177,9 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
     .reg-root {
       min-height: 100vh;
       background:
-        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(201,162,39,.10) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 85% 85%, rgba(22,48,102,.60) 0%, transparent 60%),
-        linear-gradient(145deg, #091a3e 0%, #0e2554 50%, #091a3e 100%);
+        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(var(--color-accent-rgb),.10) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 85% 85%, rgba(var(--color-primary-rgb),.60) 0%, transparent 60%),
+        linear-gradient(145deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, var(--color-primary-dark) 100%);
       display: flex; justify-content: center;
       font-family: 'Source Serif 4', serif;
       position: relative;
@@ -187,21 +187,21 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
     .reg-root::before {
       content:''; position:fixed; inset:0;
       background-image:
-        linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px);
+        linear-gradient(rgba(var(--color-accent-rgb),.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(var(--color-accent-rgb),.04) 1px, transparent 1px);
       background-size:40px 40px; pointer-events:none;
     }
     .reg-card {
       width:100%; max-width:720px;
       background:#fff; border-radius:10px; overflow:hidden;
-      box-shadow: 0 28px 70px rgba(0,0,0,.5), 0 0 0 1px rgba(201,162,39,.18);
+      box-shadow: 0 28px 70px rgba(0,0,0,.5), 0 0 0 1px rgba(var(--color-accent-rgb),.18);
       animation: regFadeUp 0.4s ease both;
     }
     /* Step indicator */
     .reg-step-wrap { display:flex; align-items:center; margin-bottom:24px; }
     .reg-step-dot { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; transition:all .2s; }
     .reg-step-dot.done   { background:#1a7a4a; color:#fff; }
-    .reg-step-dot.active { background:#0e2554; color:#fff; box-shadow:0 0 0 4px rgba(14,37,84,0.15); }
+    .reg-step-dot.active { background:var(--color-primary); color:#fff; box-shadow:0 0 0 4px rgba(var(--color-primary-rgb),0.15); }
     .reg-step-dot.idle   { background:#e4dfd4; color:#9090aa; }
     .reg-step-line { flex:1; height:2px; background:#e4dfd4; transition:background .2s; margin:0 6px 20px; }
     .reg-step-line.done { background:#1a7a4a; }
@@ -213,7 +213,7 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       color:#1a1a2e; background:#f9f7f2; outline:none;
       transition:border-color .15s, background .15s; box-sizing:border-box;
     }
-    .reg-input:focus { border-color:#0e2554; background:#f0f3ff; }
+    .reg-input:focus { border-color:var(--color-primary); background:#f0f3ff; }
     .reg-input::placeholder { color:#b0b0c8; }
     .reg-input-bare {
       width:100%; padding:11px 14px;
@@ -222,7 +222,7 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       color:#1a1a2e; background:#f9f7f2; outline:none;
       transition:border-color .15s, background .15s; box-sizing:border-box;
     }
-    .reg-input-bare:focus { border-color:#0e2554; background:#f0f3ff; }
+    .reg-input-bare:focus { border-color:var(--color-primary); background:#f0f3ff; }
     .reg-input-bare::placeholder { color:#b0b0c8; }
     .reg-input-locked {
       width:100%; padding:11px 14px 11px 40px;
@@ -241,11 +241,11 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       background-repeat:no-repeat; background-position:right 12px center;
       transition:border-color .15s; box-sizing:border-box;
     }
-    .reg-select:focus { border-color:#0e2554; background:#f0f3ff; }
+    .reg-select:focus { border-color:var(--color-primary); background:#f0f3ff; }
     /* Buttons */
     .reg-btn-primary {
       display:inline-flex; align-items:center; gap:7px; padding:12px 24px;
-      background:linear-gradient(135deg,#163066,#091a3e);
+      background:linear-gradient(135deg,var(--color-primary-soft),var(--color-primary-dark));
       color:#fff; border:none; border-radius:5px;
       font-family:'Playfair Display',serif; font-size:13px;
       font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
@@ -259,23 +259,23 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       font-family:'Source Serif 4',serif; font-size:13px;
       font-weight:600; cursor:pointer; transition:all .15s;
     }
-    .reg-btn-ghost:hover { border-color:#0e2554; color:#0e2554; }
+    .reg-btn-ghost:hover { border-color:var(--color-primary); color:var(--color-primary); }
     /* Upload zone */
     .reg-upload-zone {
       border:2px dashed #c9d8e8; border-radius:8px;
       padding:28px 16px; text-align:center;
       cursor:pointer; transition:all .2s; background:#f8faff;
     }
-    .reg-upload-zone:hover { border-color:#0e2554; background:#f0f3ff; }
+    .reg-upload-zone:hover { border-color:var(--color-primary); background:#f0f3ff; }
     .reg-upload-zone.has-file { border-color:#1a7a4a; background:#f0faf4; border-style:solid; }
     /* Checkbox */
     .reg-checkbox {
-      width:17px; height:17px; border:2px solid #c9a227;
+      width:17px; height:17px; border:2px solid var(--color-accent);
       border-radius:3px; background:#fff; flex-shrink:0;
       margin-top:2px; display:flex; align-items:center;
       justify-content:center; transition:all .15s; cursor:pointer;
     }
-    .reg-checkbox.checked { background:#0e2554; border-color:#0e2554; }
+    .reg-checkbox.checked { background:var(--color-primary); border-color:var(--color-primary); }
     /* Label */
     .reg-label {
       font-size:10.5px; font-weight:700; color:#4a4a6a;
@@ -325,7 +325,7 @@ function IconWrap({ icon, children }) {
                     zIndex: 1,
                 }}
             >
-                <IconComp size={15} color="#0e2554" strokeWidth={2} />
+                <IconComp size={15} color="var(--color-primary)" strokeWidth={2} />
             </span>
             {children}
         </div>
@@ -371,7 +371,7 @@ function StepIndicator({ step }) {
                                 style={{
                                     fontSize: 10,
                                     color: isActive
-                                        ? "#0e2554"
+                                        ? "var(--color-primary)"
                                         : isDone
                                           ? "#1a7a4a"
                                           : "#9090aa",
@@ -712,7 +712,7 @@ export default function ResidentRegister({ onSuccess }) {
                         style={{
                             height: 4,
                             background:
-                                "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+                                "linear-gradient(90deg,var(--color-accent),var(--color-accent-soft),var(--color-accent))",
                         }}
                     />
                     <div style={{ padding: "48px 36px", textAlign: "center" }}>
@@ -740,7 +740,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 fontFamily: "'Playfair Display',serif",
                                 fontSize: 22,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary)",
                                 margin: "0 0 10px",
                             }}
                         >
@@ -938,7 +938,7 @@ export default function ResidentRegister({ onSuccess }) {
                         >
                             <CalendarDays
                                 size={15}
-                                color="#0e2554"
+                                color="var(--color-primary)"
                                 strokeWidth={2}
                             />
                         </span>
@@ -1323,7 +1323,7 @@ export default function ResidentRegister({ onSuccess }) {
                             type="checkbox"
                             checked={isRenter}
                             onChange={(e) => setIsRenter(e.target.checked)}
-                            style={{ marginTop: 3, accentColor: "#0e2554" }}
+                            style={{ marginTop: 3, accentColor: "var(--color-primary)" }}
                         />
                         <span
                             style={{
@@ -1475,7 +1475,7 @@ export default function ResidentRegister({ onSuccess }) {
                                     width: 5,
                                     height: 5,
                                     borderRadius: "50%",
-                                    background: "#0e2554",
+                                    background: "var(--color-primary)",
                                     flexShrink: 0,
                                     marginTop: 5,
                                 }}
@@ -1520,7 +1520,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 zIndex: 1,
                             }}
                         >
-                            <Lock size={15} color="#0e2554" strokeWidth={2} />
+                            <Lock size={15} color="var(--color-primary)" strokeWidth={2} />
                         </span>
                         <input
                             className="reg-input"
@@ -1571,7 +1571,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 zIndex: 1,
                             }}
                         >
-                            <Lock size={15} color="#0e2554" strokeWidth={2} />
+                            <Lock size={15} color="var(--color-primary)" strokeWidth={2} />
                         </span>
                         <input
                             className="reg-input"
@@ -1723,7 +1723,7 @@ export default function ResidentRegister({ onSuccess }) {
                             setAgreedToTerms(e.target.checked);
                             setError("");
                         }}
-                        style={{ marginTop: 4, accentColor: "#0e2554" }}
+                        style={{ marginTop: 4, accentColor: "var(--color-primary)" }}
                     />
                     <p
                         style={{
@@ -1743,7 +1743,7 @@ export default function ResidentRegister({ onSuccess }) {
                             style={{
                                 background: "none",
                                 border: "none",
-                                color: "#0e2554",
+                                color: "var(--color-primary)",
                                 cursor: "pointer",
                                 fontFamily: "'Source Serif 4',serif",
                                 fontSize: 12.5,
@@ -1763,7 +1763,7 @@ export default function ResidentRegister({ onSuccess }) {
             <div
                 style={{
                     background: "#edf1fa",
-                    border: "1px solid rgba(14,37,84,.15)",
+                    border: "1px solid rgba(var(--color-primary-rgb),.15)",
                     borderRadius: 7,
                     padding: "12px 16px",
                 }}
@@ -1772,7 +1772,7 @@ export default function ResidentRegister({ onSuccess }) {
                     style={{
                         fontSize: 10,
                         fontWeight: 700,
-                        color: "#0e2554",
+                        color: "var(--color-primary)",
                         textTransform: "uppercase",
                         letterSpacing: 1.2,
                         marginBottom: 10,
@@ -1949,7 +1949,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 style={{
                                     padding: "16px 22px",
                                     background:
-                                        "linear-gradient(135deg,#0e2554,#163066)",
+                                        "linear-gradient(135deg,var(--color-primary),var(--color-primary-soft))",
                                     color: "#fff",
                                     fontFamily:
                                         "'Playfair Display',serif",
@@ -2059,7 +2059,7 @@ export default function ResidentRegister({ onSuccess }) {
                     style={{
                         height: 4,
                         background:
-                            "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+                            "linear-gradient(90deg,var(--color-accent),var(--color-accent-soft),var(--color-accent))",
                     }}
                 />
 
@@ -2067,7 +2067,7 @@ export default function ResidentRegister({ onSuccess }) {
                 <div
                     style={{
                         background:
-                            "linear-gradient(180deg,#0e2554 0%,#163066 100%)",
+                            "linear-gradient(180deg,var(--color-primary) 0%,var(--color-primary-soft) 100%)",
                         padding: "22px 32px 20px",
                         textAlign: "center",
                     }}
@@ -2077,8 +2077,8 @@ export default function ResidentRegister({ onSuccess }) {
                             width: 72,
                             height: 72,
                             borderRadius: "50%",
-                            border: "2.5px solid rgba(201,162,39,0.6)",
-                            background: "rgba(201,162,39,0.08)",
+                            border: "2.5px solid rgba(var(--color-accent-rgb),0.6)",
+                            background: "rgba(var(--color-accent-rgb),0.08)",
                             overflow: "hidden",
                             margin: "0 auto 14px",
                             flexShrink: 0,
@@ -2099,7 +2099,7 @@ export default function ResidentRegister({ onSuccess }) {
                             fontSize: 9.5,
                             letterSpacing: "2.5px",
                             textTransform: "uppercase",
-                            color: "rgba(201,162,39,0.7)",
+                            color: "rgba(var(--color-accent-rgb),0.7)",
                             marginBottom: 4,
                         }}
                     >
@@ -2144,7 +2144,7 @@ export default function ResidentRegister({ onSuccess }) {
                                 fontFamily: "'Playfair Display',serif",
                                 fontSize: 17,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary)",
                                 marginBottom: 3,
                             }}
                         >
@@ -2243,8 +2243,8 @@ export default function ResidentRegister({ onSuccess }) {
                 {/* Footer — high-contrast sign-in prompt */}
                 <div
                     style={{
-                        background: "#0e2554",
-                        borderTop: "1px solid rgba(201,162,39,0.2)",
+                        background: "var(--color-primary)",
+                        borderTop: "1px solid rgba(var(--color-accent-rgb),0.2)",
                         padding: "14px 32px",
                         display: "flex",
                         alignItems: "center",
@@ -2265,13 +2265,13 @@ export default function ResidentRegister({ onSuccess }) {
                         type="button"
                         onClick={() => navigate("/resident/login")}
                         style={{
-                            background: "rgba(201,162,39,0.18)",
-                            border: "1.5px solid rgba(201,162,39,0.55)",
+                            background: "rgba(var(--color-accent-rgb),0.18)",
+                            border: "1.5px solid rgba(var(--color-accent-rgb),0.55)",
                             borderRadius: 5,
                             padding: "7px 18px",
                             fontSize: 13.5,
                             fontWeight: 700,
-                            color: "#f0d060",
+                            color: "var(--color-accent-soft)",
                             cursor: "pointer",
                             fontFamily: "'Source Serif 4',serif",
                             transition: "background .15s",

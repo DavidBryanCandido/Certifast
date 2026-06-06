@@ -170,6 +170,31 @@ function normalizeProofRequirements(raw) {
         }));
 }
 
+function normalizeFeeAmount(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed =
+        typeof value === "number"
+            ? value
+            : Number.parseFloat(String(value).replace(/,/g, "").trim());
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.round(parsed * 100) / 100;
+}
+
+function formatPesoAmount(value) {
+    const amount = normalizeFeeAmount(value);
+    if (amount === null) return "";
+    return `PHP ${amount.toLocaleString("en-PH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+}
+
+function feePaymentText(cert) {
+    if (!cert?.hasFee) return "";
+    const amount = formatPesoAmount(cert.feeAmount);
+    return amount ? `Fee payment: ${amount}` : "Fee payment";
+}
+
 function normalizeTemplateRows(rows) {
     if (!Array.isArray(rows) || rows.length === 0) return ALL_CERTS;
 
@@ -188,6 +213,7 @@ function normalizeTemplateRows(rows) {
             templateId: row.templateId || row.template_id || null,
             templateKey,
             hasFee: Boolean(row.hasFee ?? row.has_fee),
+            feeAmount: normalizeFeeAmount(row.feeAmount ?? row.fee_amount),
             desc: row.desc || row.description || "",
             fields: fieldConfigs,
             proofRequirements: normalizeProofRequirements(
@@ -1122,7 +1148,13 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     }}
                                 >
                                     {selectedCert?.hasFee
-                                        ? `This certificate requires a fee. Bring payment when claiming at the ${branding.name} office. Bring a valid ID.`
+                                        ? `This certificate requires a fee${
+                                              selectedCert.feeAmount
+                                                  ? ` of ${formatPesoAmount(
+                                                        selectedCert.feeAmount,
+                                                    )}`
+                                                  : ""
+                                          }. Bring payment when claiming at the ${branding.name} office. Bring a valid ID.`
                                         : `Please bring a valid ID when claiming your certificate at the ${branding.name} office.`}
                                 </span>
                             </div>
@@ -1346,7 +1378,11 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         whiteSpace: "nowrap",
                                     }}
                                 >
-                                    {cert.hasFee ? "₱ Fee" : "Free"}
+                                    {cert.hasFee
+                                        ? cert.feeAmount
+                                            ? formatPesoAmount(cert.feeAmount)
+                                            : "PHP Fee"
+                                        : "Free"}
                                 </span>
                                 <div
                                     style={{
@@ -2026,6 +2062,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                         }}
                     >
                         <strong>{selectedCert.name}</strong> requires a fee
+                        {selectedCert.feeAmount
+                            ? ` of ${formatPesoAmount(selectedCert.feeAmount)}`
+                            : ""}{" "}
                         payable at the barangay office upon claiming.
                     </span>
                 </div>
@@ -2049,7 +2088,9 @@ export default function SubmitRequest({ resident, onLogout }) {
         {
             label: "Fee Required",
             value: selectedCert?.hasFee
-                ? "Yes – payable at barangay office"
+                ? selectedCert.feeAmount
+                    ? `Yes - ${formatPesoAmount(selectedCert.feeAmount)}`
+                    : "Yes - payable at barangay office"
                 : "None",
         },
         { label: "Notes", value: notes.trim() || "None" },
@@ -2450,7 +2491,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                             {
                                                 n: "3",
                                                 title: "Claim In Person",
-                                                desc: "Visit with a valid ID (and fee if applicable).",
+                                                desc: "Visit with a valid ID and any listed fee.",
                                             },
                                         ].map((s) => (
                                             <div
@@ -2603,19 +2644,24 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                 "Valid government-issued ID",
                                                 "Request ID / reference number",
                                             ];
+                                            const paymentItem =
+                                                feePaymentText(selectedCert);
+                                            const feeItem =
+                                                paymentItem ||
+                                                "Fee payment";
                                             const extras = {
                                                 "Business Permit": [
-                                                    "Fee payment",
+                                                    feeItem,
                                                     "Sketch or location map of business",
                                                     "Proof of business address",
                                                 ],
                                                 "Barangay Business Clearance (Renewal)":
                                                     [
-                                                        "Fee payment",
+                                                        feeItem,
                                                         "Previous barangay clearance / permit",
                                                     ],
                                                 "Barangay Clearance": [
-                                                    "Fee payment",
+                                                    feeItem,
                                                 ],
                                                 "Certificate of Indigency": [
                                                     "Proof of income or indigency (if available)",
@@ -2640,10 +2686,10 @@ export default function SubmitRequest({ resident, onLogout }) {
                                             const certItems = selectedCert
                                                 ? extras[selectedCert.name] ||
                                                   (selectedCert.hasFee
-                                                      ? ["Fee payment"]
+                                                      ? [feeItem]
                                                       : [])
                                                 : [
-                                                      "Payment (for fee-required certificates)",
+                                                      "Fee payment for fee-required certificates",
                                                   ];
                                             const all = [...base, ...certItems];
                                             return all.map((item, i) => (

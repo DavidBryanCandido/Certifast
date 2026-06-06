@@ -25,9 +25,9 @@ if (!document.head.querySelector("[data-certifast-resident]")) {
     .r-root {
       min-height: 100vh;
       background:
-        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(201,162,39,.10) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 85% 85%, rgba(22,48,102,.60) 0%, transparent 60%),
-        linear-gradient(145deg, #091a3e 0%, #0e2554 50%, #091a3e 100%);
+        radial-gradient(ellipse 80% 60% at 15% 15%, rgba(var(--color-accent-rgb),.10) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 85% 85%, rgba(var(--color-primary-rgb),.60) 0%, transparent 60%),
+        linear-gradient(145deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, var(--color-primary-dark) 100%);
       display: flex; align-items: center; justify-content: center;
       font-family: 'Source Serif 4', serif;
       position: relative; padding: 24px 16px;
@@ -35,11 +35,11 @@ if (!document.head.querySelector("[data-certifast-resident]")) {
     .r-root::before {
       content: ''; position: fixed; inset: 0;
       background-image:
-        linear-gradient(rgba(201,162,39,.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(201,162,39,.04) 1px, transparent 1px);
+        linear-gradient(rgba(var(--color-accent-rgb),.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(var(--color-accent-rgb),.04) 1px, transparent 1px);
       background-size: 40px 40px; pointer-events: none;
     }
-    .r-bracket { position: fixed; width: 48px; height: 48px; border-color: rgba(201,162,39,.25); border-style: solid; border-width: 0; }
+    .r-bracket { position: fixed; width: 48px; height: 48px; border-color: rgba(var(--color-accent-rgb),.25); border-style: solid; border-width: 0; }
     .r-tl { top: 24px; left: 24px;   border-top-width: 2px; border-left-width: 2px; }
     .r-tr { top: 24px; right: 24px;  border-top-width: 2px; border-right-width: 2px; }
     .r-bl { bottom: 24px; left: 24px;  border-bottom-width: 2px; border-left-width: 2px; }
@@ -52,7 +52,7 @@ if (!document.head.querySelector("[data-certifast-resident]")) {
       color: #1a1a2e; background: #f9f7f2; outline: none;
       transition: border-color .18s, background .18s; box-sizing: border-box;
     }
-    .r-input:focus { border-color: #0e2554; background: #f0f3ff; }
+    .r-input:focus { border-color: var(--color-primary); background: #f0f3ff; }
     .r-input::placeholder { color: #9090aa; font-size: 13px; }
     .r-input:-webkit-autofill,
     .r-input:-webkit-autofill:hover,
@@ -63,7 +63,7 @@ if (!document.head.querySelector("[data-certifast-resident]")) {
     }
     .r-btn {
       width: 100%; padding: 13px;
-      background: linear-gradient(135deg, #163066 0%, #091a3e 100%);
+      background: linear-gradient(135deg, var(--color-primary-soft) 0%, var(--color-primary-dark) 100%);
       color: #fff; border: none; border-radius: 4px;
       font-family: 'Playfair Display', serif; font-size: 14px;
       font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
@@ -71,7 +71,7 @@ if (!document.head.querySelector("[data-certifast-resident]")) {
     }
     .r-btn::after {
       content: ''; position: absolute; inset: 0;
-      background: linear-gradient(90deg, transparent 30%, rgba(201,162,39,.18) 50%, transparent 70%);
+      background: linear-gradient(90deg, transparent 30%, rgba(var(--color-accent-rgb),.18) 50%, transparent 70%);
       transform: translateX(-100%); transition: transform .45s ease;
     }
     .r-btn:hover::after { transform: translateX(100%); }
@@ -214,7 +214,7 @@ export default function ResidentLogin({ onLogin }) {
                             borderRadius: 8,
                             overflow: "hidden",
                             boxShadow:
-                                "0 24px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(201,162,39,0.18)",
+                                "0 24px 60px rgba(0,0,0,0.35), 0 0 0 1px rgba(var(--color-accent-rgb),0.18)",
                         }}
                     >
                         <div
@@ -282,7 +282,7 @@ export default function ResidentLogin({ onLogin }) {
                                     padding: "9px 18px",
                                     border: "none",
                                     borderRadius: 4,
-                                    background: "#0e2554",
+                                    background: "var(--color-primary)",
                                     color: "#fff",
                                     fontFamily: "'Playfair Display', serif",
                                     fontSize: 12,
@@ -315,7 +315,7 @@ export default function ResidentLogin({ onLogin }) {
                     borderRadius: 8,
                     overflow: "hidden",
                     boxShadow:
-                        "0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(201,162,39,0.15)",
+                        "0 24px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(var(--color-accent-rgb),0.15)",
                 }}
             >
                 {/* Gold top bar */}
@@ -323,7 +323,7 @@ export default function ResidentLogin({ onLogin }) {
                     style={{
                         height: 3,
                         background:
-                            "linear-gradient(90deg, #c9a227, #f0d060, #c9a227)",
+                            "linear-gradient(90deg, var(--color-accent), var(--color-accent-soft), var(--color-accent))",
                     }}
                 />
 
@@ -331,7 +331,7 @@ export default function ResidentLogin({ onLogin }) {
                 <div
                     style={{
                         background:
-                            "linear-gradient(180deg, rgb(14, 37, 84) 0%, rgb(22, 48, 102) 100%)",
+                            "linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-soft) 100%)",
                         padding: "28px 44px 20px",
                         textAlign: "center",
                         borderBottom: "1px solid #ede8df",
@@ -342,8 +342,8 @@ export default function ResidentLogin({ onLogin }) {
                             width: 86,
                             height: 86,
                             borderRadius: "50%",
-                            border: "2.5px solid rgba(201,162,39,0.4)",
-                            background: "rgba(201,162,39,0.06)",
+                            border: "2.5px solid rgba(var(--color-accent-rgb),0.4)",
+                            background: "rgba(var(--color-accent-rgb),0.06)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -367,7 +367,7 @@ export default function ResidentLogin({ onLogin }) {
                             fontSize: 9.5,
                             letterSpacing: "2.5px",
                             textTransform: "uppercase",
-                            color: "rgba(201,162,39,0.7)",
+                            color: "rgba(var(--color-accent-rgb),0.7)",
                             fontFamily: "'Source Serif 4', serif",
                             margin: "0 0 4px",
                         }}
@@ -409,8 +409,8 @@ export default function ResidentLogin({ onLogin }) {
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 6,
-                            background: "rgba(201,162,39,0.08)",
-                            border: "1px solid rgba(201,162,39,0.25)",
+                            background: "rgba(var(--color-accent-rgb),0.08)",
+                            border: "1px solid rgba(var(--color-accent-rgb),0.25)",
                             borderRadius: 20,
                             padding: "4px 14px",
                         }}
@@ -419,7 +419,7 @@ export default function ResidentLogin({ onLogin }) {
                             style={{
                                 fontSize: 10.5,
                                 fontWeight: 600,
-                                color: "#9a7515",
+                                color: "var(--color-accent)",
                                 letterSpacing: "1px",
                                 textTransform: "uppercase",
                                 fontFamily: "'Source Serif 4', serif",
@@ -434,7 +434,7 @@ export default function ResidentLogin({ onLogin }) {
                         style={{
                             fontSize: 20,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary)",
                             fontFamily: "'Playfair Display', serif",
                             margin: "0 0 4px",
                         }}
@@ -521,7 +521,7 @@ export default function ResidentLogin({ onLogin }) {
                                 >
                                     <Mail
                                         size={15}
-                                        color="#0e2554"
+                                        color="var(--color-primary)"
                                         strokeWidth={2}
                                     />
                                 </span>
@@ -568,7 +568,7 @@ export default function ResidentLogin({ onLogin }) {
                                 >
                                     <Lock
                                         size={15}
-                                        color="#0e2554"
+                                        color="var(--color-primary)"
                                         strokeWidth={2}
                                     />
                                 </span>
@@ -638,7 +638,7 @@ export default function ResidentLogin({ onLogin }) {
                                 }}
                             >
                                 Visit the{" "}
-                                <strong style={{ color: "#0e2554" }}>
+                                <strong style={{ color: "var(--color-primary)" }}>
                                     Barangay Office
                                 </strong>
                                 .
@@ -686,7 +686,7 @@ export default function ResidentLogin({ onLogin }) {
                             height="13"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="#9a7515"
+                            stroke="var(--color-accent)"
                             strokeWidth="2"
                             style={{ flexShrink: 0, marginTop: 1 }}
                         >
@@ -711,8 +711,8 @@ export default function ResidentLogin({ onLogin }) {
                 {/* Card footer — high contrast */}
                 <div
                     style={{
-                        background: "#0e2554",
-                        borderTop: "1px solid rgba(201,162,39,0.2)",
+                        background: "var(--color-primary)",
+                        borderTop: "1px solid rgba(var(--color-accent-rgb),0.2)",
                         padding: isMobile ? "12px 20px" : "14px 44px",
                         display: "flex",
                         alignItems: "center",
@@ -734,13 +734,13 @@ export default function ResidentLogin({ onLogin }) {
                         type="button"
                         onClick={() => navigate("/resident/register")}
                         style={{
-                            background: "rgba(201,162,39,0.18)",
-                            border: "1.5px solid rgba(201,162,39,0.55)",
+                            background: "rgba(var(--color-accent-rgb),0.18)",
+                            border: "1.5px solid rgba(var(--color-accent-rgb),0.55)",
                             borderRadius: 5,
                             padding: isMobile ? "5px 12px" : "7px 18px",
                             fontSize: isMobile ? 11.5 : 13.5,
                             fontWeight: 700,
-                            color: "#f0d060",
+                            color: "var(--color-accent-soft)",
                             cursor: "pointer",
                             fontFamily: "'Source Serif 4', serif",
                         }}

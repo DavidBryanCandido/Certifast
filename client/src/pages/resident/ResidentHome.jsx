@@ -122,6 +122,53 @@ function formatRequestId(raw) {
     return `REQ-${String(num).padStart(4, "0")}`;
 }
 
+const HOME_CERTIFICATE_LIMIT = 6;
+
+function normalizeFeeAmount(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed =
+        typeof value === "number"
+            ? value
+            : Number.parseFloat(String(value).replace(/,/g, "").trim());
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.round(parsed * 100) / 100;
+}
+
+function formatPesoAmount(value) {
+    const amount = normalizeFeeAmount(value);
+    if (amount === null) return "";
+    return `PHP ${amount.toLocaleString("en-PH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+}
+
+function certificateFeeLabel(cert) {
+    if (!cert?.hasFee) return "Free";
+    return formatPesoAmount(cert.feeAmount) || "PHP Fee";
+}
+
+function normalizeCertificateTemplates(result) {
+    const rows = Array.isArray(result?.data)
+        ? result.data
+        : Array.isArray(result)
+          ? result
+          : [];
+
+    return rows
+        .map((row, index) => {
+            const name = row.name || row.cert_type || row.certType || "";
+            if (!name.trim()) return null;
+            return {
+                id: row.templateId || row.template_id || `${name}-${index}`,
+                name,
+                hasFee: Boolean(row.hasFee ?? row.has_fee),
+                feeAmount: normalizeFeeAmount(row.feeAmount ?? row.fee_amount),
+            };
+        })
+        .filter(Boolean);
+}
+
 function StatusBadge({ status }) {
     const normalized = String(status || "").toLowerCase();
     const map = {
@@ -161,6 +208,9 @@ export default function ResidentHome({ resident, onLogout }) {
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [requestsError, setRequestsError] = useState("");
     const [branding, setBranding] = useState(DEFAULT_PUBLIC_BRANDING);
+    const [certificateTemplates, setCertificateTemplates] = useState([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(true);
+    const [templatesError, setTemplatesError] = useState("");
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -219,6 +269,37 @@ export default function ResidentHome({ resident, onLogout }) {
     useEffect(() => {
         let mounted = true;
 
+        async function loadCertificateTemplates() {
+            try {
+                const result = await requestService.getCertificateTemplates();
+                if (mounted) {
+                    setCertificateTemplates(
+                        normalizeCertificateTemplates(result),
+                    );
+                    setTemplatesError("");
+                }
+            } catch (err) {
+                if (mounted) {
+                    setCertificateTemplates([]);
+                    setTemplatesError(
+                        err?.response?.data?.message ||
+                            "Unable to load certificates right now.",
+                    );
+                }
+            } finally {
+                if (mounted) setLoadingTemplates(false);
+            }
+        }
+
+        loadCertificateTemplates();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+
         getPublicBrandingSettings()
             .then((data) => {
                 if (mounted) setBranding(data);
@@ -257,6 +338,10 @@ export default function ResidentHome({ resident, onLogout }) {
                 new Date(b.requested_at || 0) - new Date(a.requested_at || 0),
         )
         .slice(0, 5);
+    const visibleCertificateTemplates = certificateTemplates.slice(
+        0,
+        HOME_CERTIFICATE_LIMIT,
+    );
 
     return (
         <div
@@ -818,89 +903,159 @@ export default function ResidentHome({ resident, onLogout }) {
                                     <div className="rh-panel-title">
                                         Available Certificates
                                     </div>
+                                    {!loadingTemplates &&
+                                        !templatesError &&
+                                        certificateTemplates.length > 0 && (
+                                            <span
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "#9090aa",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {certificateTemplates.length}{" "}
+                                                available
+                                            </span>
+                                        )}
                                 </div>
                                 <div style={{ padding: "8px 0" }}>
-                                    {[
-                                        {
-                                            name: "Barangay Clearance",
-                                            fee: true,
-                                        },
-                                        {
-                                            name: "Certificate of Residency",
-                                            fee: false,
-                                        },
-                                        {
-                                            name: "Certificate of Indigency",
-                                            fee: false,
-                                        },
-                                        { name: "Business Permit", fee: true },
-                                        {
-                                            name: "Good Moral Certificate",
-                                            fee: false,
-                                        },
-                                        {
-                                            name: "Cert. of Live Birth (Endorsement)",
-                                            fee: false,
-                                        },
-                                    ].map((cert) => (
+                                    {loadingTemplates ? (
                                         <div
-                                            key={cert.name}
                                             style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "space-between",
-                                                padding: "9px 20px",
-                                                borderBottom:
-                                                    "1px solid #f0ece4",
+                                                padding: "10px 20px",
+                                                fontSize: 12,
+                                                color: "#9090aa",
                                             }}
                                         >
+                                            Loading certificates...
+                                        </div>
+                                    ) : templatesError ? (
+                                        <div
+                                            style={{
+                                                padding: "10px 20px",
+                                                fontSize: 12,
+                                                color: "#b02020",
+                                                lineHeight: 1.45,
+                                            }}
+                                        >
+                                            {templatesError}
+                                        </div>
+                                    ) : visibleCertificateTemplates.length ===
+                                      0 ? (
+                                        <div
+                                            style={{
+                                                padding: "10px 20px",
+                                                fontSize: 12,
+                                                color: "#9090aa",
+                                            }}
+                                        >
+                                            No certificates available.
+                                        </div>
+                                    ) : (
+                                        visibleCertificateTemplates.map((cert) => (
                                             <div
+                                                key={cert.id}
                                                 style={{
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    gap: 8,
+                                                    justifyContent:
+                                                        "space-between",
+                                                    gap: 12,
+                                                    padding: "9px 20px",
+                                                    borderBottom:
+                                                        "1px solid #f0ece4",
                                                 }}
                                             >
                                                 <div
                                                     style={{
-                                                        width: 6,
-                                                        height: 6,
-                                                        borderRadius: "50%",
-                                                        background: "#1a7a4a",
-                                                        flexShrink: 0,
-                                                    }}
-                                                />
-                                                <span
-                                                    style={{
-                                                        fontSize: 12,
-                                                        color: "#1a1a2e",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        minWidth: 0,
                                                     }}
                                                 >
-                                                    {cert.name}
+                                                    <div
+                                                        style={{
+                                                            width: 6,
+                                                            height: 6,
+                                                            borderRadius: "50%",
+                                                            background:
+                                                                "#1a7a4a",
+                                                            flexShrink: 0,
+                                                        }}
+                                                    />
+                                                    <span
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: "#1a1a2e",
+                                                            overflow: "hidden",
+                                                            textOverflow:
+                                                                "ellipsis",
+                                                            whiteSpace:
+                                                                "nowrap",
+                                                        }}
+                                                    >
+                                                        {cert.name}
+                                                    </span>
+                                                </div>
+                                                <span
+                                                    style={{
+                                                        fontSize: 10,
+                                                        color: cert.hasFee
+                                                            ? "#b86800"
+                                                            : "#9090aa",
+                                                        fontWeight: cert.hasFee
+                                                            ? 600
+                                                            : 400,
+                                                        whiteSpace: "nowrap",
+                                                        flexShrink: 0,
+                                                    }}
+                                                >
+                                                    {certificateFeeLabel(cert)}
                                                 </span>
                                             </div>
-                                            <span
-                                                style={{
-                                                    fontSize: 10,
-                                                    color: cert.fee
-                                                        ? "#b86800"
-                                                        : "#9090aa",
-                                                    fontWeight: cert.fee
-                                                        ? 600
-                                                        : 400,
-                                                }}
-                                            >
-                                                {cert.fee ? "₱ Fee" : "Free"}
-                                            </span>
-                                        </div>
-                                    ))}
+                                        ))
+                                    )}
                                 </div>
+                                {!loadingTemplates &&
+                                    !templatesError &&
+                                    certificateTemplates.length >
+                                        HOME_CERTIFICATE_LIMIT && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                navigate(
+                                                    "/resident/submit-request",
+                                                )
+                                            }
+                                            style={{
+                                                width: "100%",
+                                                border: "none",
+                                                borderTop:
+                                                    "1px solid #f0ece4",
+                                                background: "#f8f6f1",
+                                                padding: "10px 20px",
+                                                fontFamily:
+                                                    "'Source Serif 4',serif",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                color: "var(--color-primary)",
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                            }}
+                                        >
+                                            View all certificates
+                                            <ChevronRight size={13} />
+                                        </button>
+                                    )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* ── MOBILE BOTTOM NAV ── */}
+                {/* â”€â”€ MOBILE BOTTOM NAV â”€â”€ */}
                 {isMobile && <ResidentBottomNav active="home" />}
             </div>
             {/* end inner flex */}
