@@ -667,6 +667,15 @@ export default function ResidentRegister({ onSuccess }) {
                 throw new Error(raw || "Sign up failed.");
             }
 
+            if (
+                Array.isArray(authData?.user?.identities) &&
+                authData.user.identities.length === 0
+            ) {
+                throw new Error(
+                    "Email already registered. Please sign in or use Forgot Password.",
+                );
+            }
+
             if (idFile && authData?.user) {
                 try {
                     await savePendingResidentIdUpload(authData.user.id, idFile);
