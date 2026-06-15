@@ -503,7 +503,8 @@ async function getCertificateTemplates(req, res) {
             String(req.query.includeInactive || "").toLowerCase(),
         );
         const result = await pool.query(
-            `SELECT template_id, name, template_key, has_fee, fee_amount, description, required_fields, is_active, display_order
+            `SELECT template_id, name, template_key, has_fee, fee_amount, description, required_fields,
+                    proof_requirements, resident_guidance, is_active, display_order
              FROM certificate_templates
              ${includeInactive ? "" : "WHERE is_active = TRUE"}
              ORDER BY COALESCE(display_order, 0), name ASC`,
@@ -525,6 +526,14 @@ async function getCertificateTemplates(req, res) {
                 fields: Array.isArray(row.required_fields)
                     ? row.required_fields
                     : [],
+                proofRequirements: Array.isArray(row.proof_requirements)
+                    ? row.proof_requirements
+                    : [],
+                residentGuidance:
+                    row.resident_guidance &&
+                    typeof row.resident_guidance === "object"
+                        ? row.resident_guidance
+                        : {},
             })),
         });
     } catch (err) {
@@ -671,7 +680,8 @@ async function updateCertificateTemplate(req, res) {
             `UPDATE certificate_templates
              SET ${updates.join(", ")}
              WHERE template_id = $${values.length}
-             RETURNING template_id, name, template_key, has_fee, fee_amount, description, required_fields, is_active, display_order`,
+             RETURNING template_id, name, template_key, has_fee, fee_amount, description, required_fields,
+                       proof_requirements, resident_guidance, is_active, display_order`,
             values,
         );
 
@@ -708,6 +718,14 @@ async function updateCertificateTemplate(req, res) {
                 fields: Array.isArray(row.required_fields)
                     ? row.required_fields
                     : [],
+                proofRequirements: Array.isArray(row.proof_requirements)
+                    ? row.proof_requirements
+                    : [],
+                residentGuidance:
+                    row.resident_guidance &&
+                    typeof row.resident_guidance === "object"
+                        ? row.resident_guidance
+                        : {},
             },
         });
     } catch (err) {

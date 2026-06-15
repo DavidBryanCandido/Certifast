@@ -195,6 +195,137 @@ function feePaymentText(cert) {
     return amount ? `Fee payment: ${amount}` : "Fee payment";
 }
 
+const DEFAULT_ONLINE_WAIT = "Online review: 1-3 business days.";
+
+const DEFAULT_RESIDENT_GUIDANCE = {
+    title: "Barangay Certificate Request",
+    waiting: DEFAULT_ONLINE_WAIT,
+    review:
+        "Barangay staff reviews your resident profile, purpose, and submitted requirements before preparing the certificate.",
+    release:
+        "Claim the certificate in person. Staff may ask to see your original ID or supporting document before release.",
+    bring: ["Valid government-issued ID", "Request ID / reference number"],
+};
+
+function getCharterGuidance(cert) {
+    if (!cert) return null;
+    return normalizeResidentGuidance(cert.residentGuidance, cert);
+}
+
+function uniqueList(items = []) {
+    const seen = new Set();
+    return items.filter((item) => {
+        const text = String(item || "").trim();
+        const key = text.toLowerCase();
+        if (!text || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function parseJsonObject(value) {
+    if (!value) return {};
+    if (typeof value === "object" && !Array.isArray(value)) return value;
+    if (typeof value === "string") {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+                ? parsed
+                : {};
+        } catch {
+            return {};
+        }
+    }
+    return {};
+}
+
+function normalizeStringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean);
+}
+
+function normalizeProcessSteps(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((step, index) => {
+            if (!step || typeof step !== "object") return null;
+            return {
+                n: String(step.n || index + 1),
+                title: String(step.title || "").trim(),
+                desc: String(step.desc || step.description || "").trim(),
+            };
+        })
+        .filter((step) => step?.title && step?.desc);
+}
+
+function normalizeResidentGuidance(raw, cert) {
+    const guidance = parseJsonObject(raw);
+    const steps = normalizeProcessSteps(
+        guidance.processSteps || guidance.process_steps,
+    );
+    return {
+        title:
+            String(guidance.title || "").trim() ||
+            cert?.name ||
+            DEFAULT_RESIDENT_GUIDANCE.title,
+        waiting:
+            String(guidance.waiting || guidance.waitingTime || "").trim() ||
+            DEFAULT_RESIDENT_GUIDANCE.waiting,
+        review:
+            String(guidance.review || "").trim() ||
+            DEFAULT_RESIDENT_GUIDANCE.review,
+        release:
+            String(guidance.release || "").trim() ||
+            DEFAULT_RESIDENT_GUIDANCE.release,
+        bring:
+            normalizeStringArray(guidance.bring || guidance.whatToBring)
+                .length > 0
+                ? normalizeStringArray(guidance.bring || guidance.whatToBring)
+                : DEFAULT_RESIDENT_GUIDANCE.bring,
+        processSteps: steps,
+    };
+}
+
+function getWhatToBringItems(cert, proofRequirements = []) {
+    const guidance = getCharterGuidance(cert);
+    const uploadedDocumentItems = proofRequirements.map(
+        (proof) => `Original/copy of uploaded ${proof.label}`,
+    );
+    return uniqueList([
+        "Your CertiFast QR card (printed or on your phone)",
+        ...(guidance?.bring || [
+            "Valid government-issued ID",
+            "Request ID / reference number",
+        ]),
+        ...uploadedDocumentItems,
+        feePaymentText(cert),
+    ]);
+}
+
+function getProcessSteps(guidance) {
+    const data = guidance || DEFAULT_RESIDENT_GUIDANCE;
+    if (data.processSteps?.length) return data.processSteps;
+    return [
+        {
+            n: "1",
+            title: "Submit Online",
+            desc: "Complete the form and upload the required supporting document, if the certificate asks for one.",
+        },
+        {
+            n: "2",
+            title: "Barangay Review",
+            desc: data.review,
+        },
+        {
+            n: "3",
+            title: "Claim In Person",
+            desc: data.release,
+        },
+    ];
+}
+
 function normalizeTemplateRows(rows) {
     if (!Array.isArray(rows) || rows.length === 0) return ALL_CERTS;
 
@@ -219,6 +350,8 @@ function normalizeTemplateRows(rows) {
             proofRequirements: normalizeProofRequirements(
                 row.proofRequirements || row.proof_requirements || [],
             ),
+            residentGuidance:
+                row.residentGuidance || row.resident_guidance || {},
         });
     });
 }
@@ -544,14 +677,35 @@ function formatFileSize(size = 0) {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const MAX_SUPPORTING_FILE_SIZE = 6 * 1024 * 1024;
+const MAX_SUPPORTING_FILES = 8;
+
 function validateProofFile(file) {
     if (!file) return "";
-    const maxSize = 6 * 1024 * 1024;
     const allowed =
         file.type.startsWith("image/") || file.type === "application/pdf";
     if (!allowed) return "Supporting document must be an image or PDF file.";
-    if (file.size > maxSize) return "Supporting document must be 6 MB or smaller.";
+    if (file.size > MAX_SUPPORTING_FILE_SIZE) {
+        return "Supporting document must be 6 MB or smaller.";
+    }
     return "";
+}
+
+function fileListForProof(proofFiles, key) {
+    const files = proofFiles?.[key];
+    if (Array.isArray(files)) return files.filter(Boolean);
+    return files ? [files] : [];
+}
+
+function countProofFiles(proofFiles = {}) {
+    return Object.values(proofFiles).reduce(
+        (total, files) => total + (Array.isArray(files) ? files.length : files ? 1 : 0),
+        0,
+    );
+}
+
+function proofFileNames(files = []) {
+    return files.map((file) => file.name).join(", ");
 }
 
 function FieldGroup({ label, children, required }) {
@@ -769,6 +923,12 @@ export default function SubmitRequest({ resident, onLogout }) {
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra = selectedCert ? getCertificateFields(selectedCert) : [];
     const proofRequirements = selectedCert ? getProofRequirements(selectedCert) : [];
+    const charterGuidance = getCharterGuidance(selectedCert);
+    const processSteps = getProcessSteps(charterGuidance);
+    const whatToBringItems = getWhatToBringItems(
+        selectedCert,
+        proofRequirements,
+    );
     const activeCerts = certsLoading ? ALL_CERTS : certs;
     const normalizedCertSearch = certSearch.trim().toLowerCase();
     const filteredCerts = normalizedCertSearch
@@ -809,13 +969,26 @@ export default function SubmitRequest({ resident, onLogout }) {
         setExtraFields((prev) => ({ ...prev, [key]: val }));
     }
 
-    function setProofFile(key, file) {
-        const validationError = validateProofFile(file);
-        if (validationError) {
-            setError(validationError);
+    function setProofFilesForKey(key, selectedFiles) {
+        const files = Array.from(selectedFiles || []).filter(Boolean);
+        for (const file of files) {
+            const validationError = validateProofFile(file);
+            if (validationError) {
+                setError(validationError);
+                return;
+            }
+        }
+        const otherFileCount = countProofFiles({
+            ...proofFiles,
+            [key]: [],
+        });
+        if (otherFileCount + files.length > MAX_SUPPORTING_FILES) {
+            setError(
+                `Please upload up to ${MAX_SUPPORTING_FILES} supporting files total.`,
+            );
             return;
         }
-        setProofFiles((prev) => ({ ...prev, [key]: file }));
+        setProofFiles((prev) => ({ ...prev, [key]: files }));
         setError("");
     }
 
@@ -839,47 +1012,49 @@ export default function SubmitRequest({ resident, onLogout }) {
 
         const uploaded = [];
         for (const requirement of proofRequirements) {
-            const file = proofFiles[requirement.key];
-            if (!file) continue;
+            const files = fileListForProof(proofFiles, requirement.key);
+            if (files.length === 0) continue;
 
-            const unique =
-                typeof crypto !== "undefined" && crypto.randomUUID
-                    ? crypto.randomUUID()
-                    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            const path = [
-                "request-proofs",
-                user.id,
-                `${Date.now()}-${safeFilePart(requirement.key)}-${unique}.${fileExt(file.name)}`,
-            ].join("/");
+            for (const file of files) {
+                const unique =
+                    typeof crypto !== "undefined" && crypto.randomUUID
+                        ? crypto.randomUUID()
+                        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                const path = [
+                    "request-proofs",
+                    user.id,
+                    `${Date.now()}-${safeFilePart(requirement.key)}-${unique}.${fileExt(file.name)}`,
+                ].join("/");
 
-            const { error: uploadError } = await supabase.storage
-                .from("certifast-uploads")
-                .upload(path, file, {
-                    cacheControl: "3600",
-                    contentType: file.type || undefined,
-                    upsert: false,
+                const { error: uploadError } = await supabase.storage
+                    .from("certifast-uploads")
+                    .upload(path, file, {
+                        cacheControl: "3600",
+                        contentType: file.type || undefined,
+                        upsert: false,
+                    });
+
+                if (uploadError) {
+                    throw new Error(
+                        uploadError.message ||
+                            `Could not upload ${requirement.label}.`,
+                    );
+                }
+
+                const { data: publicData } = supabase.storage
+                    .from("certifast-uploads")
+                    .getPublicUrl(path);
+
+                uploaded.push({
+                    proofKey: requirement.key,
+                    label: requirement.label,
+                    fileName: file.name,
+                    filePath: path,
+                    fileUrl: publicData?.publicUrl || "",
+                    mimeType: file.type || "",
+                    fileSize: file.size || 0,
                 });
-
-            if (uploadError) {
-                throw new Error(
-                    uploadError.message ||
-                        `Could not upload ${requirement.label}.`,
-                );
             }
-
-            const { data: publicData } = supabase.storage
-                .from("certifast-uploads")
-                .getPublicUrl(path);
-
-            uploaded.push({
-                proofKey: requirement.key,
-                label: requirement.label,
-                fileName: file.name,
-                filePath: path,
-                fileUrl: publicData?.publicUrl || "",
-                mimeType: file.type || "",
-                fileSize: file.size || 0,
-            });
         }
 
         return uploaded;
@@ -916,10 +1091,19 @@ export default function SubmitRequest({ resident, onLogout }) {
                 }
             }
             for (const proof of proofRequirements) {
-                if (proof.required && !proofFiles[proof.key]) {
+                if (
+                    proof.required &&
+                    fileListForProof(proofFiles, proof.key).length === 0
+                ) {
                     setError(`Please upload: ${proof.label}`);
                     return;
                 }
+            }
+            if (countProofFiles(proofFiles) > MAX_SUPPORTING_FILES) {
+                setError(
+                    `Please upload up to ${MAX_SUPPORTING_FILES} supporting files total.`,
+                );
+                return;
             }
             setError("");
         }
@@ -1082,8 +1266,8 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 <strong style={{ color: "#1a1a2e" }}>
                                     {selectedCert?.name}
                                 </strong>{" "}
-                                has been submitted. Processing typically takes
-                                1–3 business days.
+                                has been submitted.{" "}
+                                {charterGuidance?.waiting || DEFAULT_ONLINE_WAIT}
                             </p>
                             <div
                                 style={{
@@ -1147,15 +1331,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         lineHeight: 1.65,
                                     }}
                                 >
-                                    {selectedCert?.hasFee
-                                        ? `This certificate requires a fee${
-                                              selectedCert.feeAmount
-                                                  ? ` of ${formatPesoAmount(
-                                                        selectedCert.feeAmount,
-                                                    )}`
-                                                  : ""
-                                          }. Bring payment when claiming at the ${branding.name} office. Bring a valid ID.`
-                                        : `Please bring a valid ID when claiming your certificate at the ${branding.name} office.`}
+                                    Bring these when claiming at the{" "}
+                                    {branding.name} office:{" "}
+                                    {whatToBringItems.join(", ")}.
                                 </span>
                             </div>
                             <div
@@ -1935,7 +2113,8 @@ export default function SubmitRequest({ resident, onLogout }) {
                         approving or rejecting the request.
                     </div>
                     {proofRequirements.map((proof) => {
-                        const file = proofFiles[proof.key];
+                        const files = fileListForProof(proofFiles, proof.key);
+                        const hasFiles = files.length > 0;
                         return (
                             <FieldGroup
                                 key={proof.key}
@@ -1951,7 +2130,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         padding: "11px 12px",
                                         border: "1.5px dashed #cfc7bb",
                                         borderRadius: 6,
-                                        background: file ? "#f0faf4" : "#fffdf8",
+                                        background: hasFiles
+                                            ? "#f0faf4"
+                                            : "#fffdf8",
                                         cursor: "pointer",
                                     }}
                                 >
@@ -1966,7 +2147,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         <strong
                                             style={{
                                                 fontSize: 12.5,
-                                                color: file
+                                                color: hasFiles
                                                     ? "#1a7a4a"
                                                     : "#4a4a6a",
                                                 overflow: "hidden",
@@ -1974,7 +2155,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                 whiteSpace: "nowrap",
                                             }}
                                         >
-                                            {file ? file.name : "Choose file"}
+                                            {hasFiles
+                                                ? `${files.length} file${files.length > 1 ? "s" : ""} selected`
+                                                : "Choose files"}
                                         </strong>
                                         <span
                                             style={{
@@ -1982,9 +2165,14 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                 color: "#9090aa",
                                             }}
                                         >
-                                            {file
-                                                ? formatFileSize(file.size)
-                                                : "Image or PDF, max 6 MB"}
+                                            {hasFiles
+                                                ? files
+                                                      .map(
+                                                          (file) =>
+                                                              `${file.name} (${formatFileSize(file.size)})`,
+                                                      )
+                                                      .join(", ")
+                                                : `Images or PDFs, max 6 MB each. Up to ${MAX_SUPPORTING_FILES} files total.`}
                                         </span>
                                     </span>
                                     <span
@@ -1999,11 +2187,12 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     </span>
                                     <input
                                         type="file"
+                                        multiple
                                         accept={proof.accept || "image/*,.pdf"}
                                         onChange={(e) =>
-                                            setProofFile(
+                                            setProofFilesForKey(
                                                 proof.key,
-                                                e.target.files?.[0] || null,
+                                                e.target.files,
                                             )
                                         }
                                         style={{ display: "none" }}
@@ -2083,7 +2272,9 @@ export default function SubmitRequest({ resident, onLogout }) {
         })),
         ...proofRequirements.map((proof) => ({
             label: `Document: ${proof.label}`,
-            value: proofFiles[proof.key]?.name || "—",
+            value:
+                proofFileNames(fileListForProof(proofFiles, proof.key)) ||
+                "—",
         })),
         {
             label: "Fee Required",
@@ -2092,6 +2283,16 @@ export default function SubmitRequest({ resident, onLogout }) {
                     ? `Yes - ${formatPesoAmount(selectedCert.feeAmount)}`
                     : "Yes - payable at barangay office"
                 : "None",
+        },
+        {
+            label: "Process Note",
+            value: charterGuidance
+                ? `${charterGuidance.title}. ${charterGuidance.waiting}`
+                : DEFAULT_ONLINE_WAIT,
+        },
+        {
+            label: "Claim Requirements",
+            value: whatToBringItems.join(", "),
         },
         { label: "Notes", value: notes.trim() || "None" },
     ];
@@ -2278,9 +2479,8 @@ export default function SubmitRequest({ resident, onLogout }) {
                     }}
                 >
                     You will receive a <strong>Request ID</strong> after
-                    submission. Processing takes{" "}
-                    <strong>1–3 business days</strong>. Visit the office to
-                    claim your document.
+                    submission. {charterGuidance?.waiting || DEFAULT_ONLINE_WAIT}{" "}
+                    Visit the office to claim your document.
                 </span>
             </div>
         </div>
@@ -2477,23 +2677,26 @@ export default function SubmitRequest({ resident, onLogout }) {
                                             gap: 14,
                                         }}
                                     >
-                                        {[
-                                            {
-                                                n: "1",
-                                                title: "Submit Online",
-                                                desc: "Fill out and submit this form.",
-                                            },
-                                            {
-                                                n: "2",
-                                                title: "Staff Review",
-                                                desc: "Barangay staff process your request in 1–3 business days.",
-                                            },
-                                            {
-                                                n: "3",
-                                                title: "Claim In Person",
-                                                desc: "Visit with a valid ID and any listed fee.",
-                                            },
-                                        ].map((s) => (
+                                        {charterGuidance && (
+                                            <div
+                                                style={{
+                                                    background: "#f8f6f1",
+                                                    border: "1px solid #e4dfd4",
+                                                    borderRadius: 6,
+                                                    padding: "9px 10px",
+                                                    fontSize: 11.5,
+                                                    color: "#4a4a6a",
+                                                    lineHeight: 1.55,
+                                                }}
+                                            >
+                                                <strong>
+                                                    {charterGuidance.title}
+                                                </strong>
+                                                <br />
+                                                {charterGuidance.waiting}
+                                            </div>
+                                        )}
+                                        {processSteps.map((s) => (
                                             <div
                                                 key={s.n}
                                                 style={{
@@ -2638,98 +2841,43 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         )}
                                     </div>
                                     <div style={{ padding: "8px 0" }}>
-                                        {(() => {
-                                            const base = [
-                                                "Your CertiFast QR card (printed or on your phone)",
-                                                "Valid government-issued ID",
-                                                "Request ID / reference number",
-                                            ];
-                                            const paymentItem =
-                                                feePaymentText(selectedCert);
-                                            const feeItem =
-                                                paymentItem ||
-                                                "Fee payment";
-                                            const extras = {
-                                                "Business Permit": [
-                                                    feeItem,
-                                                    "Sketch or location map of business",
-                                                    "Proof of business address",
-                                                ],
-                                                "Barangay Business Clearance (Renewal)":
-                                                    [
-                                                        feeItem,
-                                                        "Previous barangay clearance / permit",
-                                                    ],
-                                                "Barangay Clearance": [
-                                                    feeItem,
-                                                ],
-                                                "Certificate of Indigency": [
-                                                    "Proof of income or indigency (if available)",
-                                                ],
-                                                "Certificate of Cohabitation": [
-                                                    "Both partners must be present",
-                                                    "Supporting documents (e.g. lease agreement, utility bill)",
-                                                ],
-                                                "Certificate of Guardianship": [
-                                                    "Birth certificate of the ward",
-                                                    "Supporting documents proving guardianship",
-                                                ],
-                                                "Certificate of Live Birth (Endorsement)":
-                                                    [
-                                                        "Hospital or birth records of the child",
-                                                        "Valid IDs of both parents (if available)",
-                                                    ],
-                                                "Good Moral Certificate": [
-                                                    "Letter of request from the school or employer (if applicable)",
-                                                ],
-                                            };
-                                            const certItems = selectedCert
-                                                ? extras[selectedCert.name] ||
-                                                  (selectedCert.hasFee
-                                                      ? [feeItem]
-                                                      : [])
-                                                : [
-                                                      "Fee payment for fee-required certificates",
-                                                  ];
-                                            const all = [...base, ...certItems];
-                                            return all.map((item, i) => (
+                                        {whatToBringItems.map((item, i) => (
+                                            <div
+                                                key={item}
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "flex-start",
+                                                    gap: 10,
+                                                    padding: "8px 18px",
+                                                    borderBottom:
+                                                        i <
+                                                        whatToBringItems.length -
+                                                            1
+                                                            ? "1px solid #f5f2ee"
+                                                            : "none",
+                                                }}
+                                            >
                                                 <div
-                                                    key={item}
                                                     style={{
-                                                        display: "flex",
-                                                        alignItems:
-                                                            "flex-start",
-                                                        gap: 10,
-                                                        padding: "8px 18px",
-                                                        borderBottom:
-                                                            i < all.length - 1
-                                                                ? "1px solid #f5f2ee"
-                                                                : "none",
+                                                        width: 6,
+                                                        height: 6,
+                                                        borderRadius: "50%",
+                                                        background: "#1a7a4a",
+                                                        flexShrink: 0,
+                                                        marginTop: 5,
+                                                    }}
+                                                />
+                                                <span
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: "#1a1a2e",
+                                                        lineHeight: 1.5,
                                                     }}
                                                 >
-                                                    <div
-                                                        style={{
-                                                            width: 6,
-                                                            height: 6,
-                                                            borderRadius: "50%",
-                                                            background:
-                                                                "#1a7a4a",
-                                                            flexShrink: 0,
-                                                            marginTop: 5,
-                                                        }}
-                                                    />
-                                                    <span
-                                                        style={{
-                                                            fontSize: 12,
-                                                            color: "#1a1a2e",
-                                                            lineHeight: 1.5,
-                                                        }}
-                                                    >
-                                                        {item}
-                                                    </span>
-                                                </div>
-                                            ));
-                                        })()}
+                                                    {item}
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
