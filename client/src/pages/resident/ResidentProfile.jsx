@@ -2,11 +2,21 @@
 // FILE: client/src/pages/resident/ResidentProfile.jsx
 // =============================================================
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-    User, Edit3, Check, X, AlertCircle,
+    User,
+    Edit3,
+    Check,
+    X,
+    AlertCircle,
+    Users,
+    Briefcase,
+    FileUp,
+    Plus,
+    Trash2,
 } from "lucide-react";
 import residentProfileService from "../../services/residentProfileService";
+import { supabase } from "../../supabaseClient";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
@@ -26,13 +36,19 @@ if (!document.head.querySelector("[data-resident-home]")) {
 }
 
 const CIVIL_STATUSES = ["Single", "Married", "Widowed", "Separated", "Annulled"];
+const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 
 const PUROKS_FALLBACK = [
-    { purok_id: 1,  name: "Purok 1"  }, { purok_id: 2,  name: "Purok 2"  },
-    { purok_id: 3,  name: "Purok 3"  }, { purok_id: 4,  name: "Purok 4"  },
-    { purok_id: 5,  name: "Purok 5"  }, { purok_id: 6,  name: "Purok 6"  },
-    { purok_id: 7,  name: "Purok 7"  }, { purok_id: 8,  name: "Purok 8"  },
-    { purok_id: 9,  name: "Purok 9"  }, { purok_id: 10, name: "Purok 10" },
+    { purok_id: 1, name: "Purok 1" },
+    { purok_id: 2, name: "Purok 2" },
+    { purok_id: 3, name: "Purok 3" },
+    { purok_id: 4, name: "Purok 4" },
+    { purok_id: 5, name: "Purok 5" },
+    { purok_id: 6, name: "Purok 6" },
+    { purok_id: 7, name: "Purok 7" },
+    { purok_id: 8, name: "Purok 8" },
+    { purok_id: 9, name: "Purok 9" },
+    { purok_id: 10, name: "Purok 10" },
     { purok_id: 11, name: "Purok 11" },
 ];
 
@@ -61,48 +77,250 @@ const STREETS_FALLBACK = [
     { street_id: 22, name: "16th Street" },
 ];
 
+const EMPTY_PROFILE_DETAILS = Object.freeze({
+    fatherName: "",
+    motherName: "",
+    legalSpouseName: "",
+    currentPartnerName: "",
+    childrenNames: [],
+    businessName: "",
+    businessType: "",
+    businessArea: "",
+    businessAddress: "",
+    businessOwnerName: "",
+    businessOwnerAddress: "",
+    businessPermitNo: "",
+    monthlyIncome: "",
+    incomeStartYear: "",
+    businessProof: null,
+});
+
+const MAX_PROFILE_FILE_SIZE = 6 * 1024 * 1024;
+
+function textValue(value) {
+    return value === null || value === undefined ? "" : String(value);
+}
+
+function trimText(value) {
+    return textValue(value).trim();
+}
+
 function fmtDate(str) {
-    if (!str) return "—";
+    if (!str) return "-";
     const dateOnly = String(str).slice(0, 10);
     const [y, m, d] = dateOnly.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-        month: "long", day: "numeric", year: "numeric",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
     });
 }
 
 function calcAge(dob) {
-    if (!dob) return "—";
+    if (!dob) return null;
     const dateOnly = String(dob).slice(0, 10);
     const [y, m, d] = dateOnly.split("-").map(Number);
     const birth = new Date(y, m - 1, d);
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
-    if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
+    if (
+        today <
+        new Date(today.getFullYear(), birth.getMonth(), birth.getDate())
+    ) {
+        age -= 1;
+    }
     return age;
 }
 
+function fileExt(name = "") {
+    const ext = String(name).split(".").pop()?.toLowerCase();
+    return ext && ext !== name.toLowerCase() ? ext : "bin";
+}
+
+function safeFilePart(raw = "") {
+    return String(raw)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 42);
+}
+
+function formatFileSize(size = 0) {
+    if (!size) return "0 KB";
+    if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function validateBusinessProofFile(file) {
+    if (!file) return "";
+    const allowed =
+        file.type.startsWith("image/") || file.type === "application/pdf";
+    if (!allowed) return "Proof of business must be an image or PDF file.";
+    if (file.size > MAX_PROFILE_FILE_SIZE) {
+        return "Proof of business must be 6 MB or smaller.";
+    }
+    return "";
+}
+
+function normalizeBusinessProof(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+
+    const normalized = {
+        fileName: trimText(value.fileName),
+        filePath: trimText(value.filePath),
+        fileUrl: trimText(value.fileUrl),
+        mimeType: trimText(value.mimeType),
+        fileSize: Number(value.fileSize) || 0,
+        uploadedAt: trimText(value.uploadedAt),
+    };
+
+    if (!normalized.fileName && !normalized.filePath && !normalized.fileUrl) {
+        return null;
+    }
+
+    return normalized;
+}
+
+function normalizeProfileDetails(value) {
+    const details =
+        value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+    return {
+        ...EMPTY_PROFILE_DETAILS,
+        fatherName: textValue(details.fatherName),
+        motherName: textValue(details.motherName),
+        legalSpouseName: textValue(details.legalSpouseName),
+        currentPartnerName: textValue(details.currentPartnerName),
+        childrenNames: Array.isArray(details.childrenNames)
+            ? details.childrenNames
+                  .map((item) => trimText(item))
+                  .filter(Boolean)
+            : [],
+        businessName: textValue(details.businessName),
+        businessType: textValue(details.businessType),
+        businessArea: textValue(details.businessArea),
+        businessAddress: textValue(details.businessAddress),
+        businessOwnerName: textValue(details.businessOwnerName),
+        businessOwnerAddress: textValue(details.businessOwnerAddress),
+        businessPermitNo: textValue(details.businessPermitNo),
+        monthlyIncome: textValue(details.monthlyIncome),
+        incomeStartYear: textValue(details.incomeStartYear),
+        businessProof: normalizeBusinessProof(details.businessProof),
+    };
+}
+
+function nonEmptyChildren(childrenNames) {
+    const cleaned = (childrenNames || [])
+        .map((item) => trimText(item))
+        .filter(Boolean);
+    return cleaned.length > 0 ? cleaned : [];
+}
+
+function withChildRow(childrenNames) {
+    const cleaned = Array.isArray(childrenNames) ? childrenNames : [];
+    return cleaned.length > 0 ? cleaned : [""];
+}
+
+function buildProfileDetailsPayload(form, businessProof) {
+    const payload = {
+        fatherName: trimText(form.fatherName),
+        motherName: trimText(form.motherName),
+        legalSpouseName: trimText(form.legalSpouseName),
+        currentPartnerName: trimText(form.currentPartnerName),
+        childrenNames: nonEmptyChildren(form.childrenNames),
+        businessName: trimText(form.businessName),
+        businessType: trimText(form.businessType),
+        businessArea: trimText(form.businessArea),
+        businessAddress: trimText(form.businessAddress),
+        businessOwnerName: trimText(form.businessOwnerName),
+        businessOwnerAddress: trimText(form.businessOwnerAddress),
+        businessPermitNo: trimText(form.businessPermitNo),
+        monthlyIncome: trimText(form.monthlyIncome),
+        incomeStartYear: trimText(form.incomeStartYear),
+        businessProof: normalizeBusinessProof(businessProof),
+    };
+
+    return Object.fromEntries(
+        Object.entries(payload).filter(([, value]) => {
+            if (Array.isArray(value)) return value.length > 0;
+            if (value && typeof value === "object") return true;
+            return Boolean(value);
+        }),
+    );
+}
+
+function formFromProfile(profile) {
+    const details = normalizeProfileDetails(profile?.profile_details);
+    const childrenNames = withChildRow(details.childrenNames);
+
+    return {
+        date_of_birth: profile?.date_of_birth
+            ? String(profile.date_of_birth).slice(0, 10)
+            : "",
+        civil_status: profile?.civil_status || CIVIL_STATUSES[0],
+        contact_number: profile?.contact_number || "",
+        house_number: profile?.house_number || "",
+        purok_id: profile?.purok_id ? String(profile.purok_id) : "",
+        street_id: profile?.street_other
+            ? "other"
+            : profile?.street_id
+              ? String(profile.street_id)
+              : "",
+        street_other: profile?.street_other || "",
+        gender: profile?.gender || "",
+        place_of_birth: profile?.place_of_birth || "",
+        occupation: profile?.occupation || "",
+        years_of_residency:
+            profile?.years_of_residency !== null &&
+            profile?.years_of_residency !== undefined
+                ? String(profile.years_of_residency)
+                : "",
+        fatherName: details.fatherName,
+        motherName: details.motherName,
+        legalSpouseName: details.legalSpouseName,
+        currentPartnerName: details.currentPartnerName,
+        childrenNames,
+        businessName: details.businessName,
+        businessType: details.businessType,
+        businessArea: details.businessArea,
+        businessAddress: details.businessAddress,
+        businessOwnerName: details.businessOwnerName,
+        businessOwnerAddress: details.businessOwnerAddress,
+        businessPermitNo: details.businessPermitNo,
+        monthlyIncome: details.monthlyIncome,
+        incomeStartYear: details.incomeStartYear,
+        businessProof: details.businessProof,
+    };
+}
+
+function hasBusinessInfo(details) {
+    return Boolean(
+        trimText(details.businessName) ||
+            trimText(details.businessType) ||
+            trimText(details.businessArea) ||
+            trimText(details.businessAddress) ||
+            trimText(details.businessOwnerName) ||
+            trimText(details.businessOwnerAddress) ||
+            trimText(details.businessPermitNo) ||
+            trimText(details.monthlyIncome) ||
+            trimText(details.incomeStartYear) ||
+            details.businessProof,
+    );
+}
+
 export default function ResidentProfile({ resident, onLogout }) {
-    const [width, setWidth]     = useState(window.innerWidth);
+    const [width, setWidth] = useState(window.innerWidth);
     const [profile, setProfile] = useState(null);
     const [editing, setEditing] = useState(false);
-    const [saving, setSaving]   = useState(false);
-    const [saved, setSaved]     = useState(false);
-    const [error, setError]     = useState("");
-
-    // Address options
-    const [puroks,  setPuroks]  = useState(PUROKS_FALLBACK);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
+    const [puroks, setPuroks] = useState(PUROKS_FALLBACK);
     const [streets, setStreets] = useState(STREETS_FALLBACK);
-
-    // Editable form fields
-    const [form, setForm] = useState({
-        date_of_birth:  "",
-        civil_status:   "",
-        contact_number: "",
-        house_number:   "",
-        purok_id:       "",
-        street_id:      "",
-        street_other:   "",
-    });
+    const [businessProofFile, setBusinessProofFile] = useState(null);
+    const [form, setForm] = useState(formFromProfile(null));
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -110,30 +328,16 @@ export default function ResidentProfile({ resident, onLogout }) {
         return () => window.removeEventListener("resize", fn);
     }, []);
 
-    // Load purok/street options from API (fallback to hardcoded)
     useEffect(() => {
         fetch("/api/address-options")
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                if (data?.puroks?.length)  setPuroks(data.puroks);
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data) => {
+                if (data?.puroks?.length) setPuroks(data.puroks);
                 if (data?.streets?.length) setStreets(data.streets);
             })
             .catch(() => {});
     }, []);
 
-    const formFromProfile = (p) => ({
-        date_of_birth:  p.date_of_birth ? String(p.date_of_birth).slice(0, 10) : "",
-        civil_status:   p.civil_status || CIVIL_STATUSES[0],
-        contact_number: p.contact_number || "",
-        house_number:   p.house_number || "",
-        purok_id:       p.purok_id ? String(p.purok_id) : "",
-        street_id:      p.street_other ? "other"
-                      : p.street_id   ? String(p.street_id)
-                      : "",
-        street_other:   p.street_other || "",
-    });
-
-    // Load profile
     useEffect(() => {
         let mounted = true;
 
@@ -141,6 +345,7 @@ export default function ResidentProfile({ resident, onLogout }) {
             if (!mounted || !nextProfile) return;
             setProfile(nextProfile);
             setForm(formFromProfile(nextProfile));
+            setBusinessProofFile(null);
         };
 
         const loadProfile = async ({ silent = false } = {}) => {
@@ -150,11 +355,18 @@ export default function ResidentProfile({ resident, onLogout }) {
                 applyProfile(data?.profile || data);
             } catch (err) {
                 if (!mounted) return;
-                if (err?.response?.status === 401 || err?.response?.status === 403) {
-                    onLogout?.(); return;
+                if (
+                    err?.response?.status === 401 ||
+                    err?.response?.status === 403
+                ) {
+                    onLogout?.();
+                    return;
                 }
                 if (!silent) {
-                    setError(err?.response?.data?.message || "Failed to load profile. Please refresh and try again.");
+                    setError(
+                        err?.response?.data?.message ||
+                            "Failed to load profile. Please refresh and try again.",
+                    );
                 }
             }
         };
@@ -162,40 +374,135 @@ export default function ResidentProfile({ resident, onLogout }) {
         loadProfile();
 
         const intervalId = setInterval(() => {
-            if (!document.hidden && !editing && !saving) loadProfile({ silent: true });
+            if (!document.hidden && !editing && !saving) {
+                loadProfile({ silent: true });
+            }
         }, 10000);
 
-        return () => { mounted = false; clearInterval(intervalId); };
+        return () => {
+            mounted = false;
+            clearInterval(intervalId);
+        };
     }, [editing, onLogout, saving]);
 
-    async function handleSave() {
-        if (!form.contact_number.trim()) { setError("Contact number is required."); return; }
-        if (!form.street_id) { setError("Please select your street."); return; }
-        if (form.street_id === "other" && !form.street_other.trim()) {
-            setError("Please specify your street name."); return;
+    async function uploadBusinessProof(file) {
+        const {
+            data: { user },
+            error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user?.id) {
+            throw new Error(
+                "Please sign in again before uploading the proof of business.",
+            );
         }
+
+        const unique =
+            typeof crypto !== "undefined" && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const path = [
+            "resident-profile",
+            user.id,
+            `${Date.now()}-${safeFilePart("business-proof")}-${unique}.${fileExt(file.name)}`,
+        ].join("/");
+
+        const { error: uploadError } = await supabase.storage
+            .from("certifast-uploads")
+            .upload(path, file, {
+                cacheControl: "3600",
+                contentType: file.type || undefined,
+                upsert: false,
+            });
+
+        if (uploadError) {
+            throw new Error(
+                uploadError.message ||
+                    "Could not upload the proof of business document.",
+            );
+        }
+
+        const { data: publicData } = supabase.storage
+            .from("certifast-uploads")
+            .getPublicUrl(path);
+
+        return {
+            fileName: file.name,
+            filePath: path,
+            fileUrl: publicData?.publicUrl || "",
+            mimeType: file.type || "",
+            fileSize: file.size || 0,
+            uploadedAt: new Date().toISOString(),
+        };
+    }
+
+    async function handleSave() {
+        if (!trimText(form.contact_number)) {
+            setError("Contact number is required.");
+            return;
+        }
+        if (!trimText(form.house_number)) {
+            setError("House or unit number is required.");
+            return;
+        }
+        if (!form.street_id) {
+            setError("Please select your street.");
+            return;
+        }
+        if (form.street_id === "other" && !trimText(form.street_other)) {
+            setError("Please specify your street name.");
+            return;
+        }
+        if (
+            trimText(form.years_of_residency) &&
+            !/^\d+$/.test(trimText(form.years_of_residency))
+        ) {
+            setError("Years of residency must be a whole number.");
+            return;
+        }
+
         setSaving(true);
         setError("");
+
         try {
+            let businessProof = form.businessProof;
+            if (businessProofFile) {
+                businessProof = await uploadBusinessProof(businessProofFile);
+            }
+
             const payload = {
-                date_of_birth:  form.date_of_birth || null,
-                civil_status:   form.civil_status  || null,
-                contact_number: form.contact_number,
-                house_number:   form.house_number  || null,
-                purok_id:       form.purok_id      || null,
-                street_id:      form.street_id !== "other" ? (form.street_id || null) : null,
-                street_other:   form.street_id === "other" ? form.street_other : null,
+                date_of_birth: form.date_of_birth || null,
+                civil_status: form.civil_status || null,
+                contact_number: trimText(form.contact_number),
+                house_number: trimText(form.house_number) || null,
+                purok_id: form.purok_id || null,
+                street_id:
+                    form.street_id !== "other" ? form.street_id || null : null,
+                street_other:
+                    form.street_id === "other"
+                        ? trimText(form.street_other) || null
+                        : null,
+                gender: trimText(form.gender) || null,
+                place_of_birth: trimText(form.place_of_birth) || null,
+                occupation: trimText(form.occupation) || null,
+                years_of_residency: trimText(form.years_of_residency) || null,
+                profile_details: buildProfileDetailsPayload(form, businessProof),
             };
 
             const data = await residentProfileService.updateProfile(payload);
             const updatedProfile = data?.profile || data;
             setProfile(updatedProfile);
             setForm(formFromProfile(updatedProfile));
+            setBusinessProofFile(null);
             setEditing(false);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (err) {
-            setError(err?.response?.data?.message || "Failed to save. Please try again.");
+            setError(
+                err?.response?.data?.message ||
+                    err?.message ||
+                    "Failed to save. Please try again.",
+            );
         } finally {
             setSaving(false);
         }
@@ -204,100 +511,387 @@ export default function ResidentProfile({ resident, onLogout }) {
     function handleCancel() {
         setEditing(false);
         setError("");
+        setBusinessProofFile(null);
         if (profile) setForm(formFromProfile(profile));
+    }
+
+    function updateField(key, value) {
+        setForm((current) => ({ ...current, [key]: value }));
+    }
+
+    function updateChild(index, value) {
+        setForm((current) => ({
+            ...current,
+            childrenNames: current.childrenNames.map((child, childIndex) =>
+                childIndex === index ? value : child,
+            ),
+        }));
+    }
+
+    function addChildRow() {
+        setForm((current) => ({
+            ...current,
+            childrenNames: [...current.childrenNames, ""],
+        }));
+    }
+
+    function removeChildRow(index) {
+        setForm((current) => {
+            const next = current.childrenNames.filter(
+                (_, childIndex) => childIndex !== index,
+            );
+            return {
+                ...current,
+                childrenNames: next.length > 0 ? next : [""],
+            };
+        });
+    }
+
+    function handleBusinessProofSelect(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const validationError = validateBusinessProofFile(file);
+        if (validationError) {
+            setError(validationError);
+            event.target.value = "";
+            return;
+        }
+
+        setError("");
+        setBusinessProofFile(file);
     }
 
     const isMobile = width < 640;
     const isTablet = width >= 640 && width < 1024;
-    const name     = profile?.full_name || resident?.full_name || resident?.name || "Resident";
-    const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+    const name =
+        profile?.full_name || resident?.full_name || resident?.name || "Resident";
+    const initials = name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+    const profileDetails = normalizeProfileDetails(profile?.profile_details);
+    const age = calcAge(editing ? form.date_of_birth : profile?.date_of_birth);
+    const displayChildren = profileDetails.childrenNames;
+    const displayBusinessProof = profileDetails.businessProof;
+    const displayAddress = profile
+        ? (() => {
+              const parts = [];
+              if (profile.house_number) parts.push(profile.house_number);
+              if (profile.purok_name) parts.push(profile.purok_name);
+              else if (profile.purok_id) {
+                  const purok = puroks.find(
+                      (item) =>
+                          String(item.purok_id) === String(profile.purok_id),
+                  );
+                  if (purok) parts.push(purok.name);
+              }
+              const street = profile.street_other
+                  ? profile.street_other
+                  : profile.street_name ||
+                    (() => {
+                        const match = streets.find(
+                            (item) =>
+                                String(item.street_id) ===
+                                String(profile.street_id),
+                        );
+                        return match?.name || "";
+                    })();
+              if (street) parts.push(street);
+              parts.push("Barangay East Tapinac", "Olongapo City");
+              return parts.filter(Boolean).join(", ");
+          })()
+        : "-";
 
-    // Display address (view mode)
-    const displayAddress = profile ? (() => {
-        const parts = [];
-        if (profile.house_number) parts.push(profile.house_number);
-        if (profile.purok_name)   parts.push(profile.purok_name);
-        else if (profile.purok_id) {
-            const p = puroks.find(p => String(p.purok_id) === String(profile.purok_id));
-            if (p) parts.push(p.name);
-        }
-        const street = profile.street_other
-            ? profile.street_other
-            : profile.street_name || (() => {
-                const s = streets.find(s => String(s.street_id) === String(profile.street_id));
-                return s?.name || "";
-            })();
-        if (street) parts.push(street);
-        parts.push("Barangay East Tapinac", "Olongapo City");
-        return parts.filter(Boolean).join(", ");
-    })() : "—";
-
-    const inp = { className: "rp-input" };
+    const inputProps = { className: "rp-input" };
 
     return (
-        <div className="rh-root" style={{ display: "flex", minHeight: "100vh" }}>
+        <div
+            className="rh-root"
+            style={{ display: "flex", minHeight: "100vh" }}
+        >
             {!isMobile && (
-                <ResidentSidebar active="profile" resident={resident} onLogout={onLogout} />
+                <ResidentSidebar
+                    active="profile"
+                    resident={resident}
+                    onLogout={onLogout}
+                />
             )}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+
+            <div
+                style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    minWidth: 0,
+                }}
+            >
                 <style>{`
-                .rp-input {
-                    width:100%; padding:9px 12px; border:1.5px solid #e4dfd4; border-radius:5px;
-                    font-family:'Source Serif 4',serif; font-size:13px; background:#fff;
-                    outline:none; color:#1a1a2e; transition:border-color .15s; box-sizing:border-box;
+                .rp-input,
+                .rp-select,
+                .rp-textarea {
+                    width:100%;
+                    padding:9px 12px;
+                    border:1.5px solid #e4dfd4;
+                    border-radius:5px;
+                    font-family:'Source Serif 4',serif;
+                    font-size:13px;
+                    background:#fff;
+                    outline:none;
+                    color:#1a1a2e;
+                    box-sizing:border-box;
+                    transition:border-color .15s;
                 }
-                .rp-input:focus { border-color:#0e2554; }
+                .rp-input:focus,
+                .rp-select:focus,
+                .rp-textarea:focus { border-color:#0e2554; }
                 .rp-select {
-                    width:100%; padding:9px 12px; border:1.5px solid #e4dfd4; border-radius:5px;
-                    font-family:'Source Serif 4',serif; font-size:13px; background:#fff;
-                    outline:none; color:#1a1a2e; cursor:pointer; box-sizing:border-box;
+                    cursor:pointer;
                     appearance:none;
                     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239090aa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-                    background-repeat:no-repeat; background-position:right 12px center; padding-right:34px;
+                    background-repeat:no-repeat;
+                    background-position:right 12px center;
+                    padding-right:34px;
                 }
-                .rp-select:focus { border-color:#0e2554; }
-                .rp-field-label { font-size:10px; font-weight:700; color:#9090aa; text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; display:block; }
-                .rp-field-value { font-size:13px; color:#1a1a2e; font-weight:600; line-height:1.4; }
-                .rp-readonly    { font-size:13px; color:#1a1a2e; font-weight:600; padding:9px 12px; background:#f8f6f1; border:1.5px solid #e4dfd4; border-radius:5px; }
+                .rp-textarea {
+                    min-height:92px;
+                    resize:vertical;
+                }
+                .rp-field-label {
+                    font-size:10px;
+                    font-weight:700;
+                    color:#9090aa;
+                    text-transform:uppercase;
+                    letter-spacing:1px;
+                    margin-bottom:5px;
+                    display:block;
+                }
+                .rp-field-value {
+                    font-size:13px;
+                    color:#1a1a2e;
+                    font-weight:600;
+                    line-height:1.5;
+                }
+                .rp-readonly {
+                    font-size:13px;
+                    color:#1a1a2e;
+                    font-weight:600;
+                    padding:9px 12px;
+                    background:#f8f6f1;
+                    border:1.5px solid #e4dfd4;
+                    border-radius:5px;
+                }
+                .rp-muted {
+                    font-size:11px;
+                    color:#9090aa;
+                    line-height:1.5;
+                }
+                .rp-card {
+                    background:#fff;
+                    border:1px solid #e4dfd4;
+                    border-radius:8px;
+                    overflow:hidden;
+                    margin-bottom:14px;
+                }
+                .rp-card-head {
+                    padding:13px 20px;
+                    background:#f8f6f1;
+                    border-bottom:1px solid #e4dfd4;
+                    display:flex;
+                    align-items:center;
+                    gap:8px;
+                }
+                .rp-card-grid {
+                    padding:20px 24px;
+                    display:grid;
+                    gap:18px 32px;
+                }
+                .rp-upload-btn {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:8px;
+                    padding:10px 14px;
+                    background:#fff;
+                    border:1.5px solid #d8d0bd;
+                    border-radius:5px;
+                    color:#0e2554;
+                    font-size:12.5px;
+                    font-weight:600;
+                    cursor:pointer;
+                }
+                .rp-upload-btn:hover { border-color:#0e2554; }
+                .rp-inline-action {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:6px;
+                    padding:8px 12px;
+                    background:#fff;
+                    border:1.5px solid #e4dfd4;
+                    border-radius:5px;
+                    color:#4a4a6a;
+                    font-family:'Source Serif 4',serif;
+                    font-size:12px;
+                    font-weight:600;
+                    cursor:pointer;
+                }
+                .rp-inline-action:hover { border-color:#0e2554; color:#0e2554; }
+                .rp-link {
+                    color:#0e2554;
+                    text-decoration:none;
+                    font-weight:600;
+                }
+                .rp-link:hover { text-decoration:underline; }
                 `}</style>
 
-                <ResidentTopbar resident={resident} onLogout={onLogout} isMobile={isMobile} />
+                <ResidentTopbar
+                    resident={resident}
+                    onLogout={onLogout}
+                    isMobile={isMobile}
+                />
 
-                <div style={{
-                    width: "100%", boxSizing: "border-box",
-                    padding: isMobile ? "16px 14px 80px" : isTablet ? "20px 18px 30px" : "28px 24px 40px",
-                }}>
-                    {/* Page heading */}
-                    <div className="rh-fadein" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
+                <div
+                    style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        padding: isMobile
+                            ? "16px 14px 80px"
+                            : isTablet
+                              ? "20px 18px 30px"
+                              : "28px 24px 40px",
+                    }}
+                >
+                    <div
+                        className="rh-fadein"
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            marginBottom: 22,
+                            flexWrap: "wrap",
+                            gap: 12,
+                        }}
+                    >
                         <div>
-                            <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: isMobile ? 20 : 22, fontWeight: 700, color: "#0e2554", margin: "0 0 3px" }}>My Profile</h1>
-                            <p style={{ fontSize: 12.5, color: "#9090aa", margin: 0 }}>Your personal information used for certificate requests</p>
+                            <h1
+                                style={{
+                                    fontFamily: "'Playfair Display', serif",
+                                    fontSize: isMobile ? 20 : 22,
+                                    fontWeight: 700,
+                                    color: "#0e2554",
+                                    margin: "0 0 3px",
+                                }}
+                            >
+                                My Profile
+                            </h1>
+                            <p
+                                style={{
+                                    fontSize: 12.5,
+                                    color: "#9090aa",
+                                    margin: 0,
+                                }}
+                            >
+                                Keep your resident record ready for certificate
+                                requests.
+                            </p>
                         </div>
+
                         {!editing && profile && (
-                            <button onClick={() => setEditing(true)} style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 18px", background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 4, color: "#0e2554", fontFamily: "'Source Serif 4',serif", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                            <button
+                                onClick={() => setEditing(true)}
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 7,
+                                    padding: "9px 18px",
+                                    background: "#fff",
+                                    border: "1.5px solid #e4dfd4",
+                                    borderRadius: 4,
+                                    color: "#0e2554",
+                                    fontFamily: "'Source Serif 4',serif",
+                                    fontSize: 12.5,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                }}
+                            >
                                 <Edit3 size={13} /> Edit Profile
                             </button>
                         )}
                     </div>
 
                     {saved && (
-                        <div style={{ background: "#e8f5ee", border: "1px solid #a8d8bc", borderRadius: 6, padding: "11px 14px", color: "#1a7a4a", fontSize: 13, marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
+                        <div
+                            style={{
+                                background: "#e8f5ee",
+                                border: "1px solid #a8d8bc",
+                                borderRadius: 6,
+                                padding: "11px 14px",
+                                color: "#1a7a4a",
+                                fontSize: 13,
+                                marginBottom: 16,
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                            }}
+                        >
                             <Check size={14} /> Profile updated successfully.
                         </div>
                     )}
 
                     {error && (
-                        <div style={{ background: "#fdecea", border: "1px solid #f5c6c6", borderRadius: 6, padding: "11px 14px", color: "#b02020", fontSize: 12.5, marginBottom: 16, display: "flex", gap: 8, alignItems: "center" }}>
+                        <div
+                            style={{
+                                background: "#fdecea",
+                                border: "1px solid #f5c6c6",
+                                borderRadius: 6,
+                                padding: "11px 14px",
+                                color: "#b02020",
+                                fontSize: 12.5,
+                                marginBottom: 16,
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                            }}
+                        >
                             <AlertCircle size={13} /> {error}
                         </div>
                     )}
 
                     {!profile && (
-                        <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 8, padding: "32px 24px" }}>
-                            {[1,2,3,4].map((i) => (
-                                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-                                    <div style={{ width: 80, height: 10, background: "#f0ece4", borderRadius: 4 }} />
-                                    <div style={{ width: "60%", height: 10, background: "#f5f2ee", borderRadius: 4 }} />
+                        <div
+                            style={{
+                                background: "#fff",
+                                border: "1px solid #e4dfd4",
+                                borderRadius: 8,
+                                padding: "32px 24px",
+                            }}
+                        >
+                            {[1, 2, 3, 4].map((item) => (
+                                <div
+                                    key={item}
+                                    style={{
+                                        display: "flex",
+                                        gap: 12,
+                                        marginBottom: 20,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: 80,
+                                            height: 10,
+                                            background: "#f0ece4",
+                                            borderRadius: 4,
+                                        }}
+                                    />
+                                    <div
+                                        style={{
+                                            width: "60%",
+                                            height: 10,
+                                            background: "#f5f2ee",
+                                            borderRadius: 4,
+                                        }}
+                                    />
                                 </div>
                             ))}
                         </div>
@@ -305,198 +899,1367 @@ export default function ResidentProfile({ resident, onLogout }) {
 
                     {profile && (
                         <>
-                            {/* Avatar banner */}
-                            <div className="rh-fadein" style={{ background: "linear-gradient(135deg, #0e2554, #163066)", borderRadius: 8, padding: "20px 24px", marginBottom: 14, display: "flex", alignItems: "center", gap: 18 }}>
-                                <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(201,162,39,0.15)", border: "2px solid rgba(201,162,39,0.5)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#c9a227", flexShrink: 0 }}>
+                            <div
+                                className="rh-fadein"
+                                style={{
+                                    background:
+                                        "linear-gradient(135deg, #0e2554, #163066)",
+                                    borderRadius: 8,
+                                    padding: "20px 24px",
+                                    marginBottom: 14,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 18,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: 56,
+                                        height: 56,
+                                        borderRadius: "50%",
+                                        background: "rgba(201,162,39,0.15)",
+                                        border: "2px solid rgba(201,162,39,0.5)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontFamily: "'Playfair Display',serif",
+                                        fontSize: 20,
+                                        fontWeight: 700,
+                                        color: "#c9a227",
+                                        flexShrink: 0,
+                                    }}
+                                >
                                     {initials}
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 17 : 20, fontWeight: 700, color: "#fff" }}>{profile.full_name}</div>
-                                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", marginTop: 3 }}>
-                                        {profile.resident_id ? `RES-${String(profile.resident_id).padStart(4, "0")}` : "—"} · Registered {fmtDate(profile.created_at)}
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: isMobile ? 17 : 20,
+                                            fontWeight: 700,
+                                            color: "#fff",
+                                        }}
+                                    >
+                                        {profile.full_name}
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 11,
+                                            color: "rgba(255,255,255,0.55)",
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        {profile.resident_id
+                                            ? `RES-${String(profile.resident_id).padStart(4, "0")}`
+                                            : "-"}{" "}
+                                        | Registered {fmtDate(profile.created_at)}
                                     </div>
                                 </div>
-                                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: profile.status === "active" ? "#e8f5ee" : "#f0ece4", color: profile.status === "active" ? "#1a7a4a" : "#9090aa", flexShrink: 0, textTransform: "uppercase" }}>
+                                <span
+                                    style={{
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        padding: "3px 10px",
+                                        borderRadius: 20,
+                                        background:
+                                            profile.status === "active"
+                                                ? "#e8f5ee"
+                                                : "#f0ece4",
+                                        color:
+                                            profile.status === "active"
+                                                ? "#1a7a4a"
+                                                : "#9090aa",
+                                        flexShrink: 0,
+                                        textTransform: "uppercase",
+                                    }}
+                                >
                                     {profile.status}
                                 </span>
                             </div>
 
-                            {/* Profile fields */}
-                            <div className="rh-fadein" style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 8, overflow: "hidden", marginBottom: 14 }}>
-                                <div style={{ padding: "13px 20px", background: "#f8f6f1", borderBottom: "1px solid #e4dfd4", display: "flex", alignItems: "center", gap: 8 }}>
+                            <div className="rp-card rh-fadein">
+                                <div className="rp-card-head">
                                     <User size={13} color="#0e2554" />
-                                    <span style={{ fontFamily: "'Playfair Display',serif", fontSize: 13, fontWeight: 700, color: "#0e2554" }}>Personal Information</span>
+                                    <span
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                        }}
+                                    >
+                                        Identity and Residency
+                                    </span>
                                 </div>
 
-                                <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr" : "1fr 1fr", gap: "18px 32px" }}>
-
-                                    {/* Full Name */}
+                                <div
+                                    className="rp-card-grid"
+                                    style={{
+                                        gridTemplateColumns: isMobile
+                                            ? "1fr"
+                                            : isTablet
+                                              ? "1fr"
+                                              : "1fr 1fr",
+                                    }}
+                                >
                                     <div>
-                                        <label className="rp-field-label">Full Name</label>
-                                        {editing ? <div className="rp-readonly">{profile.full_name}</div> : <div className="rp-field-value">{profile.full_name}</div>}
-                                        {editing && <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 4 }}>Name cannot be changed after registration.</div>}
-                                    </div>
-
-                                    {/* Resident ID */}
-                                    <div>
-                                        <label className="rp-field-label">Resident ID</label>
-                                        <div className={editing ? "rp-readonly" : "rp-field-value"} style={{ fontFamily: "'Courier New', monospace" }}>
-                                            {profile.resident_id ? `RES-${String(profile.resident_id).padStart(4, "0")}` : "—"}
-                                        </div>
-                                    </div>
-
-                                    {/* Date of Birth */}
-                                    <div>
-                                        <label className="rp-field-label">Date of Birth</label>
-                                        {editing
-                                            ? <input {...inp} type="date" value={form.date_of_birth} onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))} max={new Date().toISOString().split("T")[0]} />
-                                            : <div className="rp-field-value">{fmtDate(profile.date_of_birth)}</div>}
-                                    </div>
-
-                                    {/* Age */}
-                                    <div>
-                                        <label className="rp-field-label">Age</label>
-                                        <div className={editing ? "rp-readonly" : "rp-field-value"}>
-                                            {calcAge(editing ? form.date_of_birth : profile.date_of_birth)} years old
-                                        </div>
-                                    </div>
-
-                                    {/* Civil Status */}
-                                    <div>
-                                        <label className="rp-field-label">Civil Status</label>
-                                        {editing
-                                            ? <select className="rp-select" value={form.civil_status} onChange={(e) => setForm((f) => ({ ...f, civil_status: e.target.value }))}>
-                                                {CIVIL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-                                              </select>
-                                            : <div className="rp-field-value">{profile.civil_status || "—"}</div>}
-                                    </div>
-
-                                    {/* Nationality */}
-                                    <div>
-                                        <label className="rp-field-label">Nationality</label>
-                                        <div className={editing ? "rp-readonly" : "rp-field-value"}>{profile.nationality || "—"}</div>
-                                    </div>
-
-                                    {/* ── ADDRESS — full row with dropdowns in edit mode ── */}
-                                    <div style={{ gridColumn: isMobile ? "1" : "1 / -1" }}>
                                         <label className="rp-field-label">
-                                            Address <span style={{ color: "#b02020" }}>*</span>
+                                            Full Name
+                                        </label>
+                                        {editing ? (
+                                            <div className="rp-readonly">
+                                                {profile.full_name}
+                                            </div>
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.full_name}
+                                            </div>
+                                        )}
+                                        {editing && (
+                                            <div
+                                                style={{
+                                                    fontSize: 10.5,
+                                                    color: "#9090aa",
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                Name cannot be changed after
+                                                registration.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Resident ID
+                                        </label>
+                                        <div
+                                            className={
+                                                editing
+                                                    ? "rp-readonly"
+                                                    : "rp-field-value"
+                                            }
+                                            style={{
+                                                fontFamily:
+                                                    "'Courier New', monospace",
+                                            }}
+                                        >
+                                            {profile.resident_id
+                                                ? `RES-${String(profile.resident_id).padStart(4, "0")}`
+                                                : "-"}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Date of Birth
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                type="date"
+                                                value={form.date_of_birth}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "date_of_birth",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                max={
+                                                    new Date()
+                                                        .toISOString()
+                                                        .split("T")[0]
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {fmtDate(profile.date_of_birth)}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Age
+                                        </label>
+                                        <div
+                                            className={
+                                                editing
+                                                    ? "rp-readonly"
+                                                    : "rp-field-value"
+                                            }
+                                        >
+                                            {age !== null
+                                                ? `${age} years old`
+                                                : "-"}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Gender
+                                        </label>
+                                        {editing ? (
+                                            <select
+                                                className="rp-select"
+                                                value={form.gender}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "gender",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            >
+                                                <option value="">
+                                                    Select...
+                                                </option>
+                                                {GENDER_OPTIONS.map((option) => (
+                                                    <option
+                                                        key={option}
+                                                        value={option}
+                                                    >
+                                                        {option}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.gender || "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Civil Status
+                                        </label>
+                                        {editing ? (
+                                            <select
+                                                className="rp-select"
+                                                value={form.civil_status}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "civil_status",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            >
+                                                {CIVIL_STATUSES.map((option) => (
+                                                    <option
+                                                        key={option}
+                                                        value={option}
+                                                    >
+                                                        {option}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.civil_status || "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Place of Birth
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                placeholder="City or municipality"
+                                                value={form.place_of_birth}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "place_of_birth",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.place_of_birth || "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Nationality
+                                        </label>
+                                        <div
+                                            className={
+                                                editing
+                                                    ? "rp-readonly"
+                                                    : "rp-field-value"
+                                            }
+                                        >
+                                            {profile.nationality || "-"}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Years of Residency
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                inputMode="numeric"
+                                                placeholder="e.g. 12"
+                                                value={form.years_of_residency}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "years_of_residency",
+                                                        event.target.value
+                                                            .replace(
+                                                                /[^0-9]/g,
+                                                                "",
+                                                            )
+                                                            .slice(0, 3),
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.years_of_residency ??
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            gridColumn: isMobile
+                                                ? "1"
+                                                : "1 / -1",
+                                        }}
+                                    >
+                                        <label className="rp-field-label">
+                                            Address{" "}
+                                            <span style={{ color: "#b02020" }}>
+                                                *
+                                            </span>
                                         </label>
 
                                         {editing ? (
-                                            <div style={{ background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 7, padding: "14px 16px" }}>
-                                                {/* Row 1: House No / Purok / Street */}
-                                                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
-                                                    {/* House No */}
+                                            <div
+                                                style={{
+                                                    background: "#f8f6f1",
+                                                    border: "1px solid #e4dfd4",
+                                                    borderRadius: 7,
+                                                    padding: "14px 16px",
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns:
+                                                            isMobile
+                                                                ? "1fr"
+                                                                : "1fr 1fr 1fr",
+                                                        gap: 10,
+                                                        marginBottom: 10,
+                                                    }}
+                                                >
                                                     <div>
-                                                        <label className="rp-field-label">House / Unit No. <span style={{ color: "#b02020" }}>*</span></label>
+                                                        <label className="rp-field-label">
+                                                            House / Unit No.{" "}
+                                                            <span
+                                                                style={{
+                                                                    color: "#b02020",
+                                                                }}
+                                                            >
+                                                                *
+                                                            </span>
+                                                        </label>
                                                         <input
-                                                            {...inp}
+                                                            {...inputProps}
                                                             placeholder="e.g. 12-B"
-                                                            value={form.house_number}
-                                                            onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))}
+                                                            value={
+                                                                form.house_number
+                                                            }
+                                                            onChange={(event) =>
+                                                                updateField(
+                                                                    "house_number",
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
-                                                    {/* Purok dropdown */}
+
                                                     <div>
-                                                        <label className="rp-field-label">Purok</label>
-                                                        <select className="rp-select" value={form.purok_id} onChange={(e) => setForm((f) => ({ ...f, purok_id: e.target.value }))}>
-                                                            <option value="">Select…</option>
-                                                            {puroks.map(p => <option key={p.purok_id} value={p.purok_id}>{p.name}</option>)}
+                                                        <label className="rp-field-label">
+                                                            Purok
+                                                        </label>
+                                                        <select
+                                                            className="rp-select"
+                                                            value={form.purok_id}
+                                                            onChange={(event) =>
+                                                                updateField(
+                                                                    "purok_id",
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        >
+                                                            <option value="">
+                                                                Select...
+                                                            </option>
+                                                            {puroks.map(
+                                                                (item) => (
+                                                                    <option
+                                                                        key={
+                                                                            item.purok_id
+                                                                        }
+                                                                        value={
+                                                                            item.purok_id
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            item.name
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
                                                         </select>
                                                     </div>
-                                                    {/* Street dropdown */}
+
                                                     <div>
-                                                        <label className="rp-field-label">Street <span style={{ color: "#b02020" }}>*</span></label>
-                                                        <select className="rp-select" value={form.street_id} onChange={(e) => setForm((f) => ({ ...f, street_id: e.target.value }))}>
-                                                            <option value="">Select street…</option>
-                                                            {streets.map(s => <option key={s.street_id} value={s.street_id}>{s.name}</option>)}
-                                                            <option value="other">Other / Not listed</option>
+                                                        <label className="rp-field-label">
+                                                            Street{" "}
+                                                            <span
+                                                                style={{
+                                                                    color: "#b02020",
+                                                                }}
+                                                            >
+                                                                *
+                                                            </span>
+                                                        </label>
+                                                        <select
+                                                            className="rp-select"
+                                                            value={form.street_id}
+                                                            onChange={(event) =>
+                                                                updateField(
+                                                                    "street_id",
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        >
+                                                            <option value="">
+                                                                Select
+                                                                street...
+                                                            </option>
+                                                            {streets.map(
+                                                                (item) => (
+                                                                    <option
+                                                                        key={
+                                                                            item.street_id
+                                                                        }
+                                                                        value={
+                                                                            item.street_id
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            item.name
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
+                                                            <option value="other">
+                                                                Other / Not
+                                                                listed
+                                                            </option>
                                                         </select>
                                                     </div>
                                                 </div>
 
-                                                {/* Street other text input */}
                                                 {form.street_id === "other" && (
-                                                    <div style={{ marginBottom: 10 }}>
-                                                        <label className="rp-field-label">Specify Street <span style={{ color: "#b02020" }}>*</span></label>
+                                                    <div
+                                                        style={{
+                                                            marginBottom: 10,
+                                                        }}
+                                                    >
+                                                        <label className="rp-field-label">
+                                                            Specify Street{" "}
+                                                            <span
+                                                                style={{
+                                                                    color: "#b02020",
+                                                                }}
+                                                            >
+                                                                *
+                                                            </span>
+                                                        </label>
                                                         <input
-                                                            {...inp}
+                                                            {...inputProps}
                                                             placeholder="Enter your street name"
-                                                            value={form.street_other}
-                                                            onChange={(e) => setForm((f) => ({ ...f, street_other: e.target.value }))}
+                                                            value={
+                                                                form.street_other
+                                                            }
+                                                            onChange={(event) =>
+                                                                updateField(
+                                                                    "street_other",
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
                                                         />
                                                     </div>
                                                 )}
 
-                                                {/* Locked fields */}
-                                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                                <div
+                                                    style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns:
+                                                            isMobile
+                                                                ? "1fr"
+                                                                : "1fr 1fr",
+                                                        gap: 10,
+                                                    }}
+                                                >
                                                     <div>
-                                                        <label className="rp-field-label">Barangay</label>
-                                                        <div className="rp-readonly">East Tapinac</div>
+                                                        <label className="rp-field-label">
+                                                            Barangay
+                                                        </label>
+                                                        <div className="rp-readonly">
+                                                            East Tapinac
+                                                        </div>
                                                     </div>
                                                     <div>
-                                                        <label className="rp-field-label">City</label>
-                                                        <div className="rp-readonly">Olongapo City</div>
+                                                        <label className="rp-field-label">
+                                                            City
+                                                        </label>
+                                                        <div className="rp-readonly">
+                                                            Olongapo City
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="rp-field-value">{displayAddress}</div>
-                                                <div style={{ fontSize: 11, color: "#9090aa", marginTop: 3 }}>Barangay East Tapinac, Olongapo City (Barangay is fixed)</div>
+                                                <div className="rp-field-value">
+                                                    {displayAddress}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        fontSize: 11,
+                                                        color: "#9090aa",
+                                                        marginTop: 3,
+                                                    }}
+                                                >
+                                                    Barangay East Tapinac,
+                                                    Olongapo City
+                                                </div>
                                             </>
                                         )}
                                     </div>
 
-                                    {/* Contact Number */}
                                     <div>
-                                        <label className="rp-field-label">Contact Number <span style={{ color: "#b02020" }}>*</span></label>
-                                        {editing
-                                            ? <input {...inp} type="tel" placeholder="09XXXXXXXXX" maxLength={11} value={form.contact_number} onChange={(e) => setForm((f) => ({ ...f, contact_number: e.target.value }))} />
-                                            : <div className="rp-field-value">{profile.contact_number || "—"}</div>}
+                                        <label className="rp-field-label">
+                                            Contact Number{" "}
+                                            <span style={{ color: "#b02020" }}>
+                                                *
+                                            </span>
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                type="tel"
+                                                placeholder="09XXXXXXXXX"
+                                                maxLength={11}
+                                                value={form.contact_number}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "contact_number",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.contact_number || "-"}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Email */}
                                     <div>
-                                        <label className="rp-field-label">Email Address</label>
-                                        <div className={editing ? "rp-readonly" : "rp-field-value"}>{profile.email}</div>
-                                        {editing && <div style={{ fontSize: 10.5, color: "#9090aa", marginTop: 4 }}>Email cannot be changed after registration.</div>}
+                                        <label className="rp-field-label">
+                                            Email Address
+                                        </label>
+                                        <div
+                                            className={
+                                                editing
+                                                    ? "rp-readonly"
+                                                    : "rp-field-value"
+                                            }
+                                        >
+                                            {profile.email}
+                                        </div>
+                                        {editing && (
+                                            <div
+                                                style={{
+                                                    fontSize: 10.5,
+                                                    color: "#9090aa",
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                Email cannot be changed after
+                                                registration.
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Date Registered */}
                                     <div>
-                                        <label className="rp-field-label">Date Registered</label>
-                                        <div className={editing ? "rp-readonly" : "rp-field-value"}>{fmtDate(profile.created_at)}</div>
+                                        <label className="rp-field-label">
+                                            Date Registered
+                                        </label>
+                                        <div
+                                            className={
+                                                editing
+                                                    ? "rp-readonly"
+                                                    : "rp-field-value"
+                                            }
+                                        >
+                                            {fmtDate(profile.created_at)}
+                                        </div>
                                     </div>
 
-                                    {/* Account Status */}
                                     <div>
-                                        <label className="rp-field-label">Account Status</label>
-                                        <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 20, textTransform: "uppercase", background: profile.status === "active" ? "#e8f5ee" : "#f0ece4", color: profile.status === "active" ? "#1a7a4a" : "#9090aa" }}>
+                                        <label className="rp-field-label">
+                                            Account Status
+                                        </label>
+                                        <span
+                                            style={{
+                                                display: "inline-block",
+                                                fontSize: 10,
+                                                fontWeight: 700,
+                                                padding: "3px 10px",
+                                                borderRadius: 20,
+                                                textTransform: "uppercase",
+                                                background:
+                                                    profile.status === "active"
+                                                        ? "#e8f5ee"
+                                                        : "#f0ece4",
+                                                color:
+                                                    profile.status === "active"
+                                                        ? "#1a7a4a"
+                                                        : "#9090aa",
+                                            }}
+                                        >
                                             {profile.status}
                                         </span>
                                     </div>
                                 </div>
-
-                                {/* Edit action buttons */}
-                                {editing && (
-                                    <div style={{ padding: "14px 24px", borderTop: "1px solid #e4dfd4", background: "#f8f6f1", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                                        <button onClick={handleCancel} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "#fff", border: "1.5px solid #e4dfd4", borderRadius: 4, color: "#4a4a6a", fontFamily: "'Source Serif 4',serif", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
-                                            <X size={13} /> Cancel
-                                        </button>
-                                        <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 22px", background: "linear-gradient(135deg, #163066, #091a3e)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
-                                            {saving ? "Saving…" : <><Check size={13} /> Save Changes</>}
-                                        </button>
-                                    </div>
-                                )}
                             </div>
 
-                            {/* Info note */}
-                            <div className="rh-fadein" style={{ background: "#f5edce", border: "1px solid #e0d4a8", borderRadius: 8, padding: "12px 16px", display: "flex", gap: 10, alignItems: "flex-start" }}>
-                                <AlertCircle size={13} color="#9a7515" style={{ flexShrink: 0, marginTop: 1 }} />
-                                <span style={{ fontSize: 12, color: "#7a6530", lineHeight: 1.65 }}>
-                                    Resident information is provided during self-registration. Name, email, and resident ID cannot be changed here — contact the barangay office for corrections.
+                            <div className="rp-card rh-fadein">
+                                <div className="rp-card-head">
+                                    <Users size={13} color="#0e2554" />
+                                    <span
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                        }}
+                                    >
+                                        Family Details
+                                    </span>
+                                </div>
+
+                                <div
+                                    className="rp-card-grid"
+                                    style={{
+                                        gridTemplateColumns: isMobile
+                                            ? "1fr"
+                                            : isTablet
+                                              ? "1fr"
+                                              : "1fr 1fr",
+                                    }}
+                                >
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Father's Full Name
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.fatherName}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "fatherName",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.fatherName || "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Mother's Full Name
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.motherName}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "motherName",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.motherName || "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Wife / Husband Name
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.legalSpouseName}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "legalSpouseName",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.legalSpouseName ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Current / Common-Law Partner
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.currentPartnerName}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "currentPartnerName",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.currentPartnerName ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            gridColumn: isMobile
+                                                ? "1"
+                                                : "1 / -1",
+                                        }}
+                                    >
+                                        <label className="rp-field-label">
+                                            Children Names
+                                        </label>
+
+                                        {editing ? (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 10,
+                                                }}
+                                            >
+                                                {form.childrenNames.map(
+                                                    (childName, index) => (
+                                                        <div
+                                                            key={`child-${index}`}
+                                                            style={{
+                                                                display: "grid",
+                                                                gridTemplateColumns:
+                                                                    isMobile
+                                                                        ? "1fr auto"
+                                                                        : "minmax(0, 1fr) auto",
+                                                                gap: 10,
+                                                                alignItems:
+                                                                    "center",
+                                                            }}
+                                                        >
+                                                            <input
+                                                                {...inputProps}
+                                                                placeholder={`Child ${index + 1}`}
+                                                                value={childName}
+                                                                onChange={(event) =>
+                                                                    updateChild(
+                                                                        index,
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="rp-inline-action"
+                                                                onClick={() =>
+                                                                    removeChildRow(
+                                                                        index,
+                                                                    )
+                                                                }
+                                                                aria-label={`Remove child ${index + 1}`}
+                                                            >
+                                                                <Trash2
+                                                                    size={13}
+                                                                />
+                                                                {!isMobile &&
+                                                                    "Remove"}
+                                                            </button>
+                                                        </div>
+                                                    ),
+                                                )}
+
+                                                <div>
+                                                    <button
+                                                        type="button"
+                                                        className="rp-inline-action"
+                                                        onClick={addChildRow}
+                                                    >
+                                                        <Plus size={13} /> Add
+                                                        Child
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : displayChildren.length > 0 ? (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 6,
+                                                }}
+                                            >
+                                                {displayChildren.map((child) => (
+                                                    <div
+                                                        key={child}
+                                                        className="rp-field-value"
+                                                    >
+                                                        {child}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                -
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rp-card rh-fadein">
+                                <div className="rp-card-head">
+                                    <Briefcase size={13} color="#0e2554" />
+                                    <span
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: "#0e2554",
+                                        }}
+                                    >
+                                        Work and Business
+                                    </span>
+                                </div>
+
+                                <div
+                                    className="rp-card-grid"
+                                    style={{
+                                        gridTemplateColumns: isMobile
+                                            ? "1fr"
+                                            : isTablet
+                                              ? "1fr"
+                                              : "1fr 1fr",
+                                    }}
+                                >
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Occupation / Role
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.occupation}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "occupation",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profile.occupation || "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Monthly Income
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                placeholder="e.g. PHP 12,000"
+                                                value={form.monthlyIncome}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "monthlyIncome",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.monthlyIncome ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Income Start Year
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                placeholder="e.g. 2021"
+                                                value={form.incomeStartYear}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "incomeStartYear",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.incomeStartYear ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Business / Trade Name
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.businessName}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessName",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.businessName ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Type of Business
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.businessType}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessType",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.businessType ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Coverage / Area
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.businessArea}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessArea",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.businessArea ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Business Owner Name
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                placeholder="Leave blank if same as your name"
+                                                value={form.businessOwnerName}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessOwnerName",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {hasBusinessInfo(profileDetails)
+                                                    ? profileDetails.businessOwnerName ||
+                                                      "-"
+                                                    : "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <label className="rp-field-label">
+                                            Barangay Permit No.
+                                        </label>
+                                        {editing ? (
+                                            <input
+                                                {...inputProps}
+                                                value={form.businessPermitNo}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessPermitNo",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.businessPermitNo ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            gridColumn: isMobile
+                                                ? "1"
+                                                : "1 / -1",
+                                        }}
+                                    >
+                                        <label className="rp-field-label">
+                                            Business Address
+                                        </label>
+                                        {editing ? (
+                                            <textarea
+                                                className="rp-textarea"
+                                                value={form.businessAddress}
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessAddress",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.businessAddress ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            gridColumn: isMobile
+                                                ? "1"
+                                                : "1 / -1",
+                                        }}
+                                    >
+                                        <label className="rp-field-label">
+                                            Operator Address
+                                        </label>
+                                        {editing ? (
+                                            <textarea
+                                                className="rp-textarea"
+                                                value={
+                                                    form.businessOwnerAddress
+                                                }
+                                                onChange={(event) =>
+                                                    updateField(
+                                                        "businessOwnerAddress",
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                {profileDetails.businessOwnerAddress ||
+                                                    "-"}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            gridColumn: isMobile
+                                                ? "1"
+                                                : "1 / -1",
+                                        }}
+                                    >
+                                        <label className="rp-field-label">
+                                            Proof of Business
+                                        </label>
+
+                                        {editing ? (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 10,
+                                                    alignItems: "flex-start",
+                                                }}
+                                            >
+                                                {form.businessProof?.fileUrl ? (
+                                                    <a
+                                                        className="rp-link"
+                                                        href={
+                                                            form.businessProof
+                                                                .fileUrl
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        View current file:{" "}
+                                                        {form.businessProof
+                                                            .fileName ||
+                                                            "Business document"}
+                                                    </a>
+                                                ) : (
+                                                    <div className="rp-muted">
+                                                        No proof file uploaded
+                                                        yet.
+                                                    </div>
+                                                )}
+
+                                                <label className="rp-upload-btn">
+                                                    <FileUp size={14} />
+                                                    {businessProofFile
+                                                        ? "Replace selected file"
+                                                        : "Upload proof file"}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*,.pdf"
+                                                        style={{
+                                                            display: "none",
+                                                        }}
+                                                        onChange={
+                                                            handleBusinessProofSelect
+                                                        }
+                                                    />
+                                                </label>
+
+                                                {businessProofFile && (
+                                                    <div className="rp-muted">
+                                                        Selected:{" "}
+                                                        {businessProofFile.name}{" "}
+                                                        (
+                                                        {formatFileSize(
+                                                            businessProofFile.size,
+                                                        )}
+                                                        )
+                                                    </div>
+                                                )}
+
+                                                <div className="rp-muted">
+                                                    Accepts image or PDF files
+                                                    up to 6 MB.
+                                                </div>
+                                            </div>
+                                        ) : displayBusinessProof?.fileUrl ? (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: 4,
+                                                }}
+                                            >
+                                                <a
+                                                    className="rp-link"
+                                                    href={
+                                                        displayBusinessProof.fileUrl
+                                                    }
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    {displayBusinessProof.fileName ||
+                                                        "Business document"}
+                                                </a>
+                                                <div className="rp-muted">
+                                                    {displayBusinessProof.fileSize
+                                                        ? formatFileSize(
+                                                              displayBusinessProof.fileSize,
+                                                          )
+                                                        : ""}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="rp-field-value">
+                                                -
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {editing && (
+                                <div
+                                    className="rh-fadein"
+                                    style={{
+                                        padding: "14px 18px",
+                                        border: "1px solid #e4dfd4",
+                                        borderRadius: 8,
+                                        background: "#f8f6f1",
+                                        display: "flex",
+                                        gap: 10,
+                                        justifyContent: "flex-end",
+                                        flexWrap: "wrap",
+                                        marginBottom: 14,
+                                    }}
+                                >
+                                    <button
+                                        onClick={handleCancel}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                            padding: "9px 18px",
+                                            background: "#fff",
+                                            border: "1.5px solid #e4dfd4",
+                                            borderRadius: 4,
+                                            color: "#4a4a6a",
+                                            fontFamily:
+                                                "'Source Serif 4',serif",
+                                            fontSize: 12.5,
+                                            fontWeight: 600,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <X size={13} /> Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 7,
+                                            padding: "9px 22px",
+                                            background:
+                                                "linear-gradient(135deg, #163066, #091a3e)",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: 4,
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            letterSpacing: 1,
+                                            textTransform: "uppercase",
+                                            cursor: saving
+                                                ? "default"
+                                                : "pointer",
+                                            opacity: saving ? 0.7 : 1,
+                                        }}
+                                    >
+                                        {saving ? (
+                                            "Saving..."
+                                        ) : (
+                                            <>
+                                                <Check size={13} /> Save Changes
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+
+                            <div
+                                className="rh-fadein"
+                                style={{
+                                    background: "#f5edce",
+                                    border: "1px solid #e0d4a8",
+                                    borderRadius: 8,
+                                    padding: "12px 16px",
+                                    display: "flex",
+                                    gap: 10,
+                                    alignItems: "flex-start",
+                                }}
+                            >
+                                <AlertCircle
+                                    size={13}
+                                    color="#9a7515"
+                                    style={{ flexShrink: 0, marginTop: 1 }}
+                                />
+                                <span
+                                    style={{
+                                        fontSize: 12,
+                                        color: "#7a6530",
+                                        lineHeight: 1.65,
+                                    }}
+                                >
+                                    Name, email, and resident ID cannot be
+                                    changed here. Contact the barangay office
+                                    for account corrections.
                                 </span>
                             </div>
                         </>

@@ -207,6 +207,46 @@ const DEFAULT_RESIDENT_GUIDANCE = {
     bring: ["Valid government-issued ID", "Request ID / reference number"],
 };
 
+const REQUEST_SUBJECT_SELF = "self";
+const REQUEST_SUBJECT_MINOR = "minor";
+const EMPTY_MINOR_DETAILS = {
+    fullName: "",
+    dateOfBirth: "",
+    relationship: "",
+};
+const MINOR_PROOF_REQUIREMENT = {
+    key: "minor_guardianship_document",
+    label: "Minor birth record, guardianship proof, or authorization document",
+    required: true,
+    accept: "image/*,.pdf",
+};
+
+function calculateAge(dateString) {
+    if (!dateString) return null;
+    const birth = new Date(`${dateString}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
+        age -= 1;
+    }
+    return age;
+}
+
+function mergeProofRequirements(base = [], additional = []) {
+    const seen = new Set();
+    return [...base, ...additional].filter((proof) => {
+        const key = String(proof?.key || proof?.label || "").toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 function getCharterGuidance(cert) {
     if (!cert) return null;
     return normalizeResidentGuidance(cert.residentGuidance, cert);
@@ -816,6 +856,8 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [purpose, setPurpose] = useState("");
     const [customPurpose, setCustomPurpose] = useState("");
     const [extraFields, setExtraFields] = useState({});
+    const [requestSubject, setRequestSubject] = useState(REQUEST_SUBJECT_SELF);
+    const [minorDetails, setMinorDetails] = useState(EMPTY_MINOR_DETAILS);
     const [proofFiles, setProofFiles] = useState({});
     const [notes, setNotes] = useState("");
 
@@ -922,7 +964,16 @@ export default function SubmitRequest({ resident, onLogout }) {
     const isMobile = width < 768;
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra = selectedCert ? getCertificateFields(selectedCert) : [];
-    const proofRequirements = selectedCert ? getProofRequirements(selectedCert) : [];
+    const isMinorRequest = requestSubject === REQUEST_SUBJECT_MINOR;
+    const representedMinorAge = calculateAge(minorDetails.dateOfBirth);
+    const certificateProofRequirements = selectedCert
+        ? getProofRequirements(selectedCert)
+        : [];
+    const proofRequirements = isMinorRequest
+        ? mergeProofRequirements(certificateProofRequirements, [
+              MINOR_PROOF_REQUIREMENT,
+          ])
+        : certificateProofRequirements;
     const charterGuidance = getCharterGuidance(selectedCert);
     const processSteps = getProcessSteps(charterGuidance);
     const whatToBringItems = getWhatToBringItems(
@@ -969,6 +1020,23 @@ export default function SubmitRequest({ resident, onLogout }) {
         setExtraFields((prev) => ({ ...prev, [key]: val }));
     }
 
+    function setMinorDetail(key, val) {
+        setMinorDetails((prev) => ({ ...prev, [key]: val }));
+        setError("");
+    }
+
+    function handleRequestSubjectChange(nextSubject) {
+        setRequestSubject(nextSubject);
+        setError("");
+        if (nextSubject === REQUEST_SUBJECT_SELF) {
+            setProofFiles((prev) => {
+                const { [MINOR_PROOF_REQUIREMENT.key]: _minorProof, ...rest } =
+                    prev;
+                return rest;
+            });
+        }
+    }
+
     function setProofFilesForKey(key, selectedFiles) {
         const files = Array.from(selectedFiles || []).filter(Boolean);
         for (const file of files) {
@@ -995,6 +1063,8 @@ export default function SubmitRequest({ resident, onLogout }) {
     // Reset extra fields when cert changes
     useEffect(() => {
         setExtraFields(defaultExtraFieldValues(certExtra));
+        setRequestSubject(REQUEST_SUBJECT_SELF);
+        setMinorDetails(EMPTY_MINOR_DETAILS);
         setProofFiles({});
     }, [selectedCert]);
 
@@ -1077,6 +1147,30 @@ export default function SubmitRequest({ resident, onLogout }) {
                 setError("Please state the purpose of your request.");
                 return;
             }
+            if (isMinorRequest) {
+                if (!minorDetails.fullName.trim()) {
+                    setError("Please enter the minor's full name.");
+                    return;
+                }
+                if (!minorDetails.dateOfBirth) {
+                    setError("Please enter the minor's date of birth.");
+                    return;
+                }
+                if (representedMinorAge === null) {
+                    setError("Please enter a valid date of birth for the minor.");
+                    return;
+                }
+                if (representedMinorAge >= 18) {
+                    setError(
+                        "This option is only for minors under 18 years old.",
+                    );
+                    return;
+                }
+                if (!minorDetails.relationship.trim()) {
+                    setError("Please state your relationship to the minor.");
+                    return;
+                }
+            }
             // Validate required extra fields
             for (const field of certExtra) {
                 if (
@@ -1120,12 +1214,28 @@ export default function SubmitRequest({ resident, onLogout }) {
         setError("");
         try {
             const attachments = await uploadProofFiles();
+            const subjectFields = isMinorRequest
+                ? {
+                      requestSubject: REQUEST_SUBJECT_MINOR,
+                      certificateFor: "minor",
+                      minorName: minorDetails.fullName.trim(),
+                      minorDateOfBirth: minorDetails.dateOfBirth,
+                      minorAge: representedMinorAge,
+                      minorRelationship: minorDetails.relationship.trim(),
+                      guardianName:
+                          profile?.full_name || resident?.full_name || "",
+                  }
+                : {
+                      requestSubject: REQUEST_SUBJECT_SELF,
+                      certificateFor: "self",
+                  };
             const data = await requestService.createRequest({
                 certType: selectedCert.name,
                 templateId: selectedCert.templateId || null,
                 purpose: finalPurpose,
                 extraFields: {
                     ...extraFields,
+                    ...subjectFields,
                     templateKey: selectedCert.templateKey || "",
                     proofAttachments: attachments,
                 },
@@ -1159,6 +1269,9 @@ export default function SubmitRequest({ resident, onLogout }) {
         setPurpose("");
         setCustomPurpose("");
         setExtraFields({});
+        setRequestSubject(REQUEST_SUBJECT_SELF);
+        setMinorDetails(EMPTY_MINOR_DETAILS);
+        setProofFiles({});
         setNotes("");
         setError("");
         setSuccess(null);
@@ -1940,12 +2053,163 @@ export default function SubmitRequest({ resident, onLogout }) {
                             color: "#9090aa",
                         }}
                     >
-                        This information will be used to generate your
-                        certificate. If anything is incorrect, update your
-                        profile first.
+                        Your resident profile anchors this online request. If
+                        anything is incorrect, update your profile first.
                     </div>
                 </div>
             )}
+
+            <div
+                style={{
+                    border: "1px solid #e4dfd4",
+                    borderRadius: 8,
+                    padding: "14px 16px",
+                    marginBottom: 22,
+                    background: "#fffdf8",
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 7,
+                        marginBottom: 12,
+                    }}
+                >
+                    <UserCircle size={13} color="#0e2554" />
+                    <span
+                        style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "#0e2554",
+                            textTransform: "uppercase",
+                            letterSpacing: 1,
+                        }}
+                    >
+                        Certificate Recipient
+                    </span>
+                </div>
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                        gap: 10,
+                    }}
+                >
+                    {[
+                        {
+                            key: REQUEST_SUBJECT_SELF,
+                            label: "For myself",
+                            Icon: UserCircle,
+                        },
+                        {
+                            key: REQUEST_SUBJECT_MINOR,
+                            label: "For a minor I represent",
+                            Icon: Baby,
+                        },
+                    ].map(({ key, label, Icon }) => {
+                        const active = requestSubject === key;
+                        return (
+                            <button
+                                key={key}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => handleRequestSubjectChange(key)}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "11px 12px",
+                                    border: active
+                                        ? "1.5px solid #0e2554"
+                                        : "1.5px solid #e4dfd4",
+                                    borderRadius: 6,
+                                    background: active ? "#edf1fa" : "#fff",
+                                    color: active ? "#0e2554" : "#4a4a6a",
+                                    cursor: "pointer",
+                                    fontFamily: "'Source Serif 4',serif",
+                                    fontSize: 12.5,
+                                    fontWeight: 700,
+                                    textAlign: "left",
+                                }}
+                            >
+                                <Icon size={15} strokeWidth={1.8} />
+                                <span>{label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+                {isMinorRequest && (
+                    <div
+                        style={{
+                            marginTop: 16,
+                            paddingTop: 16,
+                            borderTop: "1px solid #e4dfd4",
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: isMobile
+                                    ? "1fr"
+                                    : "1fr 1fr",
+                                gap: "0 12px",
+                            }}
+                        >
+                            <FieldGroup label="Minor's Full Name" required>
+                                <input
+                                    className="sr-input"
+                                    type="text"
+                                    placeholder="Full legal name of the minor"
+                                    value={minorDetails.fullName}
+                                    onChange={(e) =>
+                                        setMinorDetail("fullName", e.target.value)
+                                    }
+                                    maxLength={120}
+                                />
+                            </FieldGroup>
+                            <FieldGroup label="Minor's Date of Birth" required>
+                                <input
+                                    className="sr-input"
+                                    type="date"
+                                    value={minorDetails.dateOfBirth}
+                                    onChange={(e) =>
+                                        setMinorDetail(
+                                            "dateOfBirth",
+                                            e.target.value,
+                                        )
+                                    }
+                                    max={new Date().toISOString().split("T")[0]}
+                                />
+                            </FieldGroup>
+                            <div
+                                style={{
+                                    gridColumn: isMobile ? "auto" : "1 / -1",
+                                }}
+                            >
+                                <FieldGroup
+                                    label="Relationship to Minor"
+                                    required
+                                >
+                                    <input
+                                        className="sr-input"
+                                        type="text"
+                                        placeholder="e.g. Parent, Guardian, Grandparent"
+                                        value={minorDetails.relationship}
+                                        onChange={(e) =>
+                                            setMinorDetail(
+                                                "relationship",
+                                                e.target.value,
+                                            )
+                                        }
+                                        maxLength={80}
+                                    />
+                                </FieldGroup>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <div
                 style={{
@@ -2264,6 +2528,31 @@ export default function SubmitRequest({ resident, onLogout }) {
     // ─── STEP 3 — Confirmation ────────────────────────────────
     const summaryRows = [
         { label: "Certificate", value: selectedCert?.name },
+        {
+            label: "Certificate For",
+            value: isMinorRequest
+                ? `Minor - ${minorDetails.fullName.trim()}`
+                : "Myself",
+        },
+        ...(isMinorRequest
+            ? [
+                  {
+                      label: "Minor Date of Birth",
+                      value: fmtDate(minorDetails.dateOfBirth),
+                  },
+                  {
+                      label: "Minor Age",
+                      value:
+                          representedMinorAge !== null
+                              ? `${representedMinorAge} years old`
+                              : "N/A",
+                  },
+                  {
+                      label: "Relationship",
+                      value: minorDetails.relationship.trim() || "N/A",
+                  },
+              ]
+            : []),
         { label: "Purpose", value: finalPurpose || "—" },
         // Extra fields in summary
         ...certExtra.map((f) => ({

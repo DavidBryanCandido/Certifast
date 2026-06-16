@@ -146,7 +146,10 @@ async function completeResidentRegistration(req, res) {
     if (applicantAge < 18) {
         return res
             .status(400)
-            .json({ message: "Applicant must be at least 18 years old." });
+            .json({
+                message:
+                    "Applicant must be at least 18 years old. A parent or legal guardian can create an account and request certificates for a minor.",
+            });
     }
     if (!supabase) {
         return res.status(500).json({

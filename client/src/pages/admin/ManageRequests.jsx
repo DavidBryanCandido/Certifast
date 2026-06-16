@@ -202,6 +202,55 @@ function timelineTime(value, fallback = "") {
     });
 }
 
+function formatShortDate(value, fallback = "N/A") {
+    if (!value) return fallback;
+    const normalized = String(value).includes("T")
+        ? String(value)
+        : `${value}T00:00:00`;
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return fallback;
+    return d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
+function getRepresentedMinorDetails(extraFields = {}) {
+    const subject = String(
+        extraFields.requestSubject || extraFields.certificateFor || "",
+    ).toLowerCase();
+    const name = String(
+        extraFields.minorName ||
+            extraFields.minorFullName ||
+            extraFields.representedMinorName ||
+            "",
+    ).trim();
+
+    if (subject !== "minor" && !name) return null;
+
+    const rawAge = extraFields.minorAge ?? extraFields.representedMinorAge;
+    const ageText =
+        rawAge !== undefined && rawAge !== null && rawAge !== ""
+            ? `${rawAge} years old`
+            : "N/A";
+
+    return {
+        name: name || "N/A",
+        dateOfBirth: formatShortDate(
+            extraFields.minorDateOfBirth || extraFields.minorDOB,
+        ),
+        age: ageText,
+        relationship:
+            String(
+                extraFields.minorRelationship ||
+                    extraFields.relationshipToMinor ||
+                    "",
+            ).trim() || "N/A",
+        guardianName: String(extraFields.guardianName || "").trim() || "N/A",
+    };
+}
+
 function buildTimeline(request, status) {
     const requestedAt = timelineTime(request.requestedAtIso, "Pending review");
     const processedAt = timelineTime(request.processedAtIso, "");
@@ -307,6 +356,7 @@ function RequestDrawer({
         ...(request.extraFields || {}),
         ...adminExtraFields,
     };
+    const representedMinor = getRepresentedMinorDetails(mergedExtraFields);
 
     const handleApiError = (err) => {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -610,6 +660,47 @@ function RequestDrawer({
                     </div>
 
                     {/* ── Workflow hint (approved only) ── */}
+                    {representedMinor && (
+                        <div className="mr-drawer-section">
+                            <SectionTitle>Represented Minor</SectionTitle>
+                            <div className="mr-detail-grid">
+                                <div className="mr-detail-item">
+                                    <label>Minor Name</label>
+                                    <span className="mr-detail-value">
+                                        {representedMinor.name}
+                                    </span>
+                                </div>
+                                <div className="mr-detail-item">
+                                    <label>Date of Birth</label>
+                                    <span className="mr-detail-value">
+                                        {representedMinor.dateOfBirth}
+                                    </span>
+                                </div>
+                                <div className="mr-detail-item">
+                                    <label>Age</label>
+                                    <span className="mr-detail-value">
+                                        {representedMinor.age}
+                                    </span>
+                                </div>
+                                <div className="mr-detail-item">
+                                    <label>Relationship</label>
+                                    <span className="mr-detail-value">
+                                        {representedMinor.relationship}
+                                    </span>
+                                </div>
+                                <div
+                                    className="mr-detail-item"
+                                    style={{ gridColumn: "1/-1" }}
+                                >
+                                    <label>Guardian Account</label>
+                                    <span className="mr-detail-value">
+                                        {representedMinor.guardianName}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="mr-drawer-section">
                         <SectionTitle>Submitted Supporting Documents</SectionTitle>
                         {request.attachments?.length > 0 ? (

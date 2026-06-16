@@ -8,6 +8,10 @@ import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import axios from "axios";
 import { supabase } from "../../supabaseClient";
 import { getApiBase } from "../../apiBase";
+import {
+    DEFAULT_PUBLIC_BRANDING,
+    getPublicBrandingSettings,
+} from "../../services/publicBrandingService";
 
 const API = getApiBase();
 
@@ -101,6 +105,25 @@ export default function ResidentLogin({ onLogin }) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [noticeModal, setNoticeModal] = useState(null);
+    const [branding, setBranding] = useState(DEFAULT_PUBLIC_BRANDING);
+    const [officeInfoOpen, setOfficeInfoOpen] = useState(false);
+    const [officeInfoHover, setOfficeInfoHover] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+
+        getPublicBrandingSettings()
+            .then((data) => {
+                if (mounted) setBranding(data);
+            })
+            .catch(() => {});
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const showOfficeInfo = officeInfoOpen || officeInfoHover;
 
     const handleChange = (e) => {
         setError("");
@@ -638,9 +661,87 @@ export default function ResidentLogin({ onLogin }) {
                                 }}
                             >
                                 Visit the{" "}
-                                <strong style={{ color: "var(--color-primary)" }}>
-                                    Barangay Office
-                                </strong>
+                                <span
+                                    style={{
+                                        display: "inline-block",
+                                        position: "relative",
+                                    }}
+                                    onMouseEnter={() => setOfficeInfoHover(true)}
+                                    onMouseLeave={() => setOfficeInfoHover(false)}
+                                    onBlurCapture={(e) => {
+                                        if (
+                                            !e.currentTarget.contains(
+                                                e.relatedTarget,
+                                            )
+                                        ) {
+                                            setOfficeInfoHover(false);
+                                        }
+                                    }}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setOfficeInfoOpen((open) => !open)
+                                        }
+                                        onFocus={() => setOfficeInfoHover(true)}
+                                        aria-expanded={showOfficeInfo}
+                                        aria-label={`Show barangay office address: ${branding.address}`}
+                                        style={{
+                                            appearance: "none",
+                                            background: "none",
+                                            border: "none",
+                                            padding: 0,
+                                            margin: 0,
+                                            color: "var(--color-primary)",
+                                            fontFamily:
+                                                "'Source Serif 4', serif",
+                                            fontSize: 11.5,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                            textDecoration: showOfficeInfo
+                                                ? "underline"
+                                                : "none",
+                                        }}
+                                    >
+                                        Barangay Office
+                                    </button>
+                                    {showOfficeInfo && (
+                                        <div
+                                            role="status"
+                                            style={{
+                                                position: "absolute",
+                                                right: 0,
+                                                top: "calc(100% + 8px)",
+                                                width: 220,
+                                                padding: "10px 12px",
+                                                borderRadius: 6,
+                                                background: "#fff",
+                                                border: "1px solid rgba(var(--color-accent-rgb),0.28)",
+                                                boxShadow:
+                                                    "0 14px 28px rgba(9,26,62,0.16)",
+                                                color: "#4a4a6a",
+                                                fontSize: 11.5,
+                                                lineHeight: 1.55,
+                                                textAlign: "left",
+                                                zIndex: 3,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: 9.5,
+                                                    fontWeight: 700,
+                                                    letterSpacing: 0.8,
+                                                    textTransform: "uppercase",
+                                                    color: "#9090aa",
+                                                    marginBottom: 4,
+                                                }}
+                                            >
+                                                Barangay Address
+                                            </div>
+                                            {branding.address}
+                                        </div>
+                                    )}
+                                </span>
                                 .
                             </span>
                         </div>

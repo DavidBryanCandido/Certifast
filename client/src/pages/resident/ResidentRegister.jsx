@@ -542,7 +542,7 @@ export default function ResidentRegister({ onSuccess }) {
                 return "Contact number is required.";
             if (!form.date_of_birth) return "Date of birth is required.";
             if (isApplicantUnderage)
-                return "You must be at least 18 years old to register.";
+                return "A parent or legal guardian must create the CertiFast account and request certificates for minors.";
             if (!form.civil_status) return "Civil status is required.";
             if (!form.house_no.trim())
                 return "House / Unit number is required.";
@@ -1900,10 +1900,10 @@ export default function ResidentRegister({ onSuccess }) {
                                     }}
                                 >
                                     You must be at least 18 years old to
-                                    register for a CertiFast account. For
-                                    certificate requests on behalf of a minor,
-                                    please visit the Barangay East Tapinac
-                                    office in person.
+                                    register for a CertiFast account. A parent
+                                    or legal guardian may create their own
+                                    account and request certificates for a
+                                    minor from the resident portal.
                                 </p>
                                 <button
                                     type="button"

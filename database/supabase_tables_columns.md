@@ -153,6 +153,7 @@ Tables: 10
 | 26 | place_of_birth | character varying | YES |  |
 | 27 | occupation | character varying | YES |  |
 | 28 | years_of_residency | integer | YES |  |
+| 29 | profile_details | jsonb | YES | '{}'::jsonb |
 
 ## public.streets
 

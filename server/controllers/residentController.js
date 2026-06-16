@@ -2,25 +2,104 @@
 const pool = require("../db/pool");
 const { createAuditLog } = require("../utils/logger");
 
-// GET /api/resident/profile
-async function getProfile(req, res) {
-    const resident_id = req.resident.id;
-    try {
-        const result = await pool.query(
-            `SELECT r.resident_id, r.full_name, r.first_name, r.middle_name, r.last_name,
+function cleanText(value) {
+    if (value === null || value === undefined) return null;
+    const text = String(value).trim();
+    return text || null;
+}
+
+function cleanInteger(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function cleanObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function cleanStringList(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => cleanText(item))
+        .filter(Boolean);
+}
+
+function cleanBusinessProof(value) {
+    const proof = cleanObject(value);
+    const normalized = {
+        fileName: cleanText(proof.fileName),
+        filePath: cleanText(proof.filePath),
+        fileUrl: cleanText(proof.fileUrl),
+        mimeType: cleanText(proof.mimeType),
+        fileSize: cleanInteger(proof.fileSize) || 0,
+        uploadedAt: cleanText(proof.uploadedAt),
+    };
+
+    if (!normalized.fileName && !normalized.filePath && !normalized.fileUrl) {
+        return null;
+    }
+
+    return normalized;
+}
+
+function cleanProfileDetails(value) {
+    const details = cleanObject(value);
+    const businessProof = cleanBusinessProof(details.businessProof);
+
+    const normalized = {
+        fatherName: cleanText(details.fatherName),
+        motherName: cleanText(details.motherName),
+        legalSpouseName: cleanText(details.legalSpouseName),
+        currentPartnerName: cleanText(details.currentPartnerName),
+        childrenNames: cleanStringList(details.childrenNames),
+        businessName: cleanText(details.businessName),
+        businessType: cleanText(details.businessType),
+        businessArea: cleanText(details.businessArea),
+        businessAddress: cleanText(details.businessAddress),
+        businessOwnerName: cleanText(details.businessOwnerName),
+        businessOwnerAddress: cleanText(details.businessOwnerAddress),
+        businessPermitNo: cleanText(details.businessPermitNo),
+        monthlyIncome: cleanText(details.monthlyIncome),
+        incomeStartYear: cleanText(details.incomeStartYear),
+        businessProof,
+    };
+
+    return Object.fromEntries(
+        Object.entries(normalized).filter(([, fieldValue]) => {
+            if (Array.isArray(fieldValue)) return fieldValue.length > 0;
+            if (
+                fieldValue &&
+                typeof fieldValue === "object" &&
+                !Array.isArray(fieldValue)
+            ) {
+                return Object.values(fieldValue).some(Boolean);
+            }
+            return fieldValue !== null && fieldValue !== undefined && fieldValue !== "";
+        }),
+    );
+}
+
+const PROFILE_SELECT = `SELECT r.resident_id, r.full_name, r.first_name, r.middle_name, r.last_name,
               r.email, r.contact_number,
               r.address_house, r.address_street,
               r.house_number, r.purok_id, r.street_id, r.street_other,
-              r.date_of_birth, r.civil_status, r.nationality,
+              r.date_of_birth, r.civil_status, r.nationality, r.gender,
+              r.place_of_birth, r.occupation, r.years_of_residency,
+              COALESCE(r.profile_details, '{}'::jsonb) AS profile_details,
               r.status, r.created_at,
               p.name AS purok_name,
               s.name AS street_name
              FROM residents r
              LEFT JOIN puroks  p ON p.purok_id  = r.purok_id
              LEFT JOIN streets s ON s.street_id = r.street_id
-             WHERE r.resident_id = $1`,
-            [resident_id],
-        );
+             WHERE r.resident_id = $1`;
+
+// GET /api/resident/profile
+async function getProfile(req, res) {
+    const resident_id = req.resident.id;
+    try {
+        const result = await pool.query(PROFILE_SELECT, [resident_id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Resident not found" });
         }
@@ -32,7 +111,7 @@ async function getProfile(req, res) {
 }
 
 // PUT /api/resident/profile
-// body: { date_of_birth, civil_status, contact_number, house_number, purok_id, street_id, street_other }
+// body: { date_of_birth, civil_status, contact_number, house_number, purok_id, street_id, street_other, gender, place_of_birth, occupation, years_of_residency, profile_details }
 async function updateProfile(req, res) {
     const resident_id = req.resident.id;
     const {
@@ -43,6 +122,11 @@ async function updateProfile(req, res) {
         purok_id,
         street_id,
         street_other,
+        gender,
+        place_of_birth,
+        occupation,
+        years_of_residency,
+        profile_details,
     } = req.body;
 
     try {
@@ -85,18 +169,25 @@ async function updateProfile(req, res) {
         const resolvedPurokId =
             purok_id && Number(purok_id) > 0 ? Number(purok_id) : null;
 
+        const sanitizedProfileDetails = cleanProfileDetails(profile_details);
+
         await pool.query(
             `UPDATE residents
              SET date_of_birth  = $1,
-                 civil_status   = $2,
-                 contact_number = $3,
-                 house_number   = $4,
-                 purok_id       = $5,
-                 street_id      = $6,
-                 street_other   = $7,
-                 address_house  = $8,
-                 address_street = $9
-             WHERE resident_id  = $10`,
+                  civil_status   = $2,
+                  contact_number = $3,
+                  house_number   = $4,
+                  purok_id       = $5,
+                  street_id      = $6,
+                  street_other   = $7,
+                  address_house  = $8,
+                  address_street = $9,
+                  gender = $10,
+                  place_of_birth = $11,
+                  occupation = $12,
+                  years_of_residency = $13,
+                  profile_details = $14::jsonb
+             WHERE resident_id  = $15`,
             [
                 date_of_birth || null,
                 civil_status || null,
@@ -107,6 +198,11 @@ async function updateProfile(req, res) {
                 street_id === "other" ? street_other || null : null,
                 address_house,
                 address_street,
+                cleanText(gender),
+                cleanText(place_of_birth),
+                cleanText(occupation),
+                cleanInteger(years_of_residency),
+                JSON.stringify(sanitizedProfileDetails),
                 resident_id,
             ],
         );
@@ -124,21 +220,7 @@ async function updateProfile(req, res) {
         });
 
         // Re-fetch with joins so the response includes purok_name and street_name
-        const joined = await pool.query(
-            `SELECT r.resident_id, r.full_name, r.first_name, r.middle_name, r.last_name,
-              r.email, r.contact_number,
-              r.address_house, r.address_street,
-              r.house_number, r.purok_id, r.street_id, r.street_other,
-              r.date_of_birth, r.civil_status, r.nationality,
-              r.status, r.created_at,
-              p.name AS purok_name,
-              s.name AS street_name
-             FROM residents r
-             LEFT JOIN puroks  p ON p.purok_id  = r.purok_id
-             LEFT JOIN streets s ON s.street_id = r.street_id
-             WHERE r.resident_id = $1`,
-            [resident_id],
-        );
+        const joined = await pool.query(PROFILE_SELECT, [resident_id]);
 
         return res.json({
             message: "Profile updated",
