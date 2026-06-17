@@ -681,6 +681,233 @@ function defaultExtraFieldValues(fields = []) {
     );
 }
 
+function textValue(value) {
+    return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function firstText(...values) {
+    for (const value of values) {
+        const text = textValue(value);
+        if (text) return text;
+    }
+    return "";
+}
+
+function normalizeProfileDetails(value) {
+    if (!value) return {};
+    if (typeof value === "string") {
+        try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+                ? parsed
+                : {};
+        } catch {
+            return {};
+        }
+    }
+    return typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function formatProfileDate(value) {
+    return value ? String(value).slice(0, 10) : "";
+}
+
+function formatYearsOfResidency(value) {
+    const years = Number.parseInt(value, 10);
+    if (!Number.isFinite(years) || years < 0) return "";
+    return years === 1 ? "1 year" : `${years} years`;
+}
+
+function estimateResidencyStartYear(value) {
+    const years = Number.parseInt(value, 10);
+    if (!Number.isFinite(years) || years < 0) return "";
+    return String(new Date().getFullYear() - years);
+}
+
+function profileAddress(profile) {
+    return [
+        profile?.address_house,
+        profile?.address_street,
+        profile?.purok_name,
+        profile?.street_name,
+    ]
+        .filter((part) => textValue(part))
+        .join(", ");
+}
+
+function profileChildrenNames(details) {
+    return Array.isArray(details.childrenNames)
+        ? details.childrenNames.map((item) => textValue(item)).filter(Boolean)
+        : [];
+}
+
+function profileFieldPrefillMap(profile) {
+    if (!profile) return {};
+
+    const details = normalizeProfileDetails(profile.profile_details);
+    const childrenNames = profileChildrenNames(details);
+    const fullName = textValue(profile.full_name);
+    const address = profileAddress(profile);
+    const dateOfBirth = formatProfileDate(profile.date_of_birth);
+    const age = calculateAge(dateOfBirth);
+    const partnerName = firstText(
+        details.legalSpouseName,
+        details.currentPartnerName,
+    );
+    const businessOwnerName = firstText(details.businessOwnerName, fullName);
+    const businessOwnerAddress = firstText(details.businessOwnerAddress, address);
+
+    return {
+        requesterName: fullName,
+        noMarriageSubject: fullName,
+        dateOfBirth,
+        age: age === null ? "" : String(age),
+        requesterAge: age === null ? "" : String(age),
+        placeOfBirth: textValue(profile.place_of_birth),
+        occupation: textValue(profile.occupation),
+        residencyDuration: formatYearsOfResidency(profile.years_of_residency),
+        yearStarted: estimateResidencyStartYear(profile.years_of_residency),
+        fatherName: textValue(details.fatherName),
+        motherName: textValue(details.motherName),
+        partnerName,
+        legalSpouseName: textValue(details.legalSpouseName),
+        currentPartnerName: textValue(details.currentPartnerName),
+        commonLawPartnerName: firstText(
+            details.currentPartnerName,
+            details.legalSpouseName,
+        ),
+        childrenNames: childrenNames.join(", "),
+        businessName: textValue(details.businessName),
+        businessAddress: textValue(details.businessAddress),
+        businessType: textValue(details.businessType),
+        businessArea: textValue(details.businessArea),
+        businessPermitNo: textValue(details.businessPermitNo),
+        businessOwnerName,
+        businessOwnerAddress,
+        operatorName: businessOwnerName,
+        companyName: textValue(details.businessName),
+        monthlyIncome: textValue(details.monthlyIncome),
+        incomeStartYear: textValue(details.incomeStartYear),
+    };
+}
+
+function profileExtraFieldValues(fields = [], profile) {
+    const prefillMap = profileFieldPrefillMap(profile);
+
+    return Object.fromEntries(
+        fields
+            .filter((field) => field?.key && field.type !== "checkbox")
+            .map((field) => [field.key, prefillMap[field.key]])
+            .filter(([, value]) => textValue(value)),
+    );
+}
+
+function fillBlankExtraFields(currentValues, profileDefaults) {
+    let changed = false;
+    const nextValues = { ...currentValues };
+
+    Object.entries(profileDefaults).forEach(([key, value]) => {
+        if (!textValue(nextValues[key])) {
+            nextValues[key] = value;
+            changed = true;
+        }
+    });
+
+    return changed ? nextValues : currentValues;
+}
+
+function isBasicIndigencyTemplate(cert) {
+    return (
+        cert?.templateKey === "doc1-indigency-medical" ||
+        cert?.name === "Certificate of Indigency"
+    );
+}
+
+function shouldHideExtraField(field, cert, requestSubject) {
+    if (!field?.key) return false;
+
+    if (field.key === "assistanceType") {
+        return true;
+    }
+
+    if (field.key === "requesterName") {
+        return true;
+    }
+
+    if (
+        field.key === "requesterRelationship" &&
+        isBasicIndigencyTemplate(cert)
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+function visibleExtraFieldsFor(fields = [], cert, requestSubject) {
+    return fields.filter(
+        (field) => !shouldHideExtraField(field, cert, requestSubject),
+    );
+}
+
+function filterExtraFieldsByVisibleKeys(values = {}, fields = []) {
+    const visibleKeys = new Set(fields.map((field) => field.key));
+    return Object.fromEntries(
+        Object.entries(values).filter(([key]) => visibleKeys.has(key)),
+    );
+}
+
+function derivedHiddenExtraFieldValues({
+    fields = [],
+    cert,
+    profile,
+    resident,
+    requestSubject,
+    minorDetails,
+    finalPurpose,
+}) {
+    const derived = {};
+    const requesterName = firstText(
+        profile?.full_name,
+        resident?.full_name,
+        resident?.name,
+    );
+
+    fields.forEach((field) => {
+        if (!shouldHideExtraField(field, cert, requestSubject)) return;
+
+        if (field.key === "assistanceType" && textValue(finalPurpose)) {
+            derived.assistanceType = finalPurpose;
+            return;
+        }
+
+        if (field.key === "requesterName") {
+            if (
+                requestSubject === REQUEST_SUBJECT_SELF &&
+                isBasicIndigencyTemplate(cert)
+            ) {
+                return;
+            }
+            if (requesterName) {
+                derived.requesterName = requesterName;
+            }
+            return;
+        }
+
+        if (
+            field.key === "requesterRelationship" &&
+            requestSubject === REQUEST_SUBJECT_MINOR
+        ) {
+            const relationship = textValue(minorDetails?.relationship);
+            if (relationship) {
+                derived.requesterRelationship = relationship;
+            }
+        }
+    });
+
+    return derived;
+}
+
 function fieldValueForDisplay(field, values) {
     const selected =
         values[field.key] !== undefined ? values[field.key] : field.defaultValue;
@@ -965,6 +1192,11 @@ export default function SubmitRequest({ resident, onLogout }) {
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
     const certExtra = selectedCert ? getCertificateFields(selectedCert) : [];
     const isMinorRequest = requestSubject === REQUEST_SUBJECT_MINOR;
+    const visibleCertExtra = visibleExtraFieldsFor(
+        certExtra,
+        selectedCert,
+        requestSubject,
+    );
     const representedMinorAge = calculateAge(minorDetails.dateOfBirth);
     const certificateProofRequirements = selectedCert
         ? getProofRequirements(selectedCert)
@@ -1062,11 +1294,26 @@ export default function SubmitRequest({ resident, onLogout }) {
 
     // Reset extra fields when cert changes
     useEffect(() => {
-        setExtraFields(defaultExtraFieldValues(certExtra));
+        const visibleDefaults = visibleExtraFieldsFor(
+            certExtra,
+            selectedCert,
+            REQUEST_SUBJECT_SELF,
+        );
+        setExtraFields({
+            ...defaultExtraFieldValues(visibleDefaults),
+            ...profileExtraFieldValues(visibleDefaults, profile),
+        });
         setRequestSubject(REQUEST_SUBJECT_SELF);
         setMinorDetails(EMPTY_MINOR_DETAILS);
         setProofFiles({});
     }, [selectedCert]);
+
+    useEffect(() => {
+        if (!selectedCert || !profile) return;
+        const profileDefaults = profileExtraFieldValues(visibleCertExtra, profile);
+        if (Object.keys(profileDefaults).length === 0) return;
+        setExtraFields((prev) => fillBlankExtraFields(prev, profileDefaults));
+    }, [profile]);
 
     async function uploadProofFiles() {
         if (proofRequirements.length === 0) return [];
@@ -1172,7 +1419,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                 }
             }
             // Validate required extra fields
-            for (const field of certExtra) {
+            for (const field of visibleCertExtra) {
                 if (
                     field.required &&
                     field.type !== "checkbox" &&
@@ -1229,12 +1476,24 @@ export default function SubmitRequest({ resident, onLogout }) {
                       requestSubject: REQUEST_SUBJECT_SELF,
                       certificateFor: "self",
                   };
+            const requestExtraFields = {
+                ...filterExtraFieldsByVisibleKeys(extraFields, visibleCertExtra),
+                ...derivedHiddenExtraFieldValues({
+                    fields: certExtra,
+                    cert: selectedCert,
+                    profile,
+                    resident,
+                    requestSubject,
+                    minorDetails,
+                    finalPurpose,
+                }),
+            };
             const data = await requestService.createRequest({
                 certType: selectedCert.name,
                 templateId: selectedCert.templateId || null,
                 purpose: finalPurpose,
                 extraFields: {
-                    ...extraFields,
+                    ...requestExtraFields,
                     ...subjectFields,
                     templateKey: selectedCert.templateKey || "",
                     proofAttachments: attachments,
@@ -2258,7 +2517,7 @@ export default function SubmitRequest({ resident, onLogout }) {
             )}
 
             {/* ── Cert-specific extra fields ── */}
-            {certExtra.length > 0 && (
+            {visibleCertExtra.length > 0 && (
                 <div style={{ marginTop: 4, marginBottom: 4 }}>
                     <div
                         style={{
@@ -2278,7 +2537,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                     >
                         Additional Information Required
                     </div>
-                    {certExtra.map((field) => {
+                    {visibleCertExtra.map((field) => {
                         const checked =
                             extraFields[field.key] !== undefined
                                 ? Boolean(extraFields[field.key])
@@ -2555,7 +2814,7 @@ export default function SubmitRequest({ resident, onLogout }) {
             : []),
         { label: "Purpose", value: finalPurpose || "—" },
         // Extra fields in summary
-        ...certExtra.map((f) => ({
+        ...visibleCertExtra.map((f) => ({
             label: f.label.replace(" (optional)", ""),
             value: fieldValueForDisplay(f, extraFields),
         })),
