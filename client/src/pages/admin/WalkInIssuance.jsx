@@ -74,7 +74,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
       width:100%; text-align:left; font-family:'Source Serif 4',serif;
     }
     .wi-nav-item:hover { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.9); }
-    .wi-nav-item.active { background:rgba(201,162,39,0.12); color:#fff; border-left-color:#c9a227; }
+    .wi-nav-item.active { background:rgba(var(--color-accent-rgb, 201, 162, 39),0.12); color:#fff; border-left-color:var(--color-accent, #c9a227); }
     .wi-nav-item-icon {
       display:flex; align-items:center; justify-content:center;
       padding:10px 0; color:rgba(255,255,255,0.65); cursor:pointer;
@@ -83,7 +83,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
       width:100%; font-family:'Source Serif 4',serif;
     }
     .wi-nav-item-icon:hover { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.9); }
-    .wi-nav-item-icon.active { background:rgba(201,162,39,0.12); color:#fff; border-left-color:#c9a227; }
+    .wi-nav-item-icon.active { background:rgba(var(--color-accent-rgb, 201, 162, 39),0.12); color:#fff; border-left-color:var(--color-accent, #c9a227); }
     /* Cert cards */
     .wi-cert-btn {
       display:flex; flex-direction:column; align-items:center; gap:6px;
@@ -114,7 +114,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
       flex:1; padding:7px 12px; border:1.5px solid #e4dfd4; border-radius:4px;
       font-family:'Source Serif 4',serif; font-size:12px; outline:none; background:#fff;
     }
-    .wi-log-input:focus { border-color:#0e2554; }
+    .wi-log-input:focus { border-color:var(--color-primary, #0e2554); }
     /* Modal item */
     .wi-modal-item {
       display:flex; align-items:center; gap:14px; padding:13px 20px;
@@ -143,10 +143,10 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
     /* Action btn */
     .wi-action-btn {
       background:none; border:1px solid #e4dfd4; border-radius:4px;
-      padding:4px 10px; font-size:10.5px; color:#0e2554; cursor:pointer;
+      padding:4px 10px; font-size:10.5px; color:var(--color-primary, #0e2554); cursor:pointer;
       font-family:'Source Serif 4',serif; transition:all .15s;
     }
-    .wi-action-btn:hover { background:#0e2554; color:white; border-color:#0e2554; }
+    .wi-action-btn:hover { background:var(--color-primary, #0e2554); color:white; border-color:var(--color-primary, #0e2554); }
     /* Toast */
     @keyframes wi-toast-in  { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
     @keyframes wi-toast-out { from { opacity:1; } to { opacity:0; } }
@@ -154,7 +154,7 @@ if (!document.head.querySelector("[data-cf-walkin]")) {
     .wi-toast.hiding { animation:wi-toast-out .3s ease both; }
     /* Cert paper */
     .wi-cert-paper { width:100%; max-width:500px; background:#fff; border:1px solid #ccc; box-shadow:0 4px 20px rgba(0,0,0,.14); padding:36px 40px; font-family:'Source Serif 4',serif; position:relative; }
-    .wi-cert-paper::before { content:''; position:absolute; inset:10px; border:1.5px solid rgba(201,162,39,.3); pointer-events:none; }
+    .wi-cert-paper::before { content:''; position:absolute; inset:10px; border:1.5px solid rgba(var(--color-accent-rgb, 201, 162, 39),.3); pointer-events:none; }
     .wi-logout-btn { background:none; border:none; cursor:pointer; color:rgba(255,255,255,.35); padding:4px; transition:color .15s; display:flex; align-items:center; }
     .wi-logout-btn:hover { color:rgba(255,255,255,.7); }
     `;
@@ -320,7 +320,7 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
             >
                 <div style={sd.brandSeal}>
                     <span
-                        style={{ fontSize: 14, color: "rgba(201,162,39,0.6)" }}
+                        style={{ fontSize: 14, color: "rgba(var(--color-accent-rgb, 201, 162, 39),0.6)" }}
                     >
                         ⚜
                     </span>
@@ -481,7 +481,7 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
                             <span
                                 style={{
                                     fontSize: 14,
-                                    color: "rgba(201,162,39,0.6)",
+                                    color: "rgba(var(--color-accent-rgb, 201, 162, 39),0.6)",
                                 }}
                             >
                                 ⚜
@@ -617,7 +617,7 @@ function CertPickerModal({ onClose, onPick, certs }) {
                 {/* Header */}
                 <div
                     style={{
-                        background: "linear-gradient(135deg,#0e2554,#163066)",
+                        background: "linear-gradient(135deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))",
                         padding: "18px 22px",
                         display: "flex",
                         alignItems: "center",
@@ -912,7 +912,7 @@ function PrintPreviewModal({
                 {/* Header */}
                 <div
                     style={{
-                        background: "linear-gradient(135deg,#0e2554,#163066)",
+                        background: "linear-gradient(135deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))",
                         padding: "16px 22px",
                         display: "flex",
                         alignItems: "center",
@@ -1003,7 +1003,7 @@ function PrintPreviewModal({
                                 style={{
                                     fontSize: 11,
                                     fontWeight: 600,
-                                    color: "#0e2554",
+                                    color: "var(--color-primary, #0e2554)",
                                     marginTop: 2,
                                 }}
                             >
@@ -1014,7 +1014,7 @@ function PrintPreviewModal({
                                     fontFamily: "'Playfair Display',serif",
                                     fontSize: 17,
                                     fontWeight: 700,
-                                    color: "#0e2554",
+                                    color: "var(--color-primary, #0e2554)",
                                     marginTop: 2,
                                 }}
                             >
@@ -1033,7 +1033,7 @@ function PrintPreviewModal({
                         <hr
                             style={{
                                 border: "none",
-                                borderTop: "2px solid #c9a227",
+                                borderTop: "2px solid var(--color-accent, #c9a227)",
                                 margin: "14px 0 10px",
                             }}
                         />
@@ -1042,7 +1042,7 @@ function PrintPreviewModal({
                                 fontFamily: "'Playfair Display',serif",
                                 fontSize: 18,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary, #0e2554)",
                                 textAlign: "center",
                                 letterSpacing: 1,
                                 marginBottom: 3,
@@ -1098,7 +1098,7 @@ function PrintPreviewModal({
                                 <div
                                     style={{
                                         width: 180,
-                                        borderTop: "1.5px solid #0e2554",
+                                        borderTop: "1.5px solid var(--color-primary, #0e2554)",
                                         paddingTop: 4,
                                         marginTop: 40,
                                     }}
@@ -1109,7 +1109,7 @@ function PrintPreviewModal({
                                                 "'Playfair Display',serif",
                                             fontSize: 12,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                         }}
                                     >
                                         HON. DANTE L. HONDO
@@ -1758,7 +1758,7 @@ p { margin: 4px 0; font-size: 14px; }
                                         color={
                                             selectedCert?.name === cert.name
                                                 ? "#6a3db8"
-                                                : "#0e2554"
+                                                : "var(--color-primary, #0e2554)"
                                         }
                                         strokeWidth={1.5}
                                     />
@@ -2093,7 +2093,7 @@ p { margin: 4px 0; font-size: 14px; }
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: 14,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary, #0e2554)",
                                     }}
                                 >
                                     Today's Walk-in Issuances
@@ -2359,7 +2359,7 @@ p { margin: 4px 0; font-size: 14px; }
 const sd = {
     sidebar: {
         minHeight: "100vh",
-        background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",
+        background: "linear-gradient(180deg,var(--color-primary, #0e2554) 0%,var(--color-primary-dark, #091a3e) 100%)",
         display: "flex",
         flexDirection: "column",
         position: "fixed",
@@ -2367,12 +2367,12 @@ const sd = {
         left: 0,
         bottom: 0,
         zIndex: 100,
-        borderRight: "1px solid rgba(201,162,39,0.15)",
+        borderRight: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
         transition: "width 0.2s",
     },
     brand: {
         padding: "20px 20px 16px",
-        borderBottom: "1px solid rgba(201,162,39,0.18)",
+        borderBottom: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.18)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -2381,8 +2381,8 @@ const sd = {
         width: 38,
         height: 38,
         borderRadius: "50%",
-        border: "1.5px solid rgba(201,162,39,0.5)",
-        background: "rgba(201,162,39,0.1)",
+        border: "1.5px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.5)",
+        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -2397,19 +2397,19 @@ const sd = {
     },
     brandSub: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.7)",
+        color: "rgba(var(--color-accent-rgb, 201, 162, 39),0.7)",
         letterSpacing: "1.5px",
         textTransform: "uppercase",
         marginTop: 1,
     },
     goldBar: {
         height: 3,
-        background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+        background: "linear-gradient(90deg,var(--color-accent, #c9a227),var(--color-accent-soft, #f0d060),var(--color-accent, #c9a227))",
         flexShrink: 0,
     },
     sectionLabel: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.5)",
+        color: "rgba(var(--color-accent-rgb, 201, 162, 39),0.5)",
         letterSpacing: "2px",
         textTransform: "uppercase",
         padding: "18px 20px 8px",
@@ -2417,8 +2417,8 @@ const sd = {
     },
     navBadge: {
         marginLeft: "auto",
-        background: "#c9a227",
-        color: "#091a3e",
+        background: "var(--color-accent, #c9a227)",
+        color: "var(--color-primary-dark, #091a3e)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -2427,8 +2427,8 @@ const sd = {
     },
     navBadgeSA: {
         marginLeft: "auto",
-        background: "rgba(201,162,39,0.25)",
-        color: "#c9a227",
+        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.25)",
+        color: "var(--color-accent, #c9a227)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -2436,13 +2436,13 @@ const sd = {
     },
     superAdminSection: {
         marginTop: "auto",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
         paddingTop: 8,
         paddingBottom: 8,
     },
     userRow: {
         padding: "14px 20px",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -2451,13 +2451,13 @@ const sd = {
         width: 32,
         height: 32,
         borderRadius: "50%",
-        background: "rgba(201,162,39,0.15)",
-        border: "1.5px solid rgba(201,162,39,0.4)",
+        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
+        border: "1.5px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 12,
-        color: "#c9a227",
+        color: "var(--color-accent, #c9a227)",
         fontWeight: 700,
         flexShrink: 0,
     },
@@ -2472,7 +2472,7 @@ const sd = {
     },
     userRole: {
         fontSize: 9.5,
-        color: "#c9a227",
+        color: "var(--color-accent, #c9a227)",
         letterSpacing: "1px",
         textTransform: "uppercase",
         marginTop: 1,
@@ -2496,7 +2496,7 @@ const tb = {
         fontFamily: "'Playfair Display',serif",
         fontSize: 18,
         fontWeight: 700,
-        color: "#0e2554",
+        color: "var(--color-primary, #0e2554)",
         flex: 1,
     },
     topbarSub: {

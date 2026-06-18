@@ -30,6 +30,7 @@ import AdminRequestDecisionFields from "../../components/AdminRequestDecisionFie
 import adminRequestService from "../../services/adminRequestService";
 import * as settingsService from "../../services/settingsService";
 import { buildCertificatePrintHtml } from "../../utils/certificateTemplateEngine";
+import { formatResidentAddress } from "../../utils/address";
 
 // =============================================================
 // useWindowSize
@@ -63,7 +64,7 @@ if (!document.head.querySelector("[data-cf-mr]")) {
       font-family:'Source Serif 4',serif; white-space:nowrap;
     }
     .mr-stab:hover { border-color:#bbb; }
-    .mr-stab.active-all    { border-color:#0e2554; background:#0e2554; color:#fff; }
+    .mr-stab.active-all    { border-color:var(--color-primary, #0e2554); background:var(--color-primary, #0e2554); color:#fff; }
     .mr-stab.active-amber  { border-color:#b86800; background:#b86800; color:#fff; }
     .mr-stab.active-blue   { border-color:#1a4a8a; background:#1a4a8a; color:#fff; }
     .mr-stab.active-green  { border-color:#1a7a4a; background:#1a7a4a; color:#fff; }
@@ -81,13 +82,13 @@ if (!document.head.querySelector("[data-cf-mr]")) {
       width:100%; padding:9px 12px 9px 34px; border:1.5px solid #e4dfd4; border-radius:5px;
       font-family:'Source Serif 4',serif; font-size:12.5px; background:#fff; outline:none; color:#1a1a2e;
     }
-    .mr-search-input:focus { border-color:#0e2554; }
+    .mr-search-input:focus { border-color:var(--color-primary, #0e2554); }
     .mr-select {
       padding:9px 12px; border:1.5px solid #e4dfd4; border-radius:5px;
       font-family:'Source Serif 4',serif; font-size:12px; background:#fff; color:#4a4a6a;
       outline:none; cursor:pointer;
     }
-    .mr-select:focus { border-color:#0e2554; }
+    .mr-select:focus { border-color:var(--color-primary, #0e2554); }
     /* Table */
     .mr-tr { cursor:pointer; }
     .mr-tr:hover td { background:#fdfaf5; }
@@ -98,7 +99,7 @@ if (!document.head.querySelector("[data-cf-mr]")) {
       letter-spacing:.5px; cursor:pointer; border:none; white-space:nowrap; transition:opacity .15s;
     }
     .mr-btn:hover { opacity:.85; }
-    .mr-btn-review  { background:#0e2554; color:#fff; }
+    .mr-btn-review  { background:var(--color-primary, #0e2554); color:#fff; }
     .mr-btn-view    { background:#e8eef8; color:#1a4a8a; }
     .mr-btn-scan    { background:#e8f5ee; color:#1a7a4a; }
     .mr-btn-icon    { background:#f8f6f1; color:#4a4a6a; border:1px solid #e4dfd4; padding:5px 8px; }
@@ -109,8 +110,8 @@ if (!document.head.querySelector("[data-cf-mr]")) {
       cursor:pointer; background:#fff; color:#4a4a6a; transition:all .15s;
       font-family:'Source Serif 4',serif;
     }
-    .mr-pag-btn:hover { border-color:#0e2554; color:#0e2554; }
-    .mr-pag-btn.active { background:#0e2554; color:#fff; border-color:#0e2554; }
+    .mr-pag-btn:hover { border-color:var(--color-primary, #0e2554); color:var(--color-primary, #0e2554); }
+    .mr-pag-btn.active { background:var(--color-primary, #0e2554); color:#fff; border-color:var(--color-primary, #0e2554); }
     .mr-pag-btn:disabled { opacity:.4; cursor:default; }
     /* Drawer */
     .mr-drawer {
@@ -174,7 +175,7 @@ const BADGE_CFG = {
 };
 
 const DOT_COLORS = {
-    gold:  "#c9a227",
+    gold:  "var(--color-accent, #c9a227)",
     blue:  "#1a4a8a",
     green: "#1a7a4a",
     amber: "#b86800",
@@ -576,7 +577,7 @@ function RequestDrawer({
                 )}
 
                 {/* Header */}
-                <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", background: "linear-gradient(135deg,#0e2554,#163066)", flexShrink: 0 }}>
+                <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "flex-start", justifyContent: "space-between", background: "linear-gradient(135deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))", flexShrink: 0 }}>
                     <div>
                         <h3 style={{ fontFamily: "'Playfair Display',serif", fontSize: 16, color: "#fff", margin: 0 }}>
                             Request {request.id}
@@ -611,7 +612,7 @@ function RequestDrawer({
                             </div>
                             <div className="mr-detail-item" style={{ gridColumn: "1/-1" }}>
                                 <label>Address</label>
-                                <span className="mr-detail-value" style={{ fontSize: 12 }}>{request.address}, Olongapo City</span>
+                                <span className="mr-detail-value" style={{ fontSize: 12 }}>{request.address}</span>
                             </div>
                             <div className="mr-detail-item">
                                 <label>Civil Status</label>
@@ -739,12 +740,12 @@ function RequestDrawer({
                                                     }}
                                                 />
                                             ) : (
-                                                <span style={{ width: 46, height: 46, borderRadius: 4, border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", color: "#0e2554", background: "#f8f6f1", flexShrink: 0 }}>
+                                                <span style={{ width: 46, height: 46, borderRadius: 4, border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary, #0e2554)", background: "#f8f6f1", flexShrink: 0 }}>
                                                     <Paperclip size={16} />
                                                 </span>
                                             )}
                                             <span style={{ minWidth: 0, flex: 1 }}>
-                                                <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#0e2554", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                                                <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--color-primary, #0e2554)", textTransform: "uppercase", letterSpacing: 0.8 }}>
                                                     {attachment.label || "Supporting document"}
                                                 </span>
                                                 <span style={{ display: "block", fontSize: 12.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -950,9 +951,15 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
 
     const mapRequestRow = useCallback((row) => {
         const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
-        const address = [row.resident_address_house, row.resident_address_street]
-            .filter((v) => String(v || "").trim())
-            .join(", ");
+        const address = formatResidentAddress(
+            {
+                address_house: row.resident_address_house,
+                address_street: row.resident_address_street,
+                address_city: row.resident_address_city,
+                address_province: row.resident_address_province,
+            },
+            { city: "Olongapo City" },
+        );
         const fallbackAttachments = Array.isArray(row.extra_fields?.proofAttachments)
             ? row.extra_fields.proofAttachments
             : [];
@@ -1143,7 +1150,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                             <Menu size={20} />
                         </button>
                     )}
-                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 16 : 18, fontWeight: 700, color: "#0e2554", flex: 1 }}>
+                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 16 : 18, fontWeight: 700, color: "var(--color-primary, #0e2554)", flex: 1 }}>
                         Manage Requests
                         {!isMobile && <span style={{ fontSize: 12, fontFamily: "'Source Serif 4',serif", color: "#9090aa", fontWeight: 400, marginLeft: 10 }}>Review and process certificate requests</span>}
                     </div>
@@ -1166,7 +1173,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
 
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
                         <div>
-                            <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 18 : 20, color: "#0e2554", margin: 0 }}>All Requests</h2>
+                            <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 18 : 20, color: "var(--color-primary, #0e2554)", margin: 0 }}>All Requests</h2>
                             <p style={{ fontSize: 12, color: "#9090aa", marginTop: 3 }}>{requests.length} total requests on record</p>
                         </div>
                     </div>
@@ -1210,7 +1217,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                     <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 6, overflow: "hidden" }}>
                         {/* Panel header */}
                         <div style={{ padding: "14px 20px", borderBottom: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8f6f1" }}>
-                            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, color: "#0e2554", fontWeight: 700 }}>
+                            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, color: "var(--color-primary, #0e2554)", fontWeight: 700 }}>
                                 {activeTab === "all" ? "All Requests" : STATUS_TABS.find((t) => t.key === activeTab)?.label}
                             </div>
                             <div style={{ fontSize: 11, color: "#9090aa" }}>
@@ -1243,7 +1250,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                                                         style={{ cursor: "pointer" }}
                                                         onClick={() => setSelectedRequest(req)}>
                                                         <td style={td}>
-                                                            <span style={{ fontFamily: "'Courier New',monospace", fontSize: 11.5, color: "#0e2554", fontWeight: 700 }}>{req.id}</span>
+                                                            <span style={{ fontFamily: "'Courier New',monospace", fontSize: 11.5, color: "var(--color-primary, #0e2554)", fontWeight: 700 }}>{req.id}</span>
                                                         </td>
                                                         <td style={td}>
                                                             <div style={{ fontWeight: 600, color: "#1a1a2e" }}>{req.name}</div>

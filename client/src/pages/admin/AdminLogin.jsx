@@ -97,7 +97,7 @@ if (!document.head.querySelector("[data-certifast-login]")) {
     }
     .cf-input:focus {
       border-color: var(--color-primary);
-      background: #f0f3ff;
+      background: rgba(var(--color-primary-rgb, 14, 37, 84), 0.08);
     }
     .cf-input::placeholder { color: #9090aa; font-size: 13px; }
     .cf-input:-webkit-autofill,

@@ -91,31 +91,31 @@ function useMAStyles() {
         }
         .ma-col-label { font-size: 9.5px; font-weight: 600; color: #9090aa; letter-spacing: 1px; text-transform: uppercase; font-family: 'Source Serif 4', serif; }
         .ma-menu-btn { background: none; border: none; cursor: pointer; color: #9090aa; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
-        .ma-menu-btn:hover { background: #f0ece4; color: #0e2554; }
+        .ma-menu-btn:hover { background: #f0ece4; color: var(--color-primary, #0e2554); }
         .ma-dropdown { position: absolute; right: 0; top: 32px; background: #fff; border: 1px solid #e4dfd4; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 50; min-width: 160px; overflow: hidden; }
         .ma-dropdown-item { display: flex; align-items: center; gap: 9px; padding: 10px 14px; font-size: 12.5px; color: #1a1a2e; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-family: 'Source Serif 4', serif; transition: background 0.1s; }
         .ma-dropdown-item:hover { background: #f8f6f1; }
         .ma-dropdown-item.danger { color: #b02020; }
         .ma-dropdown-item.danger:hover { background: #fdecea; }
         .ma-input { width: 100%; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; transition: border-color 0.15s, background 0.15s; box-sizing: border-box; }
-        .ma-input:focus { border-color: #0e2554; background: #f0f3ff; }
+        .ma-input:focus { border-color: var(--color-primary, #0e2554); background: rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
         .ma-input::placeholder { color: #9090aa; font-size: 12.5px; }
         .ma-textarea { width: 100%; min-height: 88px; resize: vertical; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; transition: border-color 0.15s, background 0.15s; box-sizing: border-box; }
-        .ma-textarea:focus { border-color: #0e2554; background: #f0f3ff; }
-        .ma-id-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid rgba(14,37,84,0.28); border-radius: 4px; background: #fff; color: #0e2554; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: 'Source Serif 4', serif; white-space: nowrap; }
-        .ma-id-btn:hover { background: #f0f3ff; border-color: #0e2554; }
+        .ma-textarea:focus { border-color: var(--color-primary, #0e2554); background: rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
+        .ma-id-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid rgba(var(--color-primary-rgb, 14, 37, 84),0.28); border-radius: 4px; background: #fff; color: var(--color-primary, #0e2554); font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: 'Source Serif 4', serif; white-space: nowrap; }
+        .ma-id-btn:hover { background: rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); border-color: var(--color-primary, #0e2554); }
         .ma-id-empty { color: #9090aa; font-size: 11.5px; font-style: italic; white-space: nowrap; }
         .ma-select { width: 100%; padding: 10px 14px; border: 1.5px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 13px; color: #1a1a2e; background: #f8f6f1; outline: none; cursor: pointer; appearance: none; transition: border-color 0.15s; }
-        .ma-select:focus { border-color: #0e2554; }
-        .ma-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 22px; background: linear-gradient(135deg, #163066, #091a3e); color: #fff; border: none; border-radius: 4px; font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
+        .ma-select:focus { border-color: var(--color-primary, #0e2554); }
+        .ma-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 22px; background: linear-gradient(135deg, var(--color-primary-soft, #163066), var(--color-primary-dark, #091a3e)); color: #fff; border: none; border-radius: 4px; font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
         .ma-btn-primary:hover { opacity: 0.88; }
         .ma-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
         .ma-btn-secondary { display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px; background: none; color: #4a4a6a; border: 1px solid #e4dfd4; border-radius: 4px; font-family: 'Source Serif 4', serif; font-size: 12px; cursor: pointer; transition: all 0.15s; }
-        .ma-btn-secondary:hover { border-color: #0e2554; color: #0e2554; }
+        .ma-btn-secondary:hover { border-color: var(--color-primary, #0e2554); color: var(--color-primary, #0e2554); }
         .ma-modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(9,26,62,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
-        .ma-modal { background: #fff; border-radius: 8px; width: 100%; max-width: 480px; box-shadow: 0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(201,162,39,0.15); overflow: hidden; animation: maModalIn 0.2s ease both; }
+        .ma-modal { background: #fff; border-radius: 8px; width: 100%; max-width: 480px; box-shadow: 0 24px 60px rgba(0,0,0,0.25), 0 0 0 1px rgba(var(--color-accent-rgb, 201, 162, 39),0.15); overflow: hidden; animation: maModalIn 0.2s ease both; }
         @keyframes maModalIn { from { opacity: 0; transform: scale(0.97) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        .ma-modal-header { padding: 16px 24px; background: linear-gradient(135deg, #163066, #091a3e); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(201,162,39,0.2); }
+        .ma-modal-header { padding: 16px 24px; background: linear-gradient(135deg, var(--color-primary-soft, #163066), var(--color-primary-dark, #091a3e)); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.2); }
         .ma-modal-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: #fff; }
         .ma-modal-close { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: rgba(255,255,255,0.6); transition: background 0.15s; }
         .ma-modal-close:hover { background: rgba(255,255,255,0.18); }
@@ -130,16 +130,16 @@ function useMAStyles() {
         .ma-badge-active   { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; background: #e8f5ee; color: #1a7a4a; border-radius: 20px; padding: 3px 10px; font-weight: 700; font-family: 'Source Serif 4', serif; }
         .ma-badge-inactive { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; background: #f0ece4; color: #9090aa; border-radius: 20px; padding: 3px 10px; font-weight: 700; font-family: 'Source Serif 4', serif; }
         .ma-badge-pending  { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; background: #fff3e0; color: #b86800; border-radius: 20px; padding: 3px 10px; font-weight: 700; font-family: 'Source Serif 4', serif; }
-        .ma-badge-admin { font-size: 10px; background: rgba(201,162,39,0.15); color: #9a7515; border: 1px solid rgba(201,162,39,0.35); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
-        .ma-badge-staff { font-size: 10px; background: rgba(14,37,84,0.08); color: #163066; border: 1px solid rgba(14,37,84,0.2); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
+        .ma-badge-admin { font-size: 10px; background: rgba(var(--color-accent-rgb, 201, 162, 39),0.15); color: var(--color-accent-dark, #9a7515); border: 1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.35); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
+        .ma-badge-staff { font-size: 10px; background: rgba(var(--color-primary-rgb, 14, 37, 84),0.08); color: var(--color-primary-soft, #163066); border: 1px solid rgba(var(--color-primary-rgb, 14, 37, 84),0.2); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
         .ma-badge-resident { font-size: 10px; background: rgba(26,122,74,0.08); color: #1a7a4a; border: 1px solid rgba(26,122,74,0.2); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
-        .ma-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0e2554; color: #fff; padding: 11px 20px; border-radius: 6px; font-size: 13px; font-family: 'Source Serif 4', serif; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 300; display: flex; align-items: center; gap: 8px; animation: maToastIn 0.2s ease both; border-left: 3px solid #c9a227; }
+        .ma-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--color-primary, #0e2554); color: #fff; padding: 11px 20px; border-radius: 6px; font-size: 13px; font-family: 'Source Serif 4', serif; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 300; display: flex; align-items: center; gap: 8px; animation: maToastIn 0.2s ease both; border-left: 3px solid var(--color-accent, #c9a227); }
         .ma-toast.success { border-left-color: #1a7a4a; }
         .ma-toast.error   { border-left-color: #b02020; background: #3a0a0a; }
         @keyframes maToastIn { from { opacity: 0; transform: translateX(-50%) translateY(12px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
         .ma-tab { padding: 8px 18px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1.5px solid #e4dfd4; background: #fff; color: #4a4a6a; cursor: pointer; transition: all 0.15s; font-family: 'Source Serif 4', serif; display: inline-flex; align-items: center; gap: 7px; }
-        .ma-tab:hover { border-color: #0e2554; color: #0e2554; }
-        .ma-tab.active { background: #0e2554; border-color: #0e2554; color: #fff; }
+        .ma-tab:hover { border-color: var(--color-primary, #0e2554); color: var(--color-primary, #0e2554); }
+        .ma-tab.active { background: var(--color-primary, #0e2554); border-color: var(--color-primary, #0e2554); color: #fff; }
         .ma-tab-count { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: rgba(255,255,255,0.18); }
         .ma-tab:not(.active) .ma-tab-count { background: #f0ece4; color: #666; }
         @media (max-width: 767px) {
@@ -172,8 +172,8 @@ function initials(name = "") {
         .join("");
 }
 const AVATAR_COLORS = [
-    ["#0e2554", "#c9a227"],
-    ["#163066", "#f0d060"],
+    ["var(--color-primary, #0e2554)", "var(--color-accent, #c9a227)"],
+    ["var(--color-primary-soft, #163066)", "var(--color-accent-soft, #f0d060)"],
     ["#1a7a4a", "#e8f5ee"],
     ["#6a3db8", "#ede8ff"],
     ["#b86800", "#fdf4d7"],
@@ -217,7 +217,7 @@ function StatCard({ icon, label, value, accent }) {
                     style={{
                         fontSize: 22,
                         fontWeight: 700,
-                        color: "#0e2554",
+                        color: "var(--color-primary, #0e2554)",
                         fontFamily: "'Playfair Display',serif",
                         lineHeight: 1,
                     }}
@@ -316,14 +316,14 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                 width: 32,
                                 height: 32,
                                 borderRadius: "50%",
-                                background: "rgba(201,162,39,0.12)",
-                                border: "1px solid rgba(201,162,39,0.3)",
+                                background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.12)",
+                                border: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.3)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                             }}
                         >
-                            <IconComp size={15} color="#c9a227" />
+                            <IconComp size={15} color="var(--color-accent, #c9a227)" />
                         </div>
                         <div>
                             <div className="ma-modal-title">{title}</div>
@@ -713,14 +713,14 @@ function ResidentPasswordModal({ resident, onClose, onSave }) {
                                 width: 32,
                                 height: 32,
                                 borderRadius: "50%",
-                                background: "rgba(201,162,39,0.12)",
-                                border: "1px solid rgba(201,162,39,0.3)",
+                                background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.12)",
+                                border: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.3)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                             }}
                         >
-                            <KeyRound size={15} color="#c9a227" />
+                            <KeyRound size={15} color="var(--color-accent, #c9a227)" />
                         </div>
                         <div>
                             <div className="ma-modal-title">
@@ -780,8 +780,8 @@ function ResidentPasswordModal({ resident, onClose, onSave }) {
                                     width: 36,
                                     height: 36,
                                     borderRadius: "50%",
-                                    background: "#0e2554",
-                                    color: "#c9a227",
+                                    background: "var(--color-primary, #0e2554)",
+                                    color: "var(--color-accent, #c9a227)",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -1857,7 +1857,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                             fontFamily: "'Playfair Display',serif",
                             fontSize: isMobile ? 16 : 18,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                             flex: 1,
                         }}
                     >
@@ -1935,7 +1935,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                             icon={Users}
                             label="Staff Accounts"
                             value={totalAccounts}
-                            accent="#0e2554"
+                            accent="var(--color-primary, #0e2554)"
                         />
                         <StatCard
                             icon={CheckCircle}
@@ -1948,14 +1948,14 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                 icon={Shield}
                                 label="Admin"
                                 value={adminCount}
-                                accent="#c9a227"
+                                accent="var(--color-accent, #c9a227)"
                             />
                         )}
                         <StatCard
                             icon={UserCog}
                             label="Staff"
                             value={staffCount}
-                            accent="#163066"
+                            accent="var(--color-primary-soft, #163066)"
                         />
                         <StatCard
                             icon={User}
@@ -2031,7 +2031,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: 14,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary, #0e2554)",
                                     }}
                                 >
                                     Staff Accounts
@@ -2434,7 +2434,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: 14,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary, #0e2554)",
                                     }}
                                 >
                                     Resident Accounts

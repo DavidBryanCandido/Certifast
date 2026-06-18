@@ -28,6 +28,7 @@ import {
 import AdminDateChip from "../../components/AdminDateChip";
 import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import residentRecordsService from "../../services/residentRecordsService";
+import { formatResidentAddress } from "../../utils/address";
 
 // =============================================================
 // useWindowSize
@@ -471,7 +472,7 @@ function ResidentDrawer({
                                 >
                                     <label>Address</label>
                                     <div className="rr-pf-val">
-                                        {resident.addr}, Olongapo City
+                                        {resident.addr}
                                     </div>
                                 </div>
                                 <div className="rr-pf-field">
@@ -701,9 +702,15 @@ export default function ResidentRecords({
             id: `#RES-${String(row.resident_id || "").padStart(4, "0")}`,
             name: row.full_name || "Unknown Resident",
             addr:
-                [row.address_house, row.address_street]
-                    .filter((v) => String(v || "").trim())
-                    .join(" ") || "N/A",
+                formatResidentAddress(
+                    {
+                        address_house: row.address_house,
+                        address_street: row.address_street,
+                        address_city: row.address_city,
+                        address_province: row.address_province,
+                    },
+                    { city: "Olongapo City" },
+                ) || "N/A",
             contact: row.contact_number || "N/A",
             date: registeredAt
                 ? registeredAt.toLocaleDateString("en-US", {

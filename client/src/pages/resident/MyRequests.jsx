@@ -24,11 +24,11 @@ if (!document.head.querySelector("[data-resident-home]")) {
     s.innerText = `
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:wght@300;400;600&display=swap');
     .rh-root { min-height:100vh; background:#f4f2ed; font-family:'Source Serif 4',serif; }
-    .rh-topbar { background:linear-gradient(135deg,#0e2554 0%,#163066 100%); border-bottom:1px solid rgba(201,162,39,0.2); position:sticky; top:0; z-index:100; }
+    .rh-topbar { background:linear-gradient(135deg,var(--color-primary, #0e2554) 0%,var(--color-primary-soft, #163066) 100%); border-bottom:1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.2); position:sticky; top:0; z-index:100; }
     .rh-topbar-inner { padding:0 24px; height:60px; display:flex; align-items:center; gap:12px; }
     .rh-panel { background:#fff; border:1px solid #e4dfd4; border-radius:8px; overflow:hidden; margin-bottom:20px; }
     .rh-panel-header { padding:14px 20px; border-bottom:1px solid #e4dfd4; background:#f8f6f1; display:flex; align-items:center; justify-content:space-between; }
-    .rh-panel-title { font-family:'Playfair Display',serif; font-size:14px; font-weight:700; color:#0e2554; }
+    .rh-panel-title { font-family:'Playfair Display',serif; font-size:14px; font-weight:700; color:var(--color-primary, #0e2554); }
     .rh-req-row { display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid #f0ece4; transition:background 0.1s; cursor:default; }
     .rh-req-row:last-child { border-bottom:none; }
     .rh-req-row:hover { background:#faf8f4; }
@@ -161,7 +161,7 @@ export default function MyRequests({ resident, onLogout }) {
                                 fontFamily: "'Playfair Display', serif",
                                 fontSize: isMobile ? 20 : 22,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary, #0e2554)",
                                 margin: "0 0 3px",
                             }}
                         >

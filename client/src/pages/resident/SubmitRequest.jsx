@@ -41,6 +41,7 @@ import {
     getTemplateFieldLabels,
     getTemplateProofRequirements,
 } from "../../utils/certificateTemplateEngine";
+import { formatResidentAddress } from "../../utils/address";
 
 // ─── Styles ───────────────────────────────────────────────────
 if (!document.head.querySelector("[data-resident-sr]")) {
@@ -49,32 +50,32 @@ if (!document.head.querySelector("[data-resident-sr]")) {
     s.innerText = `
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:wght@300;400;600&display=swap');
     .sr-root { min-height:100vh; background:#f4f2ed; font-family:'Source Serif 4',serif; }
-    .sr-topbar { background:linear-gradient(135deg,#0e2554 0%,#163066 100%); border-bottom:1px solid rgba(201,162,39,0.2); position:sticky; top:0; z-index:100; }
+    .sr-topbar { background:linear-gradient(135deg,var(--color-primary, #0e2554) 0%,var(--color-primary-soft, #163066) 100%); border-bottom:1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.2); position:sticky; top:0; z-index:100; }
     .sr-topbar-inner { max-width:860px; margin:0 auto; padding:0 24px; height:60px; display:flex; align-items:center; gap:12px; }
-    .sr-gold-line { height:2px; background:linear-gradient(90deg,#c9a227,#f0d060,#c9a227); }
+    .sr-gold-line { height:2px; background:linear-gradient(90deg,var(--color-accent, #c9a227),var(--color-accent-soft, #f0d060),var(--color-accent, #c9a227)); }
     .sr-step-wrap { display:flex; align-items:center; gap:0; margin-bottom:28px; }
     .sr-step-dot { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; transition:all .2s; }
     .sr-step-dot.done   { background:#1a7a4a; color:#fff; }
-    .sr-step-dot.active { background:#0e2554; color:#fff; }
+    .sr-step-dot.active { background:var(--color-primary, #0e2554); color:#fff; }
     .sr-step-dot.idle   { background:#e4dfd4; color:#9090aa; }
     .sr-step-line { flex:1; height:2px; background:#e4dfd4; transition:background .2s; }
     .sr-step-line.done  { background:#1a7a4a; }
     .sr-cert-card { display:flex; align-items:center; gap:14px; padding:14px 16px; border:1.5px solid #e4dfd4; border-radius:8px; cursor:pointer; background:#fff; transition:all .15s; font-family:'Source Serif 4',serif; }
-    .sr-cert-card:hover { border-color:#0e2554; background:#f8f6f1; transform:translateY(-1px); box-shadow:0 4px 14px rgba(14,37,84,0.08); }
-    .sr-cert-card.selected { border-color:#0e2554; background:#edf1fa; box-shadow:0 4px 14px rgba(14,37,84,0.12); }
+    .sr-cert-card:hover { border-color:var(--color-primary, #0e2554); background:#f8f6f1; transform:translateY(-1px); box-shadow:0 4px 14px rgba(var(--color-primary-rgb, 14, 37, 84),0.08); }
+    .sr-cert-card.selected { border-color:var(--color-primary, #0e2554); background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.06); box-shadow:0 4px 14px rgba(var(--color-primary-rgb, 14, 37, 84),0.12); }
     .sr-input { width:100%; padding:10px 12px; border:1.5px solid #e4dfd4; border-radius:5px; font-family:'Source Serif 4',serif; font-size:13px; background:#fff; outline:none; color:#1a1a2e; transition:border-color .15s; box-sizing:border-box; }
-    .sr-input:focus { border-color:#0e2554; }
+    .sr-input:focus { border-color:var(--color-primary, #0e2554); }
     .sr-select { width:100%; padding:10px 12px; border:1.5px solid #e4dfd4; border-radius:5px; font-family:'Source Serif 4',serif; font-size:13px; background:#fff; outline:none; color:#1a1a2e; cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239090aa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:34px; transition:border-color .15s; box-sizing:border-box; }
-    .sr-select:focus { border-color:#0e2554; }
+    .sr-select:focus { border-color:var(--color-primary, #0e2554); }
     .sr-textarea { width:100%; padding:10px 12px; border:1.5px solid #e4dfd4; border-radius:5px; font-family:'Source Serif 4',serif; font-size:13px; background:#fff; outline:none; color:#1a1a2e; transition:border-color .15s; resize:vertical; min-height:80px; box-sizing:border-box; }
-    .sr-textarea:focus { border-color:#0e2554; }
+    .sr-textarea:focus { border-color:var(--color-primary, #0e2554); }
     .sr-label { font-size:10px; font-weight:700; color:#4a4a6a; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; display:block; }
     .sr-readonly { padding:10px 12px; background:#f8f6f1; border:1.5px solid #e4dfd4; border-radius:5px; font-size:13px; color:#4a4a6a; font-family:'Source Serif 4',serif; }
-    .sr-btn-primary { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; background:linear-gradient(135deg,#163066,#091a3e); color:#fff; border:none; border-radius:4px; font-family:'Playfair Display',serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:opacity .15s; }
+    .sr-btn-primary { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; background:linear-gradient(135deg,var(--color-primary-soft, #163066),var(--color-primary-dark, #091a3e)); color:#fff; border:none; border-radius:4px; font-family:'Playfair Display',serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:opacity .15s; }
     .sr-btn-primary:hover { opacity:.88; }
     .sr-btn-primary:disabled { opacity:.45; cursor:default; }
     .sr-btn-ghost { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; background:#fff; color:#4a4a6a; border:1.5px solid #e4dfd4; border-radius:4px; font-family:'Source Serif 4',serif; font-size:12.5px; font-weight:600; cursor:pointer; transition:all .15s; }
-    .sr-btn-ghost:hover { border-color:#0e2554; color:#0e2554; }
+    .sr-btn-ghost:hover { border-color:var(--color-primary, #0e2554); color:var(--color-primary, #0e2554); }
     @keyframes sr-fadein { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
     .sr-fadein { animation: sr-fadein 0.3s ease both; }
     @keyframes sr-pop { from { opacity:0; transform:scale(.92); } to { opacity:1; transform:scale(1); } }
@@ -725,14 +726,7 @@ function estimateResidencyStartYear(value) {
 }
 
 function profileAddress(profile) {
-    return [
-        profile?.address_house,
-        profile?.address_street,
-        profile?.purok_name,
-        profile?.street_name,
-    ]
-        .filter((part) => textValue(part))
-        .join(", ");
+    return formatResidentAddress(profile);
 }
 
 function profileChildrenNames(details) {
@@ -1028,7 +1022,7 @@ function StepIndicator({ step }) {
                                 style={{
                                     fontSize: 10,
                                     color: isActive
-                                        ? "#0e2554"
+                                        ? "var(--color-primary, #0e2554)"
                                         : isDone
                                           ? "#1a7a4a"
                                           : "#9090aa",
@@ -1238,14 +1232,10 @@ export default function SubmitRequest({ resident, onLogout }) {
     const officeSchedule =
         branding.officeSchedule || DEFAULT_PUBLIC_BRANDING.officeSchedule;
     const fullAddress = profile
-        ? [
-              profile.address_house,
-              profile.address_street,
-              branding.name,
-              branding.city,
-          ]
-              .filter((part) => String(part || "").trim())
-              .join(", ")
+        ? formatResidentAddress(profile, {
+              barangay: branding.name,
+              city: branding.city,
+          }) || "—"
         : "—";
 
     function setExtra(key, val) {
@@ -1620,7 +1610,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     fontFamily: "'Playfair Display',serif",
                                     fontSize: isMobile ? 20 : 24,
                                     fontWeight: 700,
-                                    color: "#0e2554",
+                                    color: "var(--color-primary, #0e2554)",
                                     marginBottom: 8,
                                 }}
                             >
@@ -1672,7 +1662,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                 "'Playfair Display',serif",
                                             fontSize: 18,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                         }}
                                     >
                                         {formatRequestId(success.request_id)}
@@ -1693,7 +1683,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                             >
                                 <AlertCircle
                                     size={14}
-                                    color="#9a7515"
+                                    color="var(--color-accent-dark, #9a7515)"
                                     style={{ flexShrink: 0, marginTop: 1 }}
                                 />
                                 <span
@@ -1748,7 +1738,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                         fontFamily: "'Playfair Display',serif",
                         fontSize: 15,
                         fontWeight: 700,
-                        color: "#0e2554",
+                        color: "var(--color-primary, #0e2554)",
                         marginBottom: 4,
                     }}
                 >
@@ -1762,15 +1752,15 @@ export default function SubmitRequest({ resident, onLogout }) {
             {(certsLoading || certsError) && (
                 <div
                     style={{
-                        background: certsError ? "#fff7e6" : "#edf1fa",
-                        border: `1px solid ${certsError ? "#f5d78e" : "rgba(14,37,84,0.15)"}`,
+                        background: certsError ? "#fff7e6" : "rgba(var(--color-primary-rgb, 14, 37, 84), 0.06)",
+                        border: `1px solid ${certsError ? "#f5d78e" : "rgba(var(--color-primary-rgb, 14, 37, 84),0.15)"}`,
                         borderRadius: 6,
                         padding: "10px 12px",
                         marginBottom: 12,
                         display: "flex",
                         gap: 8,
                         alignItems: "center",
-                        color: certsError ? "#b86800" : "#0e2554",
+                        color: certsError ? "#b86800" : "var(--color-primary, #0e2554)",
                         fontSize: 11.5,
                     }}
                 >
@@ -1810,7 +1800,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 transform: "translateY(-50%)",
                                 border: "none",
                                 background: "none",
-                                color: "#0e2554",
+                                color: "var(--color-primary, #0e2554)",
                                 fontFamily: "'Source Serif 4',serif",
                                 fontSize: 11.5,
                                 fontWeight: 700,
@@ -1863,9 +1853,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     height: 38,
                                     borderRadius: 8,
                                     background: isSelected
-                                        ? "rgba(14,37,84,0.1)"
+                                        ? "rgba(var(--color-primary-rgb, 14, 37, 84),0.1)"
                                         : "#f8f6f1",
-                                    border: `1px solid ${isSelected ? "rgba(14,37,84,0.2)" : "#e4dfd4"}`,
+                                    border: `1px solid ${isSelected ? "rgba(var(--color-primary-rgb, 14, 37, 84),0.2)" : "#e4dfd4"}`,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -1874,7 +1864,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                             >
                                 <Icon
                                     size={17}
-                                    color={isSelected ? "#0e2554" : "#9090aa"}
+                                    color={isSelected ? "var(--color-primary, #0e2554)" : "#9090aa"}
                                     strokeWidth={1.8}
                                 />
                             </div>
@@ -1939,9 +1929,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         width: 20,
                                         height: 20,
                                         borderRadius: "50%",
-                                        border: `2px solid ${isSelected ? "#0e2554" : "#e4dfd4"}`,
+                                        border: `2px solid ${isSelected ? "var(--color-primary, #0e2554)" : "#e4dfd4"}`,
                                         background: isSelected
-                                            ? "#0e2554"
+                                            ? "var(--color-primary, #0e2554)"
                                             : "#fff",
                                         display: "flex",
                                         alignItems: "center",
@@ -1978,7 +1968,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                             fontFamily: "'Playfair Display',serif",
                             fontSize: 14,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                             marginBottom: 4,
                         }}
                     >
@@ -2033,11 +2023,11 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     borderRadius: 6,
                                     border:
                                         page === currentCertPage
-                                            ? "1px solid #0e2554"
+                                            ? "1px solid var(--color-primary, #0e2554)"
                                             : "1px solid #e4dfd4",
                                     background:
                                         page === currentCertPage
-                                            ? "#0e2554"
+                                            ? "var(--color-primary, #0e2554)"
                                             : "#fff",
                                     color:
                                         page === currentCertPage
@@ -2084,8 +2074,8 @@ export default function SubmitRequest({ resident, onLogout }) {
             {/* Selected cert banner */}
             <div
                 style={{
-                    background: "#edf1fa",
-                    border: "1px solid rgba(14,37,84,0.15)",
+                    background: "rgba(var(--color-primary-rgb, 14, 37, 84), 0.06)",
+                    border: "1px solid rgba(var(--color-primary-rgb, 14, 37, 84),0.15)",
                     borderRadius: 8,
                     padding: "14px 16px",
                     marginBottom: 22,
@@ -2096,14 +2086,14 @@ export default function SubmitRequest({ resident, onLogout }) {
             >
                 {(() => {
                     const Icon = selectedCert?.icon || FileText;
-                    return <Icon size={18} color="#0e2554" strokeWidth={1.8} />;
+                    return <Icon size={18} color="var(--color-primary, #0e2554)" strokeWidth={1.8} />;
                 })()}
                 <div style={{ flex: 1 }}>
                     <div
                         style={{
                             fontSize: 13,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                         }}
                     >
                         {selectedCert?.name}
@@ -2116,10 +2106,10 @@ export default function SubmitRequest({ resident, onLogout }) {
                     onClick={() => setStep(1)}
                     style={{
                         background: "none",
-                        border: "1px solid rgba(14,37,84,0.2)",
+                        border: "1px solid rgba(var(--color-primary-rgb, 14, 37, 84),0.2)",
                         borderRadius: 4,
                         padding: "4px 10px",
-                        color: "#163066",
+                        color: "var(--color-primary-soft, #163066)",
                         fontSize: 11,
                         fontFamily: "'Source Serif 4',serif",
                         cursor: "pointer",
@@ -2217,12 +2207,12 @@ export default function SubmitRequest({ resident, onLogout }) {
                             marginBottom: 12,
                         }}
                     >
-                        <UserCircle size={13} color="#0e2554" />
+                        <UserCircle size={13} color="var(--color-primary, #0e2554)" />
                         <span
                             style={{
                                 fontSize: 10,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary, #0e2554)",
                                 textTransform: "uppercase",
                                 letterSpacing: 1,
                             }}
@@ -2237,7 +2227,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 border: "none",
                                 cursor: "pointer",
                                 fontSize: 11,
-                                color: "#163066",
+                                color: "var(--color-primary-soft, #163066)",
                                 fontFamily: "'Source Serif 4',serif",
                                 fontWeight: 600,
                                 padding: 0,
@@ -2335,12 +2325,12 @@ export default function SubmitRequest({ resident, onLogout }) {
                         marginBottom: 12,
                     }}
                 >
-                    <UserCircle size={13} color="#0e2554" />
+                    <UserCircle size={13} color="var(--color-primary, #0e2554)" />
                     <span
                         style={{
                             fontSize: 10,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                             textTransform: "uppercase",
                             letterSpacing: 1,
                         }}
@@ -2380,11 +2370,11 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     gap: 10,
                                     padding: "11px 12px",
                                     border: active
-                                        ? "1.5px solid #0e2554"
+                                        ? "1.5px solid var(--color-primary, #0e2554)"
                                         : "1.5px solid #e4dfd4",
                                     borderRadius: 6,
-                                    background: active ? "#edf1fa" : "#fff",
-                                    color: active ? "#0e2554" : "#4a4a6a",
+                                    background: active ? "rgba(var(--color-primary-rgb, 14, 37, 84), 0.06)" : "#fff",
+                                    color: active ? "var(--color-primary, #0e2554)" : "#4a4a6a",
                                     cursor: "pointer",
                                     fontFamily: "'Source Serif 4',serif",
                                     fontSize: 12.5,
@@ -2475,7 +2465,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                     fontFamily: "'Playfair Display',serif",
                     fontSize: 14,
                     fontWeight: 700,
-                    color: "#0e2554",
+                    color: "var(--color-primary, #0e2554)",
                     marginBottom: 16,
                 }}
             >
@@ -2531,7 +2521,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                             fontFamily: "'Playfair Display',serif",
                             fontSize: 13,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                             marginBottom: 14,
                         }}
                     >
@@ -2615,7 +2605,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                             fontFamily: "'Playfair Display',serif",
                             fontSize: 13,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                             marginBottom: 6,
                         }}
                     >
@@ -2702,7 +2692,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         style={{
                                             fontSize: 11,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                             flexShrink: 0,
                                         }}
                                     >
@@ -2852,7 +2842,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                     fontFamily: "'Playfair Display',serif",
                     fontSize: 15,
                     fontWeight: 700,
-                    color: "#0e2554",
+                    color: "var(--color-primary, #0e2554)",
                     marginBottom: 18,
                 }}
             >
@@ -3016,7 +3006,7 @@ export default function SubmitRequest({ resident, onLogout }) {
             >
                 <AlertCircle
                     size={14}
-                    color="#9a7515"
+                    color="var(--color-accent-dark, #9a7515)"
                     style={{ flexShrink: 0, marginTop: 1 }}
                 />
                 <span
@@ -3070,7 +3060,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 fontFamily: "'Playfair Display',serif",
                                 fontSize: isMobile ? 20 : 24,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary, #0e2554)",
                                 margin: "0 0 4px",
                             }}
                         >
@@ -3211,7 +3201,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                     "'Playfair Display',serif",
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                             }}
                                         >
                                             How It Works
@@ -3257,7 +3247,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                         width: 24,
                                                         height: 24,
                                                         borderRadius: "50%",
-                                                        background: "#0e2554",
+                                                        background: "var(--color-primary, #0e2554)",
                                                         color: "#fff",
                                                         display: "flex",
                                                         alignItems: "center",
@@ -3336,7 +3326,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     <p
                                         style={{
                                             fontSize: 11,
-                                            color: "#9a7515",
+                                            color: "var(--color-accent-dark, #9a7515)",
                                             margin: 0,
                                         }}
                                     >
@@ -3367,7 +3357,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                                                     "'Playfair Display',serif",
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                             }}
                                         >
                                             What to Bring

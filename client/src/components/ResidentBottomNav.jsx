@@ -116,7 +116,7 @@ if (!document.head.querySelector("[data-rbn-nav]")) {
     }
     .rbn-fab {
         width: 52px; height: 52px;
-        background: linear-gradient(135deg, var(--color-accent), #9a7515);
+        background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark, #9a7515));
         border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         box-shadow: 0 4px 18px rgba(var(--color-accent-rgb),0.45), 0 2px 6px rgba(0,0,0,0.15);

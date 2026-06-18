@@ -59,7 +59,7 @@ if (!document.head.querySelector("[data-resident-notifications]")) {
         font-family: 'Playfair Display', serif;
         font-size: 14px;
         font-weight: 700;
-        color: #0e2554;
+        color: var(--color-primary, #0e2554);
         margin-bottom: 6px;
     }
     .rn-message {
@@ -83,7 +83,7 @@ if (!document.head.querySelector("[data-resident-notifications]")) {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        color: #0e2554;
+        color: var(--color-primary, #0e2554);
         font-size: 12px;
         font-weight: 700;
         background: none;
@@ -95,7 +95,7 @@ if (!document.head.querySelector("[data-resident-notifications]")) {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: #c9a227;
+        background: var(--color-accent, #c9a227);
         flex-shrink: 0;
     }
     @media (max-width: 1024px) {
@@ -130,7 +130,7 @@ function NotificationIcon({ type }) {
         return <Check size={18} color="#1a7a4a" />;
     }
     if (normalized.includes("approved")) {
-        return <Bell size={18} color="#0e2554" />;
+        return <Bell size={18} color="var(--color-primary, #0e2554)" />;
     }
     return <Clock size={18} color="#9090aa" />;
 }

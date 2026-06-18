@@ -17,6 +17,16 @@ import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
 
+const QR_CARD_COLORS = Object.freeze({
+    primary: "#0e2554",
+    primarySoft: "#163066",
+    accent: "#c9a227",
+    accentSoft: "#f0d060",
+    accentRgba80: "rgba(201,162,39,0.8)",
+    accentRgba90: "rgba(201,162,39,0.9)",
+    accentBorder: "rgba(201,162,39,0.5)",
+});
+
 // ─── Helper: format resident ID as RES-XXXX ───────────────────
 function formatResidentId(raw) {
     const num = parseInt(raw, 10);
@@ -198,7 +208,7 @@ function WalletCard({ name, formattedId, qrValue, logoSrc }) {
                         size={108}
                         level="H"
                         includeMargin={false}
-                        fgColor="#0e2554"
+                        fgColor={QR_CARD_COLORS.primary}
                         bgColor="#ffffff"
                     />
                 </div>
@@ -275,14 +285,14 @@ export default function MyQRCode({ resident, onLogout }) {
             ctx.fillRect(0, 0, W, H);
 
             // ── Header (scaled: 110 × 638/540 ≈ 130) ──
-            ctx.fillStyle = "#0e2554";
+            ctx.fillStyle = QR_CARD_COLORS.primary;
             ctx.fillRect(0, 0, W, 130);
 
             // Gold accent line (scaled: 10 → 12)
             const grad = ctx.createLinearGradient(0, 0, W, 0);
-            grad.addColorStop(0, "#c9a227");
-            grad.addColorStop(0.5, "#f0d060");
-            grad.addColorStop(1, "#c9a227");
+            grad.addColorStop(0, QR_CARD_COLORS.accent);
+            grad.addColorStop(0.5, QR_CARD_COLORS.accentSoft);
+            grad.addColorStop(1, QR_CARD_COLORS.accent);
             ctx.fillStyle = grad;
             ctx.fillRect(0, 130, W, 12);
 
@@ -293,7 +303,7 @@ export default function MyQRCode({ resident, onLogout }) {
             ctx.fillText("CertiFast", 33, 76);
 
             // Brand sub (scaled: 18 → 21)
-            ctx.fillStyle = "rgba(201,162,39,0.9)";
+            ctx.fillStyle = QR_CARD_COLORS.accentRgba90;
             ctx.font = "21px Georgia, serif";
             ctx.fillText("BRGY. EAST TAPINAC", 33, 108);
 
@@ -321,7 +331,7 @@ export default function MyQRCode({ resident, onLogout }) {
 
             // ── Name with word-wrap (scaled: 34 → 40, lineH 42 → 50, nameY 188 → 222) ──
             ctx.textAlign = "center";
-            ctx.fillStyle = "#0e2554";
+            ctx.fillStyle = QR_CARD_COLORS.primary;
             ctx.font = "bold 40px Georgia, serif";
 
             const maxW = W - 70;
@@ -458,7 +468,7 @@ export default function MyQRCode({ resident, onLogout }) {
                             size={300}
                             level="H"
                             includeMargin={false}
-                            fgColor="#0e2554"
+                            fgColor={QR_CARD_COLORS.primary}
                             bgColor="#ffffff"
                         />
                     </div>
@@ -479,7 +489,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                     fontFamily: "'Playfair Display', serif",
                                     fontSize: isMobile ? 20 : 22,
                                     fontWeight: 700,
-                                    color: "#0e2554",
+                                    color: "var(--color-primary, #0e2554)",
                                     margin: "0 0 6px",
                                 }}
                             >
@@ -522,7 +532,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                     <div
                                         style={{
                                             background:
-                                                "linear-gradient(135deg, #0e2554, #163066)",
+                                                `linear-gradient(135deg, ${QR_CARD_COLORS.primary}, ${QR_CARD_COLORS.primarySoft})`,
                                             padding: "14px 20px",
                                             display: "flex",
                                             alignItems: "center",
@@ -544,7 +554,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                             <div
                                                 style={{
                                                     fontSize: 9,
-                                                    color: "rgba(201,162,39,0.8)",
+                                                    color: QR_CARD_COLORS.accentRgba80,
                                                     letterSpacing: "1.5px",
                                                     textTransform: "uppercase",
                                                     marginTop: 1,
@@ -558,7 +568,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                 width: 32,
                                                 height: 32,
                                                 borderRadius: "50%",
-                                                border: "1.5px solid rgba(201,162,39,0.5)",
+                                                border: `1.5px solid ${QR_CARD_COLORS.accentBorder}`,
                                                 overflow: "hidden",
                                             }}
                                         >
@@ -577,7 +587,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                         style={{
                                             height: 3,
                                             background:
-                                                "linear-gradient(90deg, #c9a227, #f0d060, #c9a227)",
+                                                `linear-gradient(90deg, ${QR_CARD_COLORS.accent}, ${QR_CARD_COLORS.accentSoft}, ${QR_CARD_COLORS.accent})`,
                                         }}
                                     />
                                     <div
@@ -596,7 +606,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                         "'Playfair Display', serif",
                                                     fontSize: 18,
                                                     fontWeight: 700,
-                                                    color: "#0e2554",
+                                                    color: QR_CARD_COLORS.primary,
                                                 }}
                                             >
                                                 {name}
@@ -614,7 +624,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                         fontFamily:
                                                             "'Courier New', monospace",
                                                         fontWeight: 700,
-                                                        color: "#0e2554",
+                                                        color: QR_CARD_COLORS.primary,
                                                         fontSize: 12.5,
                                                         letterSpacing: "0.5px",
                                                     }}
@@ -649,9 +659,9 @@ export default function MyQRCode({ resident, onLogout }) {
                                                         width: 18,
                                                         height: 18,
                                                         [`border${v[0].toUpperCase() + v.slice(1)}`]:
-                                                            "2.5px solid #c9a227",
+                                                            `2.5px solid ${QR_CARD_COLORS.accent}`,
                                                         [`border${h[0].toUpperCase() + h.slice(1)}`]:
-                                                            "2.5px solid #c9a227",
+                                                            `2.5px solid ${QR_CARD_COLORS.accent}`,
                                                         borderRadius:
                                                             v === "top" &&
                                                             h === "left"
@@ -674,7 +684,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                 size={qrSize}
                                                 level="H"
                                                 includeMargin={false}
-                                                fgColor="#0e2554"
+                                                fgColor={QR_CARD_COLORS.primary}
                                                 bgColor="#ffffff"
                                             />
                                         </div>
@@ -763,7 +773,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                             style={{
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                                 marginBottom: 2,
                                             }}
                                         >
@@ -829,8 +839,8 @@ export default function MyQRCode({ resident, onLogout }) {
                                             width: 40,
                                             height: 40,
                                             borderRadius: 8,
-                                            background: "rgba(14,37,84,0.06)",
-                                            border: "1px solid rgba(14,37,84,0.1)",
+                                            background: "rgba(var(--color-primary-rgb, 14, 37, 84),0.06)",
+                                            border: "1px solid rgba(var(--color-primary-rgb, 14, 37, 84),0.1)",
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
@@ -839,7 +849,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                     >
                                         <Printer
                                             size={18}
-                                            color="#0e2554"
+                                            color="var(--color-primary, #0e2554)"
                                             strokeWidth={1.8}
                                         />
                                     </div>
@@ -848,7 +858,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                             style={{
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                                 marginBottom: 2,
                                             }}
                                         >
@@ -882,7 +892,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                             gap: 7,
                                             padding: "9px 16px",
                                             background:
-                                                "linear-gradient(135deg, #163066, #091a3e)",
+                                                "linear-gradient(135deg, var(--color-primary-soft, #163066), var(--color-primary-dark, #091a3e))",
                                             color: "#fff",
                                             border: "none",
                                             borderRadius: 4,
@@ -914,7 +924,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                 >
                                     <Scissors
                                         size={13}
-                                        color="#9a7515"
+                                        color="var(--color-accent-dark, #9a7515)"
                                         style={{ flexShrink: 0, marginTop: 2 }}
                                     />
                                     <div
@@ -963,7 +973,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                     "'Playfair Display', serif",
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                             }}
                                         >
                                             How to Use Your QR Code
@@ -1018,7 +1028,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                         width: 28,
                                                         height: 28,
                                                         borderRadius: "50%",
-                                                        background: "#0e2554",
+                                                        background: "var(--color-primary, #0e2554)",
                                                         color: "#fff",
                                                         display: "flex",
                                                         alignItems: "center",
@@ -1080,7 +1090,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                                     "'Playfair Display', serif",
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                             }}
                                         >
                                             What to Bring
@@ -1124,8 +1134,8 @@ export default function MyQRCode({ resident, onLogout }) {
                                                         height: 6,
                                                         borderRadius: "50%",
                                                         background: item.r
-                                                            ? "#0e2554"
-                                                            : "#c9a227",
+                                                            ? "var(--color-primary, #0e2554)"
+                                                            : "var(--color-accent, #c9a227)",
                                                         flexShrink: 0,
                                                         marginTop: 5,
                                                     }}

@@ -62,11 +62,11 @@ if (!document.head.querySelector("[data-cf-rep-v2]")) {
         font-family:'Source Serif 4',serif;
         position:relative; overflow:hidden;
     }
-    .rep-type-card:hover { border-color:#0e2554; box-shadow:0 4px 18px rgba(14,37,84,0.1); transform:translateY(-1px); }
-    .rep-type-card.selected { border-color:#0e2554; background:#f0f3ff; box-shadow:0 4px 18px rgba(14,37,84,0.12); }
+    .rep-type-card:hover { border-color:var(--color-primary, #0e2554); box-shadow:0 4px 18px rgba(var(--color-primary-rgb, 14, 37, 84),0.1); transform:translateY(-1px); }
+    .rep-type-card.selected { border-color:var(--color-primary, #0e2554); background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); box-shadow:0 4px 18px rgba(var(--color-primary-rgb, 14, 37, 84),0.12); }
     .rep-type-card.selected::before {
         content:''; position:absolute; top:0; left:0; right:0; height:3px;
-        background:linear-gradient(90deg,#0e2554,#1e3d7a);
+        background:linear-gradient(90deg,var(--color-primary, #0e2554),var(--color-primary-soft, #1e3d7a));
     }
 
     /* Format buttons */
@@ -76,7 +76,7 @@ if (!document.head.querySelector("[data-cf-rep-v2]")) {
         background:#fff; cursor:pointer; transition:all .15s;
         font-family:'Source Serif 4',serif; flex:1; min-width:80px;
     }
-    .rep-fmt-btn:hover { border-color:#0e2554; }
+    .rep-fmt-btn:hover { border-color:var(--color-primary, #0e2554); }
     .rep-fmt-btn.selected-pdf   { border-color:#b02020; background:#fdecea; }
     .rep-fmt-btn.selected-xlsx  { border-color:#1a7a4a; background:#e8f5ee; }
     .rep-fmt-btn.selected-csv   { border-color:#1a4a8a; background:#e8eef8; }
@@ -87,14 +87,14 @@ if (!document.head.querySelector("[data-cf-rep-v2]")) {
         background:#fff; font-size:12px; color:#4a4a6a; cursor:pointer;
         font-family:'Source Serif 4',serif; transition:all .15s; white-space:nowrap;
     }
-    .rep-period-btn:hover { border-color:#0e2554; color:#0e2554; }
-    .rep-period-btn.active { background:#0e2554; color:#fff; border-color:#0e2554; font-weight:600; }
+    .rep-period-btn:hover { border-color:var(--color-primary, #0e2554); color:var(--color-primary, #0e2554); }
+    .rep-period-btn.active { background:var(--color-primary, #0e2554); color:#fff; border-color:var(--color-primary, #0e2554); font-weight:600; }
 
     /* Generate button */
     .rep-generate-btn {
         display:inline-flex; align-items:center; gap:8px;
         padding:13px 28px;
-        background:linear-gradient(135deg,#163066,#091a3e);
+        background:linear-gradient(135deg,var(--color-primary-soft, #163066),var(--color-primary-dark, #091a3e));
         color:#fff; border:none; border-radius:5px;
         font-family:'Playfair Display',serif; font-size:13px;
         font-weight:700; letter-spacing:1px; text-transform:uppercase;
@@ -105,7 +105,7 @@ if (!document.head.querySelector("[data-cf-rep-v2]")) {
 
     /* Toast */
     @keyframes rep-toast-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    .rep-toast { position:fixed; bottom:28px; right:28px; background:#1a1a2e; color:#fff; padding:12px 20px; border-radius:6px; font-size:12.5px; display:flex; align-items:center; gap:10px; z-index:999; box-shadow:0 4px 18px rgba(0,0,0,.22); animation:rep-toast-in .25s ease both; border-left:3px solid #c9a227; }
+    .rep-toast { position:fixed; bottom:28px; right:28px; background:#1a1a2e; color:#fff; padding:12px 20px; border-radius:6px; font-size:12.5px; display:flex; align-items:center; gap:10px; z-index:999; box-shadow:0 4px 18px rgba(0,0,0,.22); animation:rep-toast-in .25s ease both; border-left:3px solid var(--color-accent, #c9a227); }
     .rep-toast.success { border-left-color:#1a7a4a; }
     .rep-toast.error   { border-left-color:#b02020; background:#3a0a0a; }
 
@@ -133,7 +133,7 @@ const REPORT_TYPES = [
         label: "Requests Summary",
         desc: "All certificate and permit requests with status, type, and dates.",
         icon: ClipboardList,
-        accent: "#0e2554",
+        accent: "var(--color-primary, #0e2554)",
         bg: "#e8eef8",
     },
     {
@@ -345,7 +345,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                             <Menu size={20} />
                         </button>
                     )}
-                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 16 : 18, fontWeight: 700, color: "#0e2554", flex: 1 }}>
+                    <div style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 16 : 18, fontWeight: 700, color: "var(--color-primary, #0e2554)", flex: 1 }}>
                         Reports &amp; Exports
                         {!isMobile && <span style={{ fontSize: 12, fontFamily: "'Source Serif 4',serif", color: "#9090aa", fontWeight: 400, marginLeft: 10 }}>Generate and download official barangay reports</span>}
                     </div>
@@ -390,11 +390,11 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                                                 <IconComp size={18} color={selectedType === key ? accent : "#9090aa"} strokeWidth={1.8} />
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 13, fontWeight: 700, color: selectedType === key ? "#0e2554" : "#1a1a2e", marginBottom: 2 }}>{label}</div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: selectedType === key ? "var(--color-primary, #0e2554)" : "#1a1a2e", marginBottom: 2 }}>{label}</div>
                                                 <div style={{ fontSize: 11.5, color: "#9090aa", lineHeight: 1.5 }}>{desc}</div>
                                             </div>
                                             {selectedType === key && (
-                                                <CheckCircle size={16} color="#0e2554" strokeWidth={2} style={{ flexShrink: 0 }} />
+                                                <CheckCircle size={16} color="var(--color-primary, #0e2554)" strokeWidth={2} style={{ flexShrink: 0 }} />
                                             )}
                                         </div>
                                         );
@@ -463,7 +463,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                             {/* PDF note */}
                             {selectedFormat === "pdf" && (
                                 <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
-                                    <AlertCircle size={13} color="#9a7515" style={{ flexShrink: 0, marginTop: 2 }} />
+                                    <AlertCircle size={13} color="var(--color-accent-dark, #9a7515)" style={{ flexShrink: 0, marginTop: 2 }} />
                                     <span style={{ fontSize: 11.5, color: "#7a6530" }}>
                                         PDF will open in a new tab with a print dialog. Use <strong>Save as PDF</strong> in your browser's print options to download.
                                     </span>
@@ -475,7 +475,7 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                     {/* ── Recent Exports ── */}
                     <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 8, overflow: "hidden" }}>
                         <div style={{ padding: "14px 24px", borderBottom: "1px solid #e4dfd4", background: "#f8f6f1", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: 700, color: "#0e2554" }}>
+                            <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 14, fontWeight: 700, color: "var(--color-primary, #0e2554)" }}>
                                 Recent Exports
                                 <span style={{ fontFamily: "'Source Serif 4',serif", fontSize: 11, color: "#9090aa", fontWeight: 400, marginLeft: 8 }}>{recentExports.length} records</span>
                             </div>
@@ -616,8 +616,8 @@ function buildPrintHtml(data, type, periodLabel, admin) {
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'Source Serif 4',serif; color:#1a1a2e; background:#fff; padding:32px; max-width:780px; margin:0 auto; }
     @media print { body { padding:16px; } @page { margin:15mm; } }
-    .header { text-align:center; padding-bottom:18px; margin-bottom:18px; border-bottom:2px solid #c9a227; }
-    .header h1 { font-family:'Playfair Display',serif; font-size:22px; color:#0e2554; margin-bottom:4px; }
+    .header { text-align:center; padding-bottom:18px; margin-bottom:18px; border-bottom:2px solid var(--color-accent, #c9a227); }
+    .header h1 { font-family:'Playfair Display',serif; font-size:22px; color:var(--color-primary, #0e2554); margin-bottom:4px; }
     .header p  { font-size:11px; color:#9090aa; }
     .meta { display:flex; justify-content:space-between; margin-bottom:22px; font-size:11.5px; color:#4a4a6a; padding:10px 14px; background:#f8f6f1; border-radius:4px; }
     table { width:100%; border-collapse:collapse; margin-bottom:20px; }
@@ -637,12 +637,12 @@ function buildPrintHtml(data, type, periodLabel, admin) {
         <span><strong>Period:</strong> ${periodLabel}</span>
         <span><strong>Generated:</strong> ${now} by ${adminName}</span>
     </div>
-    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:#0e2554;margin-bottom:12px;">Certificate Type Breakdown</h3>
+    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:var(--color-primary, #0e2554);margin-bottom:12px;">Certificate Type Breakdown</h3>
     <table>
         <thead><tr><th>Certificate / Permit Type</th><th>Count</th></tr></thead>
         <tbody>${certRows}</tbody>
     </table>
-    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:#0e2554;margin-bottom:12px;">Request Status Summary</h3>
+    <h3 style="font-family:'Playfair Display',serif;font-size:15px;color:var(--color-primary, #0e2554);margin-bottom:12px;">Request Status Summary</h3>
     <table>
         <thead><tr><th>Status</th><th>Total</th></tr></thead>
         <tbody>${statsRow}</tbody>

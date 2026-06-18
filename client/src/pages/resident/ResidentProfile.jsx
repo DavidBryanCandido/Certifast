@@ -20,6 +20,7 @@ import { supabase } from "../../supabaseClient";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
+import { formatAddressParts } from "../../utils/address";
 
 if (!document.head.querySelector("[data-resident-home]")) {
     const s = document.createElement("style");
@@ -27,7 +28,7 @@ if (!document.head.querySelector("[data-resident-home]")) {
     s.innerText = `
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Serif+4:wght@300;400;600&display=swap');
     .rh-root { min-height:100vh; background:#f4f2ed; font-family:'Source Serif 4',serif; }
-    .rh-topbar { background:linear-gradient(135deg,#0e2554 0%,#163066 100%); border-bottom:1px solid rgba(201,162,39,0.2); position:sticky; top:0; z-index:100; }
+    .rh-topbar { background:linear-gradient(135deg,var(--color-primary, #0e2554) 0%,var(--color-primary-soft, #163066) 100%); border-bottom:1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.2); position:sticky; top:0; z-index:100; }
     .rh-topbar-inner { padding:0 24px; height:60px; display:flex; align-items:center; gap:12px; }
     @keyframes rhFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .rh-fadein { animation:rhFadeUp 0.35s ease both; }
@@ -625,8 +626,14 @@ export default function ResidentProfile({ resident, onLogout }) {
                         return match?.name || "";
                     })();
               if (street) parts.push(street);
-              parts.push("Barangay East Tapinac", "Olongapo City");
-              return parts.filter(Boolean).join(", ");
+              return formatAddressParts(
+                  parts,
+                  profile.address_barangay,
+                  "Barangay East Tapinac",
+                  profile.address_city,
+                  "Olongapo City",
+                  profile.address_province,
+              );
           })()
         : "-";
 
@@ -671,7 +678,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                 }
                 .rp-input:focus,
                 .rp-select:focus,
-                .rp-textarea:focus { border-color:#0e2554; }
+                .rp-textarea:focus { border-color:var(--color-primary, #0e2554); }
                 .rp-select {
                     cursor:pointer;
                     appearance:none;
@@ -741,12 +748,12 @@ export default function ResidentProfile({ resident, onLogout }) {
                     background:#fff;
                     border:1.5px solid #d8d0bd;
                     border-radius:5px;
-                    color:#0e2554;
+                    color:var(--color-primary, #0e2554);
                     font-size:12.5px;
                     font-weight:600;
                     cursor:pointer;
                 }
-                .rp-upload-btn:hover { border-color:#0e2554; }
+                .rp-upload-btn:hover { border-color:var(--color-primary, #0e2554); }
                 .rp-inline-action {
                     display:inline-flex;
                     align-items:center;
@@ -761,9 +768,9 @@ export default function ResidentProfile({ resident, onLogout }) {
                     font-weight:600;
                     cursor:pointer;
                 }
-                .rp-inline-action:hover { border-color:#0e2554; color:#0e2554; }
+                .rp-inline-action:hover { border-color:var(--color-primary, #0e2554); color:var(--color-primary, #0e2554); }
                 .rp-link {
-                    color:#0e2554;
+                    color:var(--color-primary, #0e2554);
                     text-decoration:none;
                     font-weight:600;
                 }
@@ -804,7 +811,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                                     fontFamily: "'Playfair Display', serif",
                                     fontSize: isMobile ? 20 : 22,
                                     fontWeight: 700,
-                                    color: "#0e2554",
+                                    color: "var(--color-primary, #0e2554)",
                                     margin: "0 0 3px",
                                 }}
                             >
@@ -833,7 +840,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                                     background: "#fff",
                                     border: "1.5px solid #e4dfd4",
                                     borderRadius: 4,
-                                    color: "#0e2554",
+                                    color: "var(--color-primary, #0e2554)",
                                     fontFamily: "'Source Serif 4',serif",
                                     fontSize: 12.5,
                                     fontWeight: 600,
@@ -928,7 +935,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                                 className="rh-fadein"
                                 style={{
                                     background:
-                                        "linear-gradient(135deg, #0e2554, #163066)",
+                                        "linear-gradient(135deg, var(--color-primary, #0e2554), var(--color-primary-soft, #163066))",
                                     borderRadius: 8,
                                     padding: "20px 24px",
                                     marginBottom: 14,
@@ -942,15 +949,15 @@ export default function ResidentProfile({ resident, onLogout }) {
                                         width: 56,
                                         height: 56,
                                         borderRadius: "50%",
-                                        background: "rgba(201,162,39,0.15)",
-                                        border: "2px solid rgba(201,162,39,0.5)",
+                                        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
+                                        border: "2px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.5)",
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: 20,
                                         fontWeight: 700,
-                                        color: "#c9a227",
+                                        color: "var(--color-accent, #c9a227)",
                                         flexShrink: 0,
                                     }}
                                 >
@@ -1005,14 +1012,14 @@ export default function ResidentProfile({ resident, onLogout }) {
 
                             <div className="rp-card rh-fadein">
                                 <div className="rp-card-head">
-                                    <User size={13} color="#0e2554" />
+                                    <User size={13} color="var(--color-primary, #0e2554)" />
                                     <span
                                         style={{
                                             fontFamily:
                                                 "'Playfair Display',serif",
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                         }}
                                     >
                                         Identity and Residency
@@ -1583,14 +1590,14 @@ export default function ResidentProfile({ resident, onLogout }) {
 
                             <div className="rp-card rh-fadein">
                                 <div className="rp-card-head">
-                                    <Users size={13} color="#0e2554" />
+                                    <Users size={13} color="var(--color-primary, #0e2554)" />
                                     <span
                                         style={{
                                             fontFamily:
                                                 "'Playfair Display',serif",
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                         }}
                                     >
                                         Family Details
@@ -1803,14 +1810,14 @@ export default function ResidentProfile({ resident, onLogout }) {
 
                             <div className="rp-card rh-fadein">
                                 <div className="rp-card-head">
-                                    <Briefcase size={13} color="#0e2554" />
+                                    <Briefcase size={13} color="var(--color-primary, #0e2554)" />
                                     <span
                                         style={{
                                             fontFamily:
                                                 "'Playfair Display',serif",
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                         }}
                                     >
                                         Work and Business
@@ -2231,7 +2238,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                                             gap: 7,
                                             padding: "9px 22px",
                                             background:
-                                                "linear-gradient(135deg, #163066, #091a3e)",
+                                                "linear-gradient(135deg, var(--color-primary-soft, #163066), var(--color-primary-dark, #091a3e))",
                                             color: "#fff",
                                             border: "none",
                                             borderRadius: 4,
@@ -2272,7 +2279,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                             >
                                 <AlertCircle
                                     size={13}
-                                    color="#9a7515"
+                                    color="var(--color-accent-dark, #9a7515)"
                                     style={{ flexShrink: 0, marginTop: 1 }}
                                 />
                                 <span

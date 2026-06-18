@@ -211,7 +211,7 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       color:#1a1a2e; background:#f9f7f2; outline:none;
       transition:border-color .15s, background .15s; box-sizing:border-box;
     }
-    .reg-input:focus { border-color:var(--color-primary); background:#f0f3ff; }
+    .reg-input:focus { border-color:var(--color-primary); background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
     .reg-input::placeholder { color:#b0b0c8; }
     .reg-input-bare {
       width:100%; padding:11px 14px;
@@ -220,7 +220,7 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       color:#1a1a2e; background:#f9f7f2; outline:none;
       transition:border-color .15s, background .15s; box-sizing:border-box;
     }
-    .reg-input-bare:focus { border-color:var(--color-primary); background:#f0f3ff; }
+    .reg-input-bare:focus { border-color:var(--color-primary); background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
     .reg-input-bare::placeholder { color:#b0b0c8; }
     .reg-input-locked {
       width:100%; padding:11px 14px 11px 40px;
@@ -239,7 +239,7 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       background-repeat:no-repeat; background-position:right 12px center;
       transition:border-color .15s; box-sizing:border-box;
     }
-    .reg-select:focus { border-color:var(--color-primary); background:#f0f3ff; }
+    .reg-select:focus { border-color:var(--color-primary); background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
     /* Buttons */
     .reg-btn-primary {
       display:inline-flex; align-items:center; gap:7px; padding:12px 24px;
@@ -264,7 +264,7 @@ if (!document.head.querySelector("[data-certifast-reg-v4]")) {
       padding:28px 16px; text-align:center;
       cursor:pointer; transition:all .2s; background:#f8faff;
     }
-    .reg-upload-zone:hover { border-color:var(--color-primary); background:#f0f3ff; }
+    .reg-upload-zone:hover { border-color:var(--color-primary); background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
     .reg-upload-zone.has-file { border-color:#1a7a4a; background:#f0faf4; border-style:solid; }
     /* Checkbox */
     .reg-checkbox {
@@ -1769,7 +1769,7 @@ export default function ResidentRegister({ onSuccess }) {
             {/* Summary */}
             <div
                 style={{
-                    background: "#edf1fa",
+                    background: "rgba(var(--color-primary-rgb, 14, 37, 84), 0.06)",
                     border: "1px solid rgba(var(--color-primary-rgb),.15)",
                     borderRadius: 7,
                     padding: "12px 16px",

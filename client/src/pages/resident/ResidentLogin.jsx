@@ -56,7 +56,7 @@ if (!document.head.querySelector("[data-certifast-resident]")) {
       color: #1a1a2e; background: #f9f7f2; outline: none;
       transition: border-color .18s, background .18s; box-sizing: border-box;
     }
-    .r-input:focus { border-color: var(--color-primary); background: #f0f3ff; }
+    .r-input:focus { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
     .r-input::placeholder { color: #9090aa; font-size: 13px; }
     .r-input:-webkit-autofill,
     .r-input:-webkit-autofill:hover,
@@ -246,7 +246,7 @@ export default function ResidentLogin({ onLogin }) {
                                 background:
                                     noticeModal.tone === "danger"
                                         ? "linear-gradient(135deg,#7a0a0a,#b02020)"
-                                        : "linear-gradient(135deg,#9a7515,#c28a10)",
+                                        : "linear-gradient(135deg,var(--color-accent-dark, #9a7515),var(--color-accent, #c9a227))",
                                 color: "#fff",
                                 fontFamily: "'Playfair Display', serif",
                                 fontSize: 16,

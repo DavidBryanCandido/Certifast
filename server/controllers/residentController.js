@@ -83,6 +83,8 @@ function cleanProfileDetails(value) {
 const PROFILE_SELECT = `SELECT r.resident_id, r.full_name, r.first_name, r.middle_name, r.last_name,
               r.email, r.contact_number,
               r.address_house, r.address_street,
+              to_jsonb(r)->>'address_city' AS address_city,
+              to_jsonb(r)->>'address_province' AS address_province,
               r.house_number, r.purok_id, r.street_id, r.street_other,
               r.date_of_birth, r.civil_status, r.nationality, r.gender,
               r.place_of_birth, r.occupation, r.years_of_residency,

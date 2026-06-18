@@ -2,6 +2,7 @@
 const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 const pool = require("../db/pool");
+const { isSupabaseConnectivityError } = require("../utils/supabaseAuthError");
 
 const supabaseUrl =
     process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -29,6 +30,13 @@ async function residentAuth(req, res, next) {
         } = await supabase.auth.getUser(token);
 
         if (error || !user) {
+            if (isSupabaseConnectivityError(error)) {
+                console.error("Supabase resident authentication failed:", error);
+                return res.status(503).json({
+                    message:
+                        "The server could not verify your Supabase session. Please restart the API server and try again.",
+                });
+            }
             return res.status(403).json({ message: "Invalid or expired token" });
         }
 
@@ -54,7 +62,14 @@ async function residentAuth(req, res, next) {
             full_name: resident.full_name,
         };
         next();
-    } catch {
+    } catch (error) {
+        if (isSupabaseConnectivityError(error)) {
+            console.error("Supabase resident authentication failed:", error);
+            return res.status(503).json({
+                message:
+                    "The server could not verify your Supabase session. Please restart the API server and try again.",
+            });
+        }
         return res.status(403).json({ message: "Invalid token" });
     }
 }

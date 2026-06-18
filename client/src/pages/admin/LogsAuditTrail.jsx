@@ -57,7 +57,7 @@ if (!document.head.querySelector("[data-cf-logs]")) {
       width:100%; text-align:left; font-family:'Source Serif 4',serif;
     }
     .lg-nav-item:hover { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.9); }
-    .lg-nav-item.active { background:rgba(201,162,39,0.12); color:#fff; border-left-color:#c9a227; }
+    .lg-nav-item.active { background:rgba(var(--color-accent-rgb, 201, 162, 39),0.12); color:#fff; border-left-color:var(--color-accent, #c9a227); }
     .lg-nav-item-icon {
       display:flex; align-items:center; justify-content:center; padding:10px 0;
       color:rgba(255,255,255,0.65); cursor:pointer; border-left:3px solid transparent;
@@ -65,7 +65,7 @@ if (!document.head.querySelector("[data-cf-logs]")) {
       width:100%; font-family:'Source Serif 4',serif;
     }
     .lg-nav-item-icon:hover { background:rgba(255,255,255,0.06); }
-    .lg-nav-item-icon.active { background:rgba(201,162,39,0.12); color:#fff; border-left-color:#c9a227; }
+    .lg-nav-item-icon.active { background:rgba(var(--color-accent-rgb, 201, 162, 39),0.12); color:#fff; border-left-color:var(--color-accent, #c9a227); }
     .lg-log-row {
       display:grid; grid-template-columns:140px 110px 1fr 160px 100px;
       align-items:center; padding:12px 20px; border-bottom:1px solid #f0ece4;
@@ -90,21 +90,21 @@ if (!document.head.querySelector("[data-cf-logs]")) {
       border-radius:4px; font-family:'Source Serif 4',serif; font-size:12px;
       color:#1a1a2e; outline:none; background:#fff;
     }
-    .lg-search-input:focus { border-color:#0e2554; }
+    .lg-search-input:focus { border-color:var(--color-primary, #0e2554); }
     .lg-select {
       padding:7px 12px; border:1.5px solid #e4dfd4; border-radius:4px;
       font-family:'Source Serif 4',serif; font-size:11.5px; color:#1a1a2e;
       background:#fff; outline:none; cursor:pointer;
     }
-    .lg-select:focus { border-color:#0e2554; }
+    .lg-select:focus { border-color:var(--color-primary, #0e2554); }
     .lg-pg-btn {
       min-width:30px; height:30px; padding:0 9px; border:1.5px solid #e4dfd4;
       border-radius:4px; background:#fff; font-size:11.5px; color:#4a4a6a;
       cursor:pointer; font-family:'Source Serif 4',serif;
       display:inline-flex; align-items:center; justify-content:center; transition:all .15s;
     }
-    .lg-pg-btn:hover:not(:disabled) { background:#f8f6f1; border-color:#0e2554; color:#0e2554; }
-    .lg-pg-btn.active { background:#0e2554; color:#fff; border-color:#0e2554; font-weight:700; }
+    .lg-pg-btn:hover:not(:disabled) { background:#f8f6f1; border-color:var(--color-primary, #0e2554); color:var(--color-primary, #0e2554); }
+    .lg-pg-btn.active { background:var(--color-primary, #0e2554); color:#fff; border-color:var(--color-primary, #0e2554); font-weight:700; }
     .lg-pg-btn:disabled { opacity:.35; cursor:not-allowed; }
     .lg-drawer {
       position:fixed; top:0; right:0; bottom:0; width:440px;
@@ -501,7 +501,7 @@ function LogDrawer({ log, onClose, isMobile }) {
                                 fontFamily: "'Playfair Display',serif",
                                 fontSize: 15,
                                 fontWeight: 700,
-                                color: "#0e2554",
+                                color: "var(--color-primary, #0e2554)",
                             }}
                         >
                             Log Entry Detail
@@ -819,7 +819,7 @@ export default function LogsAuditTrail({
         },
     ];
     const statTop = {
-        navy: "linear-gradient(90deg,#0e2554,#163066)",
+        navy: "linear-gradient(90deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))",
         green: "linear-gradient(90deg,#1a7a4a,#2da866)",
         amber: "linear-gradient(90deg,#b86800,#e08c20)",
         purple: "linear-gradient(90deg,#6a3db8,#9060e0)",
@@ -849,7 +849,7 @@ export default function LogsAuditTrail({
                             margin: 0,
                             fontFamily: "'Playfair Display',serif",
                             fontSize: 20,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                         }}
                     >
                         Restricted Access
@@ -949,7 +949,7 @@ export default function LogsAuditTrail({
                             fontFamily: "'Playfair Display',serif",
                             fontSize: isMobile ? 16 : 18,
                             fontWeight: 700,
-                            color: "#0e2554",
+                            color: "var(--color-primary, #0e2554)",
                             flex: 1,
                         }}
                     >
@@ -1103,7 +1103,7 @@ export default function LogsAuditTrail({
                                         fontFamily: "'Playfair Display',serif",
                                         fontSize: isMobile ? 22 : 26,
                                         fontWeight: 700,
-                                        color: "#0e2554",
+                                        color: "var(--color-primary, #0e2554)",
                                         lineHeight: 1,
                                     }}
                                 >
@@ -1391,7 +1391,7 @@ export default function LogsAuditTrail({
                                                         width: 26,
                                                         height: 26,
                                                         borderRadius: "50%",
-                                                        background: "#0e2554",
+                                                        background: "var(--color-primary, #0e2554)",
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent:
@@ -1654,7 +1654,7 @@ export default function LogsAuditTrail({
 const _SD = {
     sidebar: {
         minHeight: "100vh",
-        background: "linear-gradient(180deg,#0e2554 0%,#091a3e 100%)",
+        background: "linear-gradient(180deg,var(--color-primary, #0e2554) 0%,var(--color-primary-dark, #091a3e) 100%)",
         display: "flex",
         flexDirection: "column",
         position: "fixed",
@@ -1662,12 +1662,12 @@ const _SD = {
         left: 0,
         bottom: 0,
         zIndex: 100,
-        borderRight: "1px solid rgba(201,162,39,0.15)",
+        borderRight: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
         transition: "width 0.2s",
     },
     brand: {
         padding: "20px 20px 16px",
-        borderBottom: "1px solid rgba(201,162,39,0.18)",
+        borderBottom: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.18)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -1676,8 +1676,8 @@ const _SD = {
         width: 38,
         height: 38,
         borderRadius: "50%",
-        border: "1.5px solid rgba(201,162,39,0.5)",
-        background: "rgba(201,162,39,0.1)",
+        border: "1.5px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.5)",
+        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.1)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1692,19 +1692,19 @@ const _SD = {
     },
     brandSub: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.7)",
+        color: "rgba(var(--color-accent-rgb, 201, 162, 39),0.7)",
         letterSpacing: "1.5px",
         textTransform: "uppercase",
         marginTop: 1,
     },
     goldBar: {
         height: 3,
-        background: "linear-gradient(90deg,#c9a227,#f0d060,#c9a227)",
+        background: "linear-gradient(90deg,var(--color-accent, #c9a227),var(--color-accent-soft, #f0d060),var(--color-accent, #c9a227))",
         flexShrink: 0,
     },
     sectionLabel: {
         fontSize: 9,
-        color: "rgba(201,162,39,0.5)",
+        color: "rgba(var(--color-accent-rgb, 201, 162, 39),0.5)",
         letterSpacing: "2px",
         textTransform: "uppercase",
         padding: "18px 20px 8px",
@@ -1712,8 +1712,8 @@ const _SD = {
     },
     navBadge: {
         marginLeft: "auto",
-        background: "#c9a227",
-        color: "#091a3e",
+        background: "var(--color-accent, #c9a227)",
+        color: "var(--color-primary-dark, #091a3e)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -1722,8 +1722,8 @@ const _SD = {
     },
     navBadgeSA: {
         marginLeft: "auto",
-        background: "rgba(201,162,39,0.25)",
-        color: "#c9a227",
+        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.25)",
+        color: "var(--color-accent, #c9a227)",
         fontSize: 9,
         fontWeight: 700,
         padding: "2px 7px",
@@ -1731,13 +1731,13 @@ const _SD = {
     },
     superAdminSection: {
         marginTop: "auto",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
         paddingTop: 8,
         paddingBottom: 8,
     },
     userRow: {
         padding: "14px 20px",
-        borderTop: "1px solid rgba(201,162,39,0.15)",
+        borderTop: "1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -1746,13 +1746,13 @@ const _SD = {
         width: 32,
         height: 32,
         borderRadius: "50%",
-        background: "rgba(201,162,39,0.15)",
-        border: "1.5px solid rgba(201,162,39,0.4)",
+        background: "rgba(var(--color-accent-rgb, 201, 162, 39),0.15)",
+        border: "1.5px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.4)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 12,
-        color: "#c9a227",
+        color: "var(--color-accent, #c9a227)",
         fontWeight: 700,
         flexShrink: 0,
     },
@@ -1767,7 +1767,7 @@ const _SD = {
     },
     userRole: {
         fontSize: 9.5,
-        color: "#c9a227",
+        color: "var(--color-accent, #c9a227)",
         letterSpacing: "1px",
         textTransform: "uppercase",
         marginTop: 1,

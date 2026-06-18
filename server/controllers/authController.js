@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
 const { sendPasswordChangedEmail } = require("../utils/mailer");
+const { isSupabaseConnectivityError } = require("../utils/supabaseAuthError");
 
 // Supabase client — optional at startup so the server can still boot without it.
 const supabaseUrl =
@@ -271,6 +272,13 @@ async function residentLoginWithSupabase(req, res) {
             error,
         } = await supabase.auth.getUser(token);
         if (error || !user) {
+            if (isSupabaseConnectivityError(error)) {
+                console.error("Supabase resident login verification failed:", error);
+                return res.status(503).json({
+                    message:
+                        "The server could not verify your login with Supabase. Please restart the API server and try again.",
+                });
+            }
             return res.status(401).json({ message: "Invalid or expired token" });
         }
 

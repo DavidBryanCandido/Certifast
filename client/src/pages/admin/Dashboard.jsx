@@ -55,6 +55,7 @@ import reportsService from "../../services/reportsService";
 import logsService from "../../services/logsService";
 import * as settingsService from "../../services/settingsService";
 import { buildCertificatePrintHtml } from "../../utils/certificateTemplateEngine";
+import { formatResidentAddress } from "../../utils/address";
 import {
     AdminSidebar,
     AdminMobileSidebar,
@@ -71,7 +72,7 @@ const REPORT_TYPES = [
         label: "Requests Summary",
         desc: "All certificate requests with status, type, and dates.",
         icon: ClipboardList,
-        accent: "#0e2554",
+        accent: "var(--color-primary, #0e2554)",
         bg: "#e8eef8",
     },
     {
@@ -184,8 +185,8 @@ function buildPrintHtml(data, type, periodLabel, admin) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${typeDef?.label} — Barangay East Tapinac</title>
 <style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Source Serif 4',Georgia,serif;color:#1a1a2e;padding:32px;max-width:780px;margin:0 auto;}
 @media print{body{padding:16px;}@page{margin:15mm;}}
-.hdr{text-align:center;padding-bottom:18px;margin-bottom:18px;border-bottom:2px solid #c9a227;}
-h1{font-size:22px;color:#0e2554;margin-bottom:4px;}
+.hdr{text-align:center;padding-bottom:18px;margin-bottom:18px;border-bottom:2px solid var(--color-accent, #c9a227);}
+h1{font-size:22px;color:var(--color-primary, #0e2554);margin-bottom:4px;}
 .meta{display:flex;justify-content:space-between;margin-bottom:22px;font-size:11.5px;color:#4a4a6a;padding:10px 14px;background:#f8f6f1;border-radius:4px;}
 table{width:100%;border-collapse:collapse;margin-bottom:20px;}
 th{font-size:10px;font-weight:700;color:#9090aa;text-transform:uppercase;letter-spacing:1px;padding:9px 14px;background:#f8f6f1;border-bottom:1px solid #e4dfd4;text-align:left;}
@@ -195,9 +196,9 @@ th:last-child,td:last-child{text-align:right;}
 <div class="hdr"><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#9090aa;margin-bottom:4px;">Republic of the Philippines</div>
 <h1>Barangay East Tapinac</h1><p style="font-size:11px;color:#9090aa;">City of Olongapo, Zambales · CertiFast Certificate Management System</p></div>
 <div class="meta"><span><strong>Report:</strong> ${typeDef?.label || type}</span><span><strong>Period:</strong> ${periodLabel}</span><span><strong>Generated:</strong> ${now} by ${adminName}</span></div>
-<h3 style="font-size:15px;color:#0e2554;margin-bottom:12px;">Certificate Type Breakdown</h3>
+<h3 style="font-size:15px;color:var(--color-primary, #0e2554);margin-bottom:12px;">Certificate Type Breakdown</h3>
 <table><thead><tr><th>Certificate / Permit Type</th><th>Count</th></tr></thead><tbody>${certRows}</tbody></table>
-<h3 style="font-size:15px;color:#0e2554;margin-bottom:12px;">Request Status Summary</h3>
+<h3 style="font-size:15px;color:var(--color-primary, #0e2554);margin-bottom:12px;">Request Status Summary</h3>
 <table><thead><tr><th>Status</th><th>Total</th></tr></thead><tbody>
 <tr style="background:#f8f6f1;"><td style="padding:8px 14px;font-size:12px;color:#9090aa;">Released</td><td style="padding:8px 14px;font-size:12px;font-weight:700;text-align:right;color:#1a7a4a;">${breakdown.released || 0}</td></tr>
 <tr style="background:#f8f6f1;"><td style="padding:8px 14px;font-size:12px;color:#9090aa;">Pending</td><td style="padding:8px 14px;font-size:12px;font-weight:700;text-align:right;color:#b86800;">${breakdown.pending || 0}</td></tr>
@@ -235,7 +236,7 @@ function ChartTooltip({ active, payload, label }) {
                 <div
                     style={{
                         fontWeight: 700,
-                        color: "#0e2554",
+                        color: "var(--color-primary, #0e2554)",
                         marginBottom: 4,
                     }}
                 >
@@ -297,14 +298,14 @@ if (!document.head.querySelector("[data-cf-dashboard]")) {
     .cf-dash-root { font-family:'Source Serif 4',serif; background:#f8f6f1; color:#1a1a2e; min-height:100vh; display:flex; }
     .cf-nav-item { display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:12.5px;color:rgba(255,255,255,0.65);cursor:pointer;border-left:3px solid transparent;transition:all 0.15s;text-decoration:none;background:none;border-right:none;border-top:none;border-bottom:none;width:100%;text-align:left;font-family:'Source Serif 4',serif; }
     .cf-nav-item:hover { background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.9); }
-    .cf-nav-item.active { background:rgba(201,162,39,0.12);color:#fff;border-left-color:#c9a227; }
+    .cf-nav-item.active { background:rgba(var(--color-accent-rgb, 201, 162, 39),0.12);color:#fff;border-left-color:var(--color-accent, #c9a227); }
     .cf-nav-item.active svg { opacity:1 !important; }
     .cf-action-btn { border:1px solid #e4dfd4;border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:'Source Serif 4',serif;transition:all 0.15s;font-weight:600;white-space:nowrap; }
     .cf-qa-btn { display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:6px;cursor:pointer;text-align:left;width:100%;font-family:'Source Serif 4',serif;transition:opacity 0.15s; }
     .cf-qa-btn:hover { opacity:0.88; }
     .cf-logout-btn { background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.35);padding:4px;transition:color 0.15s;display:flex;align-items:center; }
     .cf-logout-btn:hover { color:rgba(255,255,255,0.7); }
-    .cf-panel-action { font-size:11px;color:#163066;cursor:pointer;text-decoration:underline;background:none;border:none;font-family:'Source Serif 4',serif; }
+    .cf-panel-action { font-size:11px;color:var(--color-primary-soft, #163066);cursor:pointer;text-decoration:underline;background:none;border:none;font-family:'Source Serif 4',serif; }
     /* Drawer */
     .cf-drawer { width:480px;height:100vh;background:#fff;display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.2);overflow:hidden;animation:drawerSlideIn 0.22s ease both; }
     .cf-drawer-mobile { width:100%;max-height:92vh;background:#fff;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.2);overflow:hidden;animation:drawerSlideUp 0.25s ease both;border-radius:16px 16px 0 0; }
@@ -335,24 +336,24 @@ if (!document.head.querySelector("[data-cf-dashboard]")) {
     .cf-req-card-bottom { display:flex;align-items:center;justify-content:space-between;gap:8px; }
     /* Statistics & Reports section */
     .rpt-period-btn { padding:6px 14px;border:1.5px solid #e4dfd4;border-radius:4px;background:#fff;font-size:11.5px;color:#4a4a6a;cursor:pointer;font-family:'Source Serif 4',serif;transition:all .15s;white-space:nowrap; }
-    .rpt-period-btn:hover { border-color:#0e2554;color:#0e2554; }
-    .rpt-period-btn.active { background:#0e2554;color:#fff;border-color:#0e2554;font-weight:600; }
+    .rpt-period-btn:hover { border-color:var(--color-primary, #0e2554);color:var(--color-primary, #0e2554); }
+    .rpt-period-btn.active { background:var(--color-primary, #0e2554);color:#fff;border-color:var(--color-primary, #0e2554);font-weight:600; }
     .rpt-type-card { border:1.5px solid #e4dfd4;border-radius:7px;padding:14px 16px;background:#fff;cursor:pointer;transition:all .15s;display:flex;align-items:flex-start;gap:12px;font-family:'Source Serif 4',serif;position:relative;overflow:hidden; }
-    .rpt-type-card:hover { border-color:#0e2554;box-shadow:0 3px 12px rgba(14,37,84,.09); }
-    .rpt-type-card.selected { border-color:#0e2554;background:#f0f3ff; }
-    .rpt-type-card.selected::before { content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#0e2554,#1e3d7a); }
+    .rpt-type-card:hover { border-color:var(--color-primary, #0e2554);box-shadow:0 3px 12px rgba(var(--color-primary-rgb, 14, 37, 84),.09); }
+    .rpt-type-card.selected { border-color:var(--color-primary, #0e2554);background:rgba(var(--color-primary-rgb, 14, 37, 84), 0.08); }
+    .rpt-type-card.selected::before { content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--color-primary, #0e2554),var(--color-primary-soft, #1e3d7a)); }
     .rpt-fmt-btn { display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 16px;border:1.5px solid #e4dfd4;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;font-family:'Source Serif 4',serif;flex:1;min-width:72px; }
-    .rpt-fmt-btn:hover { border-color:#0e2554; }
+    .rpt-fmt-btn:hover { border-color:var(--color-primary, #0e2554); }
     .rpt-sel-pdf  { border-color:#b02020;background:#fdecea; }
     .rpt-sel-xlsx { border-color:#1a7a4a;background:#e8f5ee; }
     .rpt-sel-csv  { border-color:#1a4a8a;background:#e8eef8; }
-    .rpt-gen-btn { display:inline-flex;align-items:center;gap:8px;padding:11px 24px;background:linear-gradient(135deg,#163066,#091a3e);color:#fff;border:none;border-radius:5px;font-family:'Playfair Display',serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:opacity .15s;white-space:nowrap; }
+    .rpt-gen-btn { display:inline-flex;align-items:center;gap:8px;padding:11px 24px;background:linear-gradient(135deg,var(--color-primary-soft, #163066),var(--color-primary-dark, #091a3e));color:#fff;border:none;border-radius:5px;font-family:'Playfair Display',serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:opacity .15s;white-space:nowrap; }
     .rpt-gen-btn:hover { opacity:.88; }
     .rpt-gen-btn:disabled { opacity:.45;cursor:not-allowed; }
     @keyframes rpt-spin { to { transform:rotate(360deg); } }
     .rpt-spinner { width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:rpt-spin .7s linear infinite; }
     @keyframes rpt-toast-in { from { opacity:0;transform:translateY(8px); } to { opacity:1;transform:translateY(0); } }
-    .rpt-toast { position:fixed;bottom:28px;right:28px;background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:6px;font-size:12.5px;display:flex;align-items:center;gap:10px;z-index:999;box-shadow:0 4px 18px rgba(0,0,0,.22);animation:rpt-toast-in .25s ease both;border-left:3px solid #c9a227; }
+    .rpt-toast { position:fixed;bottom:28px;right:28px;background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:6px;font-size:12.5px;display:flex;align-items:center;gap:10px;z-index:999;box-shadow:0 4px 18px rgba(0,0,0,.22);animation:rpt-toast-in .25s ease both;border-left:3px solid var(--color-accent, #c9a227); }
     .rpt-toast.success { border-left-color:#1a7a4a; }
     .rpt-toast.error   { border-left-color:#b02020;background:#3a0a0a; }
     `;
@@ -391,7 +392,7 @@ const TIMELINE_MAP = {
 };
 
 const DOT_COLORS = {
-    gold: "#c9a227",
+    gold: "var(--color-accent, #c9a227)",
     blue: "#1a4a8a",
     green: "#1a7a4a",
     amber: "#b86800",
@@ -439,7 +440,7 @@ const BADGE_DRAWER = {
 const STATUS_MAP = {
     pending: {
         btnLabel: "Review",
-        btnStyle: { background: "#0e2554", color: "#fff" },
+        btnStyle: { background: "var(--color-primary, #0e2554)", color: "#fff" },
     },
     approved: {
         btnLabel: "View",
@@ -464,7 +465,7 @@ function activityDot(type, description) {
     const desc = String(description || "").toLowerCase();
     switch (type) {
         case "login":
-            return "#c9a227";
+            return "var(--color-accent, #c9a227)";
         case "logout":
             return "#9090aa";
         case "walkin":
@@ -926,7 +927,7 @@ function RequestDrawer({
                         display: "flex",
                         alignItems: "flex-start",
                         justifyContent: "space-between",
-                        background: "linear-gradient(135deg,#0e2554,#163066)",
+                        background: "linear-gradient(135deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))",
                         flexShrink: 0,
                     }}
                 >
@@ -1153,12 +1154,12 @@ function RequestDrawer({
                                                     }}
                                                 />
                                             ) : (
-                                                <span style={{ width: 46, height: 46, borderRadius: 4, border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", color: "#0e2554", background: "#f8f6f1", flexShrink: 0 }}>
+                                                <span style={{ width: 46, height: 46, borderRadius: 4, border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary, #0e2554)", background: "#f8f6f1", flexShrink: 0 }}>
                                                     <Paperclip size={16} />
                                                 </span>
                                             )}
                                             <span style={{ minWidth: 0, flex: 1 }}>
-                                                <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#0e2554", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                                                <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--color-primary, #0e2554)", textTransform: "uppercase", letterSpacing: 0.8 }}>
                                                     {attachment.label || "Supporting document"}
                                                 </span>
                                                 <span style={{ display: "block", fontSize: 12.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1391,10 +1392,10 @@ function StatCard({
     compact,
 }) {
     const topColors = {
-        navy: "linear-gradient(90deg,#0e2554,#163066)",
+        navy: "linear-gradient(90deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))",
         amber: "linear-gradient(90deg,#b86800,#e08000)",
         green: "linear-gradient(90deg,#1a7a4a,#2da866)",
-        gold: "linear-gradient(90deg,#9a7515,#c9a227,#f0d060)",
+        gold: "linear-gradient(90deg,var(--color-accent-dark, #9a7515),var(--color-accent, #c9a227),var(--color-accent-soft, #f0d060))",
         purple: "#6a3db8",
     };
     return (
@@ -1435,7 +1436,7 @@ function StatCard({
                         fontFamily: "'Playfair Display',serif",
                         fontSize: compact ? 22 : 30,
                         fontWeight: 700,
-                        color: color === "purple" ? "#6a3db8" : "#0e2554",
+                        color: color === "purple" ? "#6a3db8" : "var(--color-primary, #0e2554)",
                         lineHeight: 1,
                         marginBottom: compact ? 3 : 5,
                     }}
@@ -1495,7 +1496,7 @@ function StatCard({
                                     color:
                                         color === "amber"
                                             ? "#b86800"
-                                            : "#163066",
+                                            : "var(--color-primary-soft, #163066)",
                                 }}
                             >
                                 {actionLabel || "View all"}
@@ -1514,7 +1515,7 @@ function StatCard({
                         style={{
                             marginTop: 6,
                             padding: 0,
-                            color: color === "amber" ? "#b86800" : "#163066",
+                            color: color === "amber" ? "#b86800" : "var(--color-primary-soft, #163066)",
                         }}
                     >
                         {actionLabel || "View all"}
@@ -1593,9 +1594,15 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
 
     const mapRequestRow = useCallback((row) => {
         const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
-        const address = [row.resident_address_house, row.resident_address_street]
-            .filter((v) => String(v || "").trim())
-            .join(", ");
+        const address = formatResidentAddress(
+            {
+                address_house: row.resident_address_house,
+                address_street: row.resident_address_street,
+                address_city: row.resident_address_city,
+                address_province: row.resident_address_province,
+            },
+            { city: "Olongapo City" },
+        );
         const extraFields = row.extra_fields || {};
         const dateOfBirth =
             row.resident_date_of_birth ||
@@ -1694,12 +1701,16 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         const requestedAt = row.requested_at
                             ? new Date(row.requested_at)
                             : null;
-                        const address = [
-                            row.resident_address_house,
-                            row.resident_address_street,
-                        ]
-                            .filter((v) => String(v || "").trim())
-                            .join(", ");
+                        const address = formatResidentAddress(
+                            {
+                                address_house: row.resident_address_house,
+                                address_street: row.resident_address_street,
+                                address_city: row.resident_address_city,
+                                address_province:
+                                    row.resident_address_province,
+                            },
+                            { city: "Olongapo City" },
+                        );
                         const extraFields = row.extra_fields || {};
                         const dateOfBirth =
                             row.resident_date_of_birth ||
@@ -1998,7 +2009,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             label: "Total Requests",
             value: statsData.totalRequests,
             color: "navy",
-            iconColor: "#0e2554",
+            iconColor: "var(--color-primary, #0e2554)",
             iconBg: "#e8eef8",
             change: "Live data",
             changeType: "up",
@@ -2027,7 +2038,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             label: "Residents",
             value: statsData.residents,
             color: "gold",
-            iconColor: "#9a7515",
+            iconColor: "var(--color-accent-dark, #9a7515)",
             iconBg: "#f5edce",
             change: "Active residents",
             changeType: "up",
@@ -2369,8 +2380,8 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                         className="cf-action-btn"
                                                                         style={{
                                                                             borderColor:
-                                                                                "#0e2554",
-                                                                            color: "#0e2554",
+                                                                                "var(--color-primary, #0e2554)",
+                                                                            color: "var(--color-primary, #0e2554)",
                                                                             background:
                                                                                 "#fff",
                                                                         }}
@@ -2578,8 +2589,8 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                         className="cf-action-btn"
                                                         style={{
                                                             borderColor:
-                                                                "#0e2554",
-                                                            color: "#0e2554",
+                                                                "var(--color-primary, #0e2554)",
+                                                            color: "var(--color-primary, #0e2554)",
                                                             background: "#fff",
                                                         }}
                                                         onClick={() =>
@@ -2963,7 +2974,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                     height: "100%",
                                                                     width: `${c.pct}%`,
                                                                     background:
-                                                                        "linear-gradient(90deg,#163066,#0e2554)",
+                                                                        "linear-gradient(90deg,var(--color-primary-soft, #163066),var(--color-primary, #0e2554))",
                                                                     borderRadius: 2,
                                                                     transition:
                                                                         "width 0.6s ease",
@@ -2975,7 +2986,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                         style={{
                                                             fontSize: 12.5,
                                                             fontWeight: 700,
-                                                            color: "#0e2554",
+                                                            color: "var(--color-primary, #0e2554)",
                                                             flexShrink: 0,
                                                             marginLeft: 12,
                                                         }}
@@ -3153,7 +3164,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                 "'Playfair Display',serif",
                                             fontSize: isMobile ? 17 : 20,
                                             fontWeight: 700,
-                                            color: "#0e2554",
+                                            color: "var(--color-primary, #0e2554)",
                                             margin: "0 0 3px",
                                         }}
                                     >
@@ -3207,7 +3218,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                 ? "Total Issued"
                                                 : "Issued This Period",
                                         value: reportStats.issuedThisPeriod,
-                                        top: "linear-gradient(90deg,#0e2554,#163066)",
+                                        top: "linear-gradient(90deg,var(--color-primary, #0e2554),var(--color-primary-soft, #163066))",
                                     },
                                     {
                                         label: "All Time Issued",
@@ -3266,7 +3277,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                     "'Playfair Display',serif",
                                                 fontSize: isMobile ? 22 : 26,
                                                 fontWeight: 700,
-                                                color: "#0e2554",
+                                                color: "var(--color-primary, #0e2554)",
                                                 lineHeight: 1,
                                             }}
                                         >
@@ -3370,7 +3381,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                             <ChartTooltip />
                                                         }
                                                         cursor={{
-                                                            fill: "rgba(14,37,84,.04)",
+                                                            fill: "rgba(var(--color-primary-rgb, 14, 37, 84),.04)",
                                                         }}
                                                     />
                                                     <Bar
@@ -3382,14 +3393,13 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                             (entry, i) => (
                                                                 <Cell
                                                                     key={i}
-                                                                    fill={
-                                                                        (entry.color ||
-                                                                            "#0e2554") +
-                                                                        "cc"
-                                                                    }
+                                                                     fill={
+                                                                         entry.color ||
+                                                                         "var(--color-primary)"
+                                                                     }
                                                                     stroke={
                                                                         entry.color ||
-                                                                        "#0e2554"
+                                                                        "var(--color-primary, #0e2554)"
                                                                     }
                                                                     strokeWidth={
                                                                         1.5
@@ -3588,7 +3598,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                         style={{
                                                             fontSize: 12.5,
                                                             fontWeight: 700,
-                                                            color: "#0e2554",
+                                                            color: "var(--color-primary, #0e2554)",
                                                         }}
                                                     >
                                                         {item.value.toLocaleString()}
@@ -3691,11 +3701,11 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                     type="monotone"
                                                     dataKey="requests"
                                                     name="Requests"
-                                                    stroke="#0e2554"
+                                                    stroke="var(--color-primary, #0e2554)"
                                                     strokeWidth={2.5}
                                                     dot={{
                                                         r: 4,
-                                                        fill: "#0e2554",
+                                                        fill: "var(--color-primary, #0e2554)",
                                                     }}
                                                     activeDot={{ r: 6 }}
                                                 />
@@ -3785,7 +3795,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                     "'Playfair Display',serif",
                                                                 fontSize: 15,
                                                                 fontWeight: 700,
-                                                                color: "#0e2554",
+                                                                color: "var(--color-primary, #0e2554)",
                                                                 width: 20,
                                                                 flexShrink: 0,
                                                             }}
@@ -3830,7 +3840,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                         borderRadius: 3,
                                                                         background:
                                                                             cert.color ||
-                                                                            "#0e2554",
+                                                                            "var(--color-primary, #0e2554)",
                                                                         width: `${pct}%`,
                                                                     }}
                                                                 />
@@ -3842,7 +3852,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                     "'Playfair Display',serif",
                                                                 fontSize: 15,
                                                                 fontWeight: 700,
-                                                                color: "#0e2554",
+                                                                color: "var(--color-primary, #0e2554)",
                                                                 flexShrink: 0,
                                                             }}
                                                         >
@@ -3935,7 +3945,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                 "'Playfair Display',serif",
                                                             fontSize: 15,
                                                             fontWeight: 700,
-                                                            color: "#0e2554",
+                                                            color: "var(--color-primary, #0e2554)",
                                                         }}
                                                     >
                                                         {day.count}
@@ -4124,7 +4134,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                                     color:
                                                                         selectedType ===
                                                                         key
-                                                                            ? "#0e2554"
+                                                                            ? "var(--color-primary, #0e2554)"
                                                                             : "#1a1a2e",
                                                                     marginBottom: 2,
                                                                 }}
@@ -4145,7 +4155,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                             key && (
                                                             <CheckCircle
                                                                 size={15}
-                                                                color="#0e2554"
+                                                                color="var(--color-primary, #0e2554)"
                                                                 strokeWidth={2}
                                                                 style={{
                                                                     flexShrink: 0,
@@ -4391,7 +4401,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                         >
                                             <AlertCircle
                                                 size={13}
-                                                color="#9a7515"
+                                                color="var(--color-accent-dark, #9a7515)"
                                                 style={{
                                                     flexShrink: 0,
                                                     marginTop: 2,
@@ -4437,7 +4447,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                                         "'Playfair Display',serif",
                                                     fontSize: 13,
                                                     fontWeight: 700,
-                                                    color: "#0e2554",
+                                                    color: "var(--color-primary, #0e2554)",
                                                 }}
                                             >
                                                 Recent Exports
@@ -4589,7 +4599,7 @@ const d = {
     topbarTitle: {
         fontFamily: "'Playfair Display',serif",
         fontWeight: 700,
-        color: "#0e2554",
+        color: "var(--color-primary, #0e2554)",
         flex: 1,
     },
     topbarGreeting: {
@@ -4628,7 +4638,7 @@ const d = {
         fontFamily: "'Playfair Display',serif",
         fontSize: 14,
         fontWeight: 700,
-        color: "#0e2554",
+        color: "var(--color-primary, #0e2554)",
     },
     table: { width: "100%", borderCollapse: "collapse", minWidth: 520 },
     th: {

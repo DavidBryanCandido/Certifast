@@ -18,6 +18,7 @@ import {
     HelpCircle,
     Menu,
     Palette,
+    Pencil,
     QrCode,
     Search,
     Upload,
@@ -52,7 +53,7 @@ function useSettingsStyles() {
         .st-body { font-family: 'Source Serif 4', serif; }
 
         /* TABS */
-        .st-tabs { display:flex; gap:0; border-bottom:2px solid #e4dfd4; margin-bottom:28px; overflow-x:auto; }
+        .st-tabs { display:flex; gap:0; border-bottom:2px solid #e4dfd4; margin-bottom:28px; overflow-x:auto; overflow-y:hidden; }
         .st-tab-btn {
             padding:10px 24px;
             font-family:'Source Serif 4',serif;
@@ -87,7 +88,7 @@ function useSettingsStyles() {
         .st-field label .req { color:#b02020; margin-left:2px; }
         .st-label-with-help { display:flex; align-items:center; gap:7px; }
         .st-help-btn { width:18px; height:18px; border:1px solid #d8cfbd; border-radius:50%; background:#fff; color:#4a4a6a; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
-        .st-help-btn:hover { border-color:var(--color-primary); color:var(--color-primary); background:#edf1fa; }
+        .st-help-btn:hover { border-color:var(--color-primary); color:var(--color-primary); background:rgba(var(--color-primary-rgb),.06); }
         .st-field input, .st-field textarea, .st-field select {
             width:100%; padding:10px 14px;
             border:1.5px solid #e4dfd4; border-radius:4px;
@@ -96,7 +97,7 @@ function useSettingsStyles() {
             transition:border-color .15s, background .15s;
         }
         .st-field input:focus, .st-field textarea:focus, .st-field select:focus {
-            border-color:var(--color-primary); background:#f0f3ff;
+            border-color:var(--color-primary); background:rgba(var(--color-primary-rgb),.08);
         }
         .st-field textarea { resize:vertical; min-height:80px; line-height:1.6; }
         .st-field .hint { font-size:10.5px; color:#9090aa; line-height:1.5; }
@@ -385,34 +386,39 @@ function useSettingsStyles() {
         .st-modal-footer { padding:14px 24px; border-top:1px solid #e4dfd4; display:flex; justify-content:space-between; align-items:center; background:#f8f6f1; }
 
         /* CERT TYPES TABLE */
-        .st-cert-row { display:grid; grid-template-columns:minmax(220px,1fr) 190px 100px 210px; align-items:center; padding:12px 22px; border-bottom:1px solid #f0ece4; gap:10px; }
+        .st-cert-table-header > span:not(:first-child) { text-align:center; }
+        .st-cert-row { display:grid; grid-template-columns:minmax(220px,1fr) 150px 100px 210px; align-items:center; padding:12px 22px; border-bottom:1px solid #f0ece4; gap:10px; }
         .st-cert-row:last-child { border-bottom:none; }
         .st-cert-name { font-size:12.5px; font-weight:600; }
         .st-cert-desc { font-size:10.5px; color:#9090aa; margin-top:1px; }
         .st-badge-active   { font-size:10.5px; background:#e8f5ee; color:#1a7a4a; border-radius:10px; padding:2px 10px; font-weight:700; display:inline-block; width:fit-content; }
         .st-badge-inactive { font-size:10.5px; background:#f0ece4; color:#9090aa; border-radius:10px; padding:2px 10px; font-weight:700; display:inline-block; width:fit-content; }
+        .st-cert-row > .st-badge-active,
+        .st-cert-row > .st-badge-inactive { justify-self:center; }
         .st-toggle-btn { background:none; border:1px solid #e4dfd4; border-radius:4px; padding:5px 14px; font-size:10.5px; cursor:pointer; font-family:inherit; color:#9090aa; }
         .st-toggle-btn:disabled { opacity:.45; cursor:not-allowed; }
         .st-view-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#fff; border:1px solid rgba(var(--color-primary-rgb),.22); border-radius:4px; padding:5px 12px; font-size:10.5px; cursor:pointer; font-family:inherit; color:var(--color-primary); white-space:nowrap; }
-        .st-view-btn:hover { background:#edf1fa; border-color:var(--color-primary); }
-        .st-cert-actions { display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:wrap; }
+        .st-view-btn:hover { background:rgba(var(--color-primary-rgb),.06); border-color:var(--color-primary); }
+        .st-cert-actions { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
         .st-cert-toolbar { padding:14px 22px; display:flex; align-items:center; justify-content:space-between; gap:14px; border-bottom:1px solid #e4dfd4; background:#fff; flex-wrap:wrap; }
         .st-cert-search { position:relative; flex:1; min-width:240px; max-width:420px; }
         .st-cert-search svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#9090aa; }
         .st-cert-search input { width:100%; padding:9px 12px 9px 34px; border:1.5px solid #e4dfd4; border-radius:4px; font-family:'Source Serif 4',serif; font-size:12.5px; background:#f8f6f1; color:#1a1a2e; outline:none; }
-        .st-cert-search input:focus { border-color:var(--color-primary); background:#f0f3ff; }
-        .st-fee-btn { background:#fff; border:1px solid #e4dfd4; border-radius:4px; padding:5px 12px; font-size:10.5px; font-weight:700; cursor:pointer; font-family:inherit; color:#9090aa; min-width:78px; }
+        .st-cert-search input:focus { border-color:var(--color-primary); background:rgba(var(--color-primary-rgb),.08); }
+        .st-fee-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#fff; border:1px solid #e4dfd4; border-radius:4px; padding:6px 10px; font-size:10.5px; font-weight:700; cursor:pointer; font-family:inherit; color:#9090aa; min-width:92px; white-space:nowrap; }
         .st-fee-btn.fee { border-color:rgba(184,104,0,.35); background:#fff8ed; color:#b86800; }
         .st-fee-btn.free { border-color:rgba(26,122,74,.25); background:#f2fbf6; color:#1a7a4a; }
+        .st-fee-btn:hover { border-color:currentColor; }
         .st-fee-btn:disabled { opacity:.45; cursor:not-allowed; }
-        .st-fee-cell { display:flex; flex-direction:column; align-items:flex-start; gap:7px; min-width:0; }
-        .st-fee-amount-control { display:flex; align-items:center; gap:6px; width:100%; max-width:180px; }
-        .st-fee-prefix { height:28px; min-width:24px; padding:0 7px; display:flex; align-items:center; justify-content:center; border:1px solid #e4dfd4; border-radius:4px; background:#f8f6f1; color:#7a6530; font-size:11px; font-weight:700; }
-        .st-fee-amount-input { min-width:0; width:82px; height:28px; padding:5px 8px; border:1.5px solid #e4dfd4; border-radius:4px; font-family:'Source Serif 4',serif; font-size:11.5px; color:#1a1a2e; background:#fff; outline:none; }
-        .st-fee-amount-input:focus { border-color:var(--color-primary); background:#f0f3ff; }
-        .st-fee-save-btn { height:28px; padding:0 9px; border:1px solid rgba(var(--color-primary-rgb),.24); border-radius:4px; background:#fff; color:var(--color-primary); font-family:'Source Serif 4',serif; font-size:10.5px; font-weight:700; cursor:pointer; }
-        .st-fee-save-btn:disabled { opacity:.45; cursor:not-allowed; }
-        .st-fee-amount-hint { font-size:10px; color:#9090aa; line-height:1.35; }
+        .st-fee-cell { display:flex; align-items:center; justify-content:center; min-width:0; }
+        .st-fee-editor-amount { display:flex; align-items:stretch; width:100%; }
+        .st-fee-label { display:block; margin-bottom:7px; font-size:10px; font-weight:700; color:#4a4a6a; letter-spacing:1px; text-transform:uppercase; }
+        .st-fee-prefix { min-width:48px; padding:0 10px; display:flex; align-items:center; justify-content:center; border:1.5px solid #e4dfd4; border-right:none; border-radius:4px 0 0 4px; background:#f8f6f1; color:#7a6530; font-size:11px; font-weight:700; }
+        .st-fee-amount-input { min-width:0; width:100%; height:40px; padding:8px 10px; border:1.5px solid #e4dfd4; border-radius:0 4px 4px 0; font-family:'Source Serif 4',serif; font-size:14px; color:#1a1a2e; background:#fff; outline:none; }
+        .st-fee-amount-input:focus { border-color:var(--color-primary); background:rgba(var(--color-primary-rgb),.08); }
+        .st-fee-modal-note { margin-top:9px; font-size:11px; color:#77758d; line-height:1.5; }
+        .st-fee-free-btn { border:1px solid rgba(26,122,74,.28); background:#f2fbf6; color:#1a7a4a; border-radius:4px; padding:8px 12px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; }
+        .st-fee-free-btn:disabled { opacity:.45; cursor:not-allowed; }
         .st-cert-pager { padding:10px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#f8f6f1; border-top:1px solid #e4dfd4; font-size:11px; color:#9090aa; flex-wrap:wrap; }
         .st-cert-pager-actions { display:flex; align-items:center; gap:8px; }
         .st-cert-page-btn { width:28px; height:28px; border:1px solid #e4dfd4; background:#fff; color:#4a4a6a; border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
@@ -438,7 +444,6 @@ function useSettingsStyles() {
             .st-form-grid-2  { grid-template-columns:1fr; }
             .st-esig-grid    { grid-template-columns:1fr; }
             .st-cert-row     { grid-template-columns:1fr auto; gap:8px; }
-            .st-fee-amount-control { max-width:100%; }
             .st-cert-row > span:first-of-type, .st-cert-row > span:last-of-type { grid-column: auto; }
             .st-cert-toolbar { align-items:stretch; }
             .st-cert-search { min-width:100%; max-width:none; }
@@ -999,6 +1004,140 @@ function TemplateActionConfirmModal({ action, cert, onCancel, onConfirm }) {
     );
 }
 
+function FeeEditorModal({ cert, saving, onClose, onSave }) {
+    const [amount, setAmount] = useState("");
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        setAmount(cert?.fee && cert?.feeAmount ? formatFeeAmount(cert.feeAmount) : "");
+        setError("");
+    }, [cert]);
+
+    if (!cert) return null;
+
+    const submitAmount = async (value) => {
+        const parsed = parseFeeAmountDraft(value);
+        if (parsed.error) {
+            setError(parsed.error);
+            return;
+        }
+        if (parsed.value === null) {
+            setError("Enter a fee amount, or choose Set as Free.");
+            return;
+        }
+
+        setError("");
+        await onSave(parsed.value);
+    };
+
+    return (
+        <div
+            className="st-modal-overlay open"
+            style={{ zIndex: 3400 }}
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !saving) onClose();
+            }}
+        >
+            <div className="st-modal" style={{ width: 430, maxWidth: "95vw" }}>
+                <div className="st-modal-header">
+                    <div>
+                        <div className="st-modal-title">Edit Certificate Fee</div>
+                        <div
+                            style={{
+                                color: "rgba(255,255,255,.62)",
+                                fontSize: 10.5,
+                                marginTop: 2,
+                            }}
+                        >
+                            {cert.name}
+                        </div>
+                    </div>
+                    <button
+                        className="st-modal-close"
+                        onClick={onClose}
+                        disabled={saving}
+                        aria-label="Close fee editor"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="st-modal-body">
+                    <label className="st-fee-label" htmlFor="certificate-fee">
+                        Fee Amount
+                    </label>
+                    <div className="st-fee-editor-amount">
+                        <span className="st-fee-prefix">PHP</span>
+                        <input
+                            id="certificate-fee"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="st-fee-amount-input"
+                            value={amount}
+                            onChange={(event) => {
+                                setAmount(event.target.value);
+                                setError("");
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    submitAmount(amount);
+                                }
+                            }}
+                            placeholder="0.00"
+                            disabled={saving}
+                            autoFocus
+                        />
+                    </div>
+                    <div className="st-fee-modal-note">
+                        Entering <strong>0</strong> makes this certificate free.
+                        Residents will see the saved amount before submitting.
+                    </div>
+                    {error && (
+                        <div
+                            style={{
+                                marginTop: 10,
+                                color: "#b02020",
+                                fontSize: 11.5,
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
+                </div>
+                <div className="st-modal-footer">
+                    <button
+                        type="button"
+                        className="st-fee-free-btn"
+                        onClick={() => submitAmount(0)}
+                        disabled={saving}
+                    >
+                        Set as Free
+                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                            type="button"
+                            className="st-btn-cancel"
+                            onClick={onClose}
+                            disabled={saving}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="st-btn-save"
+                            onClick={() => submitAmount(amount)}
+                            disabled={saving}
+                        >
+                            {saving ? "Saving..." : "Save Fee"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function SigBlock({ id, label, sublabel, sig, onSet, onClear, onDraw }) {
     const fileRef = useRef();
     const handleFile = (e) => {
@@ -1449,17 +1588,18 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [certTemplatesLoading, setCertTemplatesLoading] = useState(false);
     const [savingTemplateId, setSavingTemplateId] = useState(null);
     const [templateAction, setTemplateAction] = useState(null);
+    const [feeEditorCertId, setFeeEditorCertId] = useState(null);
 
     const updateCertType = async (id, changes) => {
         const current = certTypes.find((c) => c.id === id);
-        if (!current) return;
+        if (!current) return false;
         const next = { ...current, ...changes };
 
         setCertTypes((prev) =>
             prev.map((c) => (c.id === id ? next : c)),
         );
 
-        if (!current.templateId) return;
+        if (!current.templateId) return true;
 
         setSavingTemplateId(id);
         try {
@@ -1483,6 +1623,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 text: "Certificate template updated.",
                 type: "success",
             });
+            return true;
         } catch (err) {
             setCertTypes((prev) =>
                 prev.map((c) => (c.id === id ? current : c)),
@@ -1491,6 +1632,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 text: err.message || "Failed to update certificate template",
                 type: "error",
             });
+            return false;
         } finally {
             setSavingTemplateId(null);
         }
@@ -1506,12 +1648,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         updateCertType(id, { active: !current.active });
     };
 
-    const toggleCertFee = (id) => {
-        const current = certTypes.find((c) => c.id === id);
-        if (!current) return;
-        setTemplateAction({ type: "fee", certId: id, nextFee: !current.fee });
-    };
-
     const confirmTemplateAction = () => {
         const action = templateAction;
         setTemplateAction(null);
@@ -1520,33 +1656,16 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         if (action.type === "disable") {
             updateCertType(action.certId, { active: false });
         }
-        if (action.type === "fee") {
-            updateCertType(action.certId, { fee: action.nextFee });
-        }
     };
 
-    const updateFeeAmountDraft = (id, value) => {
-        setCertTypes((prev) =>
-            prev.map((cert) =>
-                cert.id === id ? { ...cert, feeAmountDraft: value } : cert,
-            ),
-        );
-    };
-
-    const saveFeeAmount = (id) => {
-        const current = certTypes.find((cert) => cert.id === id);
-        if (!current) return;
-        const parsed = parseFeeAmountDraft(
-            current.feeAmountDraft ?? current.feeAmount,
-        );
-        if (parsed.error) {
-            setMessage({ text: parsed.error, type: "error" });
-            return;
-        }
-        updateCertType(id, {
-            feeAmount: parsed.value,
-            feeAmountDraft: undefined,
+    const saveFeeEditor = async (amount) => {
+        if (!feeEditorCertId) return;
+        const normalizedAmount = normalizeFeeAmount(amount) ?? 0;
+        const saved = await updateCertType(feeEditorCertId, {
+            fee: normalizedAmount > 0,
+            feeAmount: normalizedAmount,
         });
+        if (saved) setFeeEditorCertId(null);
     };
 
     // loading, errors, and messages
@@ -1896,6 +2015,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
 
     const templateActionCert = templateAction
         ? certTypes.find((cert) => cert.id === templateAction.certId)
+        : null;
+    const feeEditorCert = feeEditorCertId
+        ? certTypes.find((cert) => cert.id === feeEditorCertId)
         : null;
 
     if (!isSuperAdmin) {
@@ -2267,7 +2389,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                         }
                                                         level="H"
                                                         includeMargin
-                                                        fgColor="#0e2554"
+                                                        fgColor={
+                                                            SYSTEM_THEMES[
+                                                                systemTheme
+                                                            ].primary
+                                                        }
                                                         bgColor="#ffffff"
                                                     />
                                                 </div>
@@ -2672,13 +2798,13 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                     </div>
                                 </div>
 
-                                {/* Certificate Layout Preview */}
-                                <div
-                                    style={{
-                                        padding: "20px 24px",
-                                        background: "#f8f6f1",
-                                    }}
-                                >
+                                {false && (
+                                    <div
+                                        style={{
+                                            padding: "20px 24px",
+                                            background: "#f8f6f1",
+                                        }}
+                                    >
                                     <div
                                         style={{
                                             fontSize: 10,
@@ -2783,7 +2909,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                             "'Playfair Display',serif",
                                                         fontSize: 14,
                                                         fontWeight: 700,
-                                                        color: "#0e2554",
+                                                        color: "var(--color-primary)",
                                                         lineHeight: 1.2,
                                                     }}
                                                 >
@@ -2961,7 +3087,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         This header appears on every generated
                                         certificate and permit.
                                     </div>
-                                </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* BARANGAY INFO */}
@@ -3799,10 +3926,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                 <div style={{ overflowX: "auto" }}>
                                     {/* Table header */}
                                     <div
+                                        className="st-cert-table-header"
                                         style={{
                                             display: "grid",
                                             gridTemplateColumns:
-                                                "minmax(220px,1fr) 190px 100px 210px",
+                                                "minmax(220px,1fr) 150px 100px 210px",
                                             gap: 10,
                                             background: "#f8f6f1",
                                             borderBottom: "1px solid #e4dfd4",
@@ -3864,85 +3992,26 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                         ct.fee ? "fee" : "free"
                                                     }`}
                                                     onClick={() =>
-                                                        toggleCertFee(ct.id)
+                                                        setFeeEditorCertId(ct.id)
                                                     }
                                                     disabled={
                                                         savingTemplateId ===
                                                         ct.id
                                                     }
+                                                    title={`Edit fee for ${ct.name}`}
                                                 >
                                                     {savingTemplateId === ct.id
-                                                        ? "Saving"
+                                                        ? "Saving..."
                                                         : ct.fee
-                                                          ? "With fee"
+                                                          ? formatPesoAmount(
+                                                                ct.feeAmount,
+                                                            ) || "Edit fee"
                                                           : "Free"}
+                                                    {savingTemplateId !==
+                                                        ct.id && (
+                                                        <Pencil size={11} />
+                                                    )}
                                                 </button>
-                                                {ct.fee && (
-                                                    <>
-                                                        <div className="st-fee-amount-control">
-                                                            <span className="st-fee-prefix">
-                                                                PHP
-                                                            </span>
-                                                            <input
-                                                                type="number"
-                                                                min="0"
-                                                                step="0.01"
-                                                                className="st-fee-amount-input"
-                                                                value={
-                                                                    ct.feeAmountDraft ??
-                                                                    formatFeeAmount(
-                                                                        ct.feeAmount,
-                                                                    )
-                                                                }
-                                                                onChange={(e) =>
-                                                                    updateFeeAmountDraft(
-                                                                        ct.id,
-                                                                        e.target
-                                                                            .value,
-                                                                    )
-                                                                }
-                                                                onKeyDown={(e) => {
-                                                                    if (
-                                                                        e.key ===
-                                                                        "Enter"
-                                                                    ) {
-                                                                        e.preventDefault();
-                                                                        saveFeeAmount(
-                                                                            ct.id,
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                disabled={
-                                                                    savingTemplateId ===
-                                                                    ct.id
-                                                                }
-                                                                aria-label={`${ct.name} fee amount`}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                className="st-fee-save-btn"
-                                                                onClick={() =>
-                                                                    saveFeeAmount(
-                                                                        ct.id,
-                                                                    )
-                                                                }
-                                                                disabled={
-                                                                    savingTemplateId ===
-                                                                    ct.id
-                                                                }
-                                                            >
-                                                                Save
-                                                            </button>
-                                                        </div>
-                                                        <div className="st-fee-amount-hint">
-                                                            {ct.feeAmount
-                                                                ? `${formatPesoAmount(
-                                                                      ct.feeAmount,
-                                                                  )} shown to residents`
-                                                                : "Set amount residents should bring"}
-                                                        </div>
-                                                    </>
-                                                )}
                                             </div>
                                             <span
                                                 className={
@@ -4066,6 +4135,16 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 cert={templateActionCert}
                 onCancel={() => setTemplateAction(null)}
                 onConfirm={confirmTemplateAction}
+            />
+            <FeeEditorModal
+                cert={feeEditorCert}
+                saving={savingTemplateId === feeEditorCertId}
+                onClose={() => {
+                    if (savingTemplateId !== feeEditorCertId) {
+                        setFeeEditorCertId(null);
+                    }
+                }}
+                onSave={saveFeeEditor}
             />
         </div>
     );

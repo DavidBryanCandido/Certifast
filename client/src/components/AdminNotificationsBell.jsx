@@ -180,7 +180,7 @@ function useAdminNotificationStyles() {
             background: #fff;
             border: 1px solid #e4dfd4;
             border-radius: 8px;
-            box-shadow: 0 18px 44px rgba(14, 37, 84, .18);
+            box-shadow: 0 18px 44px rgba(var(--color-primary-rgb, 14, 37, 84), .18);
             z-index: 350;
             overflow: hidden;
         }
