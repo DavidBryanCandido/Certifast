@@ -11,6 +11,11 @@ async function createAuditLog({
     ipAddress,
 }) {
     try {
+        const normalizedRole = String(actorRole || "").toLowerCase();
+        const adminActorId = ["admin", "staff"].includes(normalizedRole)
+            ? actorId || null
+            : null;
+
         await pool.query(
             `INSERT INTO audit_logs (
                 actor_id,
@@ -24,7 +29,7 @@ async function createAuditLog({
                 created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
             [
-                actorId || null,
+                adminActorId,
                 actorName || null,
                 actorRole || null,
                 actionType,

@@ -8,43 +8,41 @@ UPDATE residents
 SET profile_details = '{}'::jsonb
 WHERE profile_details IS NULL;
 
+UPDATE storage.buckets
+SET allowed_mime_types = (
+    SELECT array_agg(DISTINCT mime_type)
+    FROM unnest(
+        allowed_mime_types
+        || ARRAY['image/jpeg', 'image/png', 'image/webp', 'application/pdf']::text[]
+    ) AS allowed_mimes(mime_type)
+)
+WHERE id = 'certifast-uploads'
+  AND allowed_mime_types IS NOT NULL;
+
+DROP POLICY IF EXISTS "Residents upload own profile files" ON storage.objects;
+DROP POLICY IF EXISTS "Residents read own profile files" ON storage.objects;
+
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_policies
-    WHERE schemaname = 'storage'
-      AND tablename = 'objects'
-      AND policyname = 'Residents upload own profile files'
-  ) THEN
-    EXECUTE $policy$
-      CREATE POLICY "Residents upload own profile files"
-      ON storage.objects
-      FOR INSERT
-      TO authenticated
-      WITH CHECK (
-        bucket_id = 'certifast-uploads'
-        AND name LIKE ('resident-profile/' || auth.uid()::text || '/%')
-      )
-    $policy$;
-  END IF;
+  EXECUTE $policy$
+    CREATE POLICY "Residents upload own profile files"
+    ON storage.objects
+    FOR INSERT
+    TO authenticated
+    WITH CHECK (
+      bucket_id = 'certifast-uploads'
+      AND name LIKE ('resident-profile/' || auth.uid()::text || '/%')
+    )
+  $policy$;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_policies
-    WHERE schemaname = 'storage'
-      AND tablename = 'objects'
-      AND policyname = 'Residents read own profile files'
-  ) THEN
-    EXECUTE $policy$
-      CREATE POLICY "Residents read own profile files"
-      ON storage.objects
-      FOR SELECT
-      TO authenticated
-      USING (
-        bucket_id = 'certifast-uploads'
-        AND name LIKE ('resident-profile/' || auth.uid()::text || '/%')
-      )
-    $policy$;
-  END IF;
+  EXECUTE $policy$
+    CREATE POLICY "Residents read own profile files"
+    ON storage.objects
+    FOR SELECT
+    TO authenticated
+    USING (
+      bucket_id = 'certifast-uploads'
+      AND name LIKE ('resident-profile/' || auth.uid()::text || '/%')
+    )
+  $policy$;
 END $$;

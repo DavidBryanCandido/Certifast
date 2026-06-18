@@ -37,6 +37,10 @@ if (!document.head.querySelector("[data-resident-home]")) {
 
 const CIVIL_STATUSES = ["Single", "Married", "Widowed", "Separated", "Annulled"];
 const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
+const PROFILE_UPLOAD_POLICY_HINT =
+    "Please run database/resident_profile_certificate_details.sql in Supabase, then try saving again.";
+const PROFILE_UPLOAD_MIME_HINT =
+    "The certifast-uploads bucket must allow image/jpeg, image/png, image/webp, and application/pdf.";
 
 const PUROKS_FALLBACK = [
     { purok_id: 1, name: "Purok 1" },
@@ -416,9 +420,30 @@ export default function ResidentProfile({ resident, onLogout }) {
             });
 
         if (uploadError) {
+            const statusCode = String(uploadError.statusCode || "");
+            const rawMessage = uploadError.message || "";
+            const likelyMimeError =
+                /mime|content.?type|not supported|unsupported|invalid.*type/i.test(
+                    rawMessage,
+                );
+            const likelyPolicyError =
+                statusCode === "403" ||
+                /policy|permission|authorized|row-level security/i.test(
+                    rawMessage,
+                );
+
+            if (likelyMimeError) {
+                throw new Error(
+                    `Could not upload the proof of business document. ${PROFILE_UPLOAD_MIME_HINT}`,
+                );
+            }
+
             throw new Error(
-                uploadError.message ||
-                    "Could not upload the proof of business document.",
+                likelyPolicyError
+                    ? `Could not upload the proof of business document. ${PROFILE_UPLOAD_POLICY_HINT}`
+                    : rawMessage
+                      ? `Could not upload the proof of business document. ${rawMessage}`
+                      : "Could not upload the proof of business document.",
             );
         }
 
