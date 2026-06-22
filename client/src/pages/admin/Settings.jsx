@@ -1473,8 +1473,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     // branding – logos
     const [brgyLogo, setBrgyLogo] = useState(null);
     const [cityLogo, setCityLogo] = useState(null);
+    const [bagongPilipinasLogo, setBagongPilipinasLogo] = useState(
+        "/bagong-pilipinas-logo.png",
+    );
     const brgyFileRef = useRef();
     const cityFileRef = useRef();
+    const bagongPilipinasFileRef = useRef();
     const publicPortalQrRef = useRef(null);
     const residentPortalLoginUrl = getResidentPortalLoginUrl();
 
@@ -1562,6 +1566,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             brgy_email: brgyInfo.email,
             brgy_logo_url: brgyLogo || "",
             city_logo_url: cityLogo || "",
+            bagong_pilipinas_logo_url: bagongPilipinasLogo || "",
             captain_name: officials.captainName,
             captain_title: officials.captainTitle,
             kagawad_name: officials.kagawadName,
@@ -1590,6 +1595,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             brgyInfo,
             brgyLogo,
             cityLogo,
+            bagongPilipinasLogo,
             officials,
             sig1,
             sig2,
@@ -1730,6 +1736,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
 
                 if (data.brgy_logo_url) setBrgyLogo(data.brgy_logo_url);
                 if (data.city_logo_url) setCityLogo(data.city_logo_url);
+                if (data.bagong_pilipinas_logo_url)
+                    setBagongPilipinasLogo(data.bagong_pilipinas_logo_url);
 
                 setOfficeSchedule(
                     DEFAULT_OFFICE_SCHEDULE.map((row, index) => {
@@ -1919,6 +1927,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 password_reset_email: brgyInfo.passwordResetEmail,
                 brgy_logo_url: brgyLogo || "",
                 city_logo_url: cityLogo || "",
+                bagong_pilipinas_logo_url: bagongPilipinasLogo || "",
             };
             officeSchedule.forEach((row, index) => {
                 const line = index + 1;
@@ -2451,9 +2460,10 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                             Seals &amp; Logos
                                         </div>
                                         <div className="st-panel-desc">
-                                            Both seals appear on all generated
-                                            certificates: city seal on the
-                                            left, barangay seal on the right.
+                                            The city and barangay seals appear
+                                            on all generated certificates. The
+                                            Bagong Pilipinas logo appears only
+                                            on BRGY.CERT# 3 templates.
                                         </div>
                                     </div>
                                 </div>
@@ -2461,9 +2471,10 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                 <div
                                     style={{
                                         display: "grid",
-                                        gridTemplateColumns: isMobile
+                                        gridTemplateColumns:
+                                            isMobile || isTablet
                                             ? "1fr"
-                                            : "1fr 1fr",
+                                            : "repeat(3, minmax(0, 1fr))",
                                         borderBottom: "1px solid #e4dfd4",
                                     }}
                                 >
@@ -2471,10 +2482,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                     <div
                                         style={{
                                             padding: 24,
-                                            borderRight: isMobile
+                                            borderRight:
+                                                isMobile || isTablet
                                                 ? "none"
                                                 : "1px solid #e4dfd4",
-                                            borderBottom: isMobile
+                                            borderBottom:
+                                                isMobile || isTablet
                                                 ? "1px solid #e4dfd4"
                                                 : "none",
                                         }}
@@ -2629,6 +2642,166 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                             handleLogoUpload(
                                                                 e,
                                                                 setCityLogo,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Bagong Pilipinas Logo */}
+                                    <div
+                                        style={{
+                                            padding: 24,
+                                            borderRight:
+                                                isMobile || isTablet
+                                                ? "none"
+                                                : "1px solid #e4dfd4",
+                                            borderBottom:
+                                                isMobile || isTablet
+                                                ? "1px solid #e4dfd4"
+                                                : "none",
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: "10.5px",
+                                                fontWeight: 600,
+                                                color: "#4a4a6a",
+                                                letterSpacing: "1.2px",
+                                                textTransform: "uppercase",
+                                                marginBottom: 14,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    display: "inline-block",
+                                                    width: 10,
+                                                    height: 10,
+                                                    background: "#1d4ed8",
+                                                    borderRadius: 2,
+                                                }}
+                                            />
+                                            Bagong Pilipinas - DOC #3 Header
+                                        </div>
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 24,
+                                            }}
+                                        >
+                                            <div
+                                                className="st-logo-preview"
+                                                style={{
+                                                    borderRadius: 10,
+                                                    borderStyle:
+                                                        bagongPilipinasLogo
+                                                            ? "solid"
+                                                            : "dashed",
+                                                }}
+                                            >
+                                                {bagongPilipinasLogo ? (
+                                                    <img
+                                                        src={
+                                                            bagongPilipinasLogo
+                                                        }
+                                                        alt="Bagong Pilipinas Logo"
+                                                        style={{
+                                                            borderRadius: 0,
+                                                            objectFit:
+                                                                "contain",
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        style={{
+                                                            color: "#9090aa",
+                                                            fontSize: 9,
+                                                            letterSpacing: 1,
+                                                            textTransform:
+                                                                "uppercase",
+                                                            textAlign:
+                                                                "center",
+                                                        }}
+                                                    >
+                                                        No Logo
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <h4
+                                                    style={{
+                                                        fontSize: 13,
+                                                        fontWeight: 600,
+                                                        color: "#1a1a2e",
+                                                        marginBottom: 6,
+                                                    }}
+                                                >
+                                                    Bagong Pilipinas Logo
+                                                </h4>
+                                                <p
+                                                    style={{
+                                                        fontSize: "11.5px",
+                                                        color: "#9090aa",
+                                                        lineHeight: 1.6,
+                                                        marginBottom: 12,
+                                                    }}
+                                                >
+                                                    Appears beside the city seal
+                                                    only on certificates from
+                                                    BRGY.CERT# 3.
+                                                    <br />
+                                                    PNG/JPG/SVG · Transparent
+                                                    background recommended · Max
+                                                    2MB
+                                                </p>
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        gap: 8,
+                                                        flexWrap: "wrap",
+                                                    }}
+                                                >
+                                                    <button
+                                                        className="st-upload-btn"
+                                                        onClick={() =>
+                                                            bagongPilipinasFileRef.current.click()
+                                                        }
+                                                    >
+                                                        <Upload size={13} />
+                                                        Upload
+                                                    </button>
+                                                    {bagongPilipinasLogo !==
+                                                        "/bagong-pilipinas-logo.png" && (
+                                                        <button
+                                                            className="st-upload-btn-secondary"
+                                                            onClick={() =>
+                                                                setBagongPilipinasLogo(
+                                                                    "/bagong-pilipinas-logo.png",
+                                                                )
+                                                            }
+                                                        >
+                                                            Use Default
+                                                        </button>
+                                                    )}
+                                                    <input
+                                                        ref={
+                                                            bagongPilipinasFileRef
+                                                        }
+                                                        type="file"
+                                                        accept="image/*"
+                                                        style={{
+                                                            display: "none",
+                                                        }}
+                                                        onChange={(e) =>
+                                                            handleLogoUpload(
+                                                                e,
+                                                                setBagongPilipinasLogo,
                                                             )
                                                         }
                                                     />
@@ -3301,6 +3474,9 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                 );
                                                 setBrgyLogo(null);
                                                 setCityLogo(null);
+                                                setBagongPilipinasLogo(
+                                                    "/bagong-pilipinas-logo.png",
+                                                );
                                             }}
                                         >
                                             Cancel

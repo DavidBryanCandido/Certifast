@@ -18,6 +18,7 @@ export const DEFAULT_PUBLIC_BRANDING = {
     passwordResetEmail: "it-admin@easttapinac.gov.ph",
     brgyLogoUrl: null,
     cityLogoUrl: null,
+    bagongPilipinasLogoUrl: "/bagong-pilipinas-logo.png",
     officeSchedule: DEFAULT_OFFICE_SCHEDULE,
     systemTheme: "default",
 };
@@ -51,6 +52,10 @@ export function normalizePublicBranding(payload = {}) {
         ),
         brgyLogoUrl: clean(data.brgy_logo_url || payload.logo_url, ""),
         cityLogoUrl: clean(data.city_logo_url, ""),
+        bagongPilipinasLogoUrl: clean(
+            data.bagong_pilipinas_logo_url,
+            DEFAULT_PUBLIC_BRANDING.bagongPilipinasLogoUrl,
+        ),
         officeSchedule: getOfficeScheduleRows(data),
         systemTheme: normalizeSystemTheme(data.system_theme),
     };

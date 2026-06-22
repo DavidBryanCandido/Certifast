@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+    AlertTriangle,
     CalendarPlus,
     CheckCircle2,
     Pencil,
@@ -130,8 +131,179 @@ const inputStyle = {
     boxSizing: "border-box",
 };
 
+function PersonnelConfirmModal({
+    confirmation,
+    saving,
+    onCancel,
+    onConfirm,
+}) {
+    useEffect(() => {
+        if (!confirmation) return undefined;
+        const previousOverflow = document.body.style.overflow;
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape" && !saving) onCancel();
+        };
+        document.body.style.overflow = "hidden";
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [confirmation, onCancel, saving]);
+
+    if (!confirmation) return null;
+
+    const danger = confirmation.tone === "danger";
+    return (
+        <div
+            role="presentation"
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 4200,
+                background: "rgba(9, 26, 62, 0.62)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 18,
+            }}
+            onClick={() => {
+                if (!saving) onCancel();
+            }}
+        >
+            <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="personnel-confirm-title"
+                style={{
+                    width: "min(480px, 96vw)",
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 24px 70px rgba(0,0,0,.3)",
+                }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div
+                    style={{
+                        padding: "16px 20px",
+                        background: danger ? "#8f2f2f" : "#173f2b",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                    }}
+                >
+                    <AlertTriangle size={18} />
+                    <div
+                        id="personnel-confirm-title"
+                        style={{
+                            fontFamily: "'Playfair Display', serif",
+                            fontWeight: 700,
+                            fontSize: 15,
+                        }}
+                    >
+                        {confirmation.title}
+                    </div>
+                </div>
+                <div style={{ padding: "18px 20px" }}>
+                    <p
+                        style={{
+                            margin: 0,
+                            color: "#343247",
+                            fontSize: 13,
+                            lineHeight: 1.55,
+                        }}
+                    >
+                        {confirmation.message}
+                    </p>
+                    {confirmation.details?.length > 0 && (
+                        <div
+                            style={{
+                                marginTop: 14,
+                                padding: "11px 13px",
+                                borderRadius: 6,
+                                background: "#f7f5f0",
+                                border: "1px solid #e5dfd3",
+                            }}
+                        >
+                            {confirmation.details.map((detail) => (
+                                <div
+                                    key={detail}
+                                    style={{
+                                        color: "#4a465a",
+                                        fontSize: 11.5,
+                                        lineHeight: 1.55,
+                                    }}
+                                >
+                                    • {detail}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {confirmation.warning && (
+                        <div
+                            style={{
+                                marginTop: 14,
+                                padding: "10px 12px",
+                                borderRadius: 5,
+                                background: danger ? "#fff0f0" : "#fff8e6",
+                                border: `1px solid ${
+                                    danger ? "#e5b2b2" : "#ebd18b"
+                                }`,
+                                color: danger ? "#8f2f2f" : "#805b0e",
+                                fontSize: 11.5,
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            <strong>Important:</strong>{" "}
+                            {confirmation.warning}
+                        </div>
+                    )}
+                </div>
+                <div
+                    style={{
+                        padding: "13px 20px",
+                        background: "#f8f6f1",
+                        borderTop: "1px solid #e4dfd4",
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: 9,
+                    }}
+                >
+                    <button
+                        type="button"
+                        className="st-btn-cancel"
+                        disabled={saving}
+                        onClick={onCancel}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        className="st-btn-save"
+                        disabled={saving}
+                        onClick={onConfirm}
+                        style={
+                            danger
+                                ? { background: "#8f2f2f", borderColor: "#8f2f2f" }
+                                : undefined
+                        }
+                    >
+                        {saving
+                            ? "Processing..."
+                            : confirmation.confirmLabel || "Confirm"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function BarangayPersonnelManager({ onRosterChange }) {
     const assignmentFormRef = useRef(null);
+    const assignmentBaselineRef = useRef("");
+    const termBaselineRef = useRef("");
     const [data, setData] = useState({
         terms: [],
         positions: [],
@@ -149,6 +321,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
     const [showTermForm, setShowTermForm] = useState(false);
+    const [confirmation, setConfirmation] = useState(null);
     const [termForm, setTermForm] = useState({
         termName: "",
         startsOn: "",
@@ -203,18 +376,50 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
         return groups;
     }, [data.assignments]);
 
-    const openNewForm = () => {
-        setForm({
+    const selectedTerm = useMemo(
+        () =>
+            data.terms.find(
+                (term) =>
+                    String(term.termId) === String(selectedTermId),
+            ) || null,
+        [data.terms, selectedTermId],
+    );
+
+    const activeTerm = useMemo(
+        () =>
+            data.terms.find(
+                (term) =>
+                    String(term.termId) === String(data.activeTermId),
+            ) || null,
+        [data.activeTermId, data.terms],
+    );
+
+    const closeConfirmation = useCallback(() => {
+        if (!saving) setConfirmation(null);
+    }, [saving]);
+
+    const hasAssignmentChanges = () =>
+        showForm &&
+        JSON.stringify(form) !== assignmentBaselineRef.current;
+
+    const hasTermChanges = () =>
+        showTermForm &&
+        JSON.stringify(termForm) !== termBaselineRef.current;
+
+    const showNewForm = () => {
+        const nextForm = {
             ...EMPTY_FORM,
             termId: selectedTermId || data.activeTermId || "",
-        });
+        };
+        setForm(nextForm);
+        assignmentBaselineRef.current = JSON.stringify(nextForm);
         setShowForm(true);
         setMessage("");
         setError("");
     };
 
-    const openEditForm = (assignment) => {
-        setForm({
+    const showEditForm = (assignment) => {
+        const nextForm = {
             assignmentId: assignment.assignmentId,
             fullName: assignment.fullName || "",
             honorific: assignment.honorific || "",
@@ -235,7 +440,9 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                 ? String(assignment.endsOn).slice(0, 10)
                 : "",
             isActive: assignment.isActive !== false,
-        });
+        };
+        setForm(nextForm);
+        assignmentBaselineRef.current = JSON.stringify(nextForm);
         setShowForm(true);
         setMessage("");
         setError("");
@@ -253,7 +460,56 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
         });
     };
 
-    const saveAssignment = async () => {
+    const openNewForm = () => {
+        if (hasAssignmentChanges()) {
+            setConfirmation({
+                type: "switch-to-new-personnel",
+                tone: "danger",
+                title: "Discard Unsaved Personnel Changes?",
+                message:
+                    "Opening a new personnel form will discard the changes currently entered.",
+                warning: "Unsaved changes cannot be recovered.",
+                confirmLabel: "Discard and Continue",
+            });
+            return;
+        }
+        showNewForm();
+    };
+
+    const openEditForm = (assignment) => {
+        if (hasAssignmentChanges()) {
+            setConfirmation({
+                type: "switch-personnel",
+                tone: "danger",
+                title: "Discard Unsaved Personnel Changes?",
+                message:
+                    "Opening another personnel record will discard the changes currently entered.",
+                warning: "Unsaved changes cannot be recovered.",
+                confirmLabel: "Discard and Continue",
+                assignment,
+            });
+            return;
+        }
+        showEditForm(assignment);
+    };
+
+    const requestCloseAssignmentForm = () => {
+        if (hasAssignmentChanges()) {
+            setConfirmation({
+                type: "discard-personnel-form",
+                tone: "danger",
+                title: "Discard Unsaved Personnel Changes?",
+                message:
+                    "Closing this form will discard the information or edits currently entered.",
+                warning: "Unsaved changes cannot be recovered.",
+                confirmLabel: "Discard Changes",
+            });
+            return;
+        }
+        setShowForm(false);
+    };
+
+    const performSaveAssignment = async () => {
         if (!form.fullName.trim() || !form.positionId || !form.termId) {
             setError("Full name, position, and administration term are required.");
             return;
@@ -289,7 +545,56 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
         }
     };
 
-    const saveTerm = async () => {
+    const requestSaveAssignment = () => {
+        if (!form.fullName.trim() || !form.positionId || !form.termId) {
+            setError(
+                "Full name, position, and administration term are required.",
+            );
+            return;
+        }
+        if (selectedPosition?.requiresPurok && !form.purokId) {
+            setError("Select the purok for this Purok Leader.");
+            return;
+        }
+
+        const assignmentTerm =
+            data.terms.find(
+                (term) => String(term.termId) === String(form.termId),
+            ) || selectedTerm;
+        const editing = Boolean(form.assignmentId);
+        setError("");
+        setConfirmation({
+            type: "save-personnel",
+            tone: editing && !form.isActive ? "danger" : "warning",
+            title: editing
+                ? "Confirm Personnel Changes"
+                : "Add Personnel Assignment?",
+            message: editing
+                ? "Review the assignment details before saving these changes."
+                : "Review the assignment details before adding this person to the roster.",
+            details: [
+                `Name: ${form.fullName.trim()}`,
+                `Position: ${selectedPosition?.positionName || "Selected position"}`,
+                `Administration: ${assignmentTerm?.termName || "Selected term"}`,
+                `Roster status: ${
+                    form.isActive ? "Included" : "Not included"
+                }`,
+            ],
+            warning:
+                editing && !form.isActive
+                    ? "This person will be removed from the active roster and signatory choices, but their assignment history will be preserved."
+                    : editing
+                      ? "Existing issued certificate snapshots will remain unchanged."
+                      : assignmentTerm &&
+                          String(assignmentTerm.termId) !==
+                              String(data.activeTermId)
+                        ? "This assignment belongs to a historical or future term and will not appear in the current roster until that term is activated."
+                        : "",
+            confirmLabel: editing ? "Save Changes" : "Add Personnel",
+        });
+    };
+
+    const performSaveTerm = async () => {
         if (!termForm.termName.trim()) {
             setError("Administration term name is required.");
             return;
@@ -320,7 +625,68 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
         }
     };
 
-    const activateSelectedTerm = async () => {
+    const requestSaveTerm = () => {
+        if (!termForm.termName.trim()) {
+            setError("Administration term name is required.");
+            return;
+        }
+        setError("");
+        setConfirmation({
+            type: "create-term",
+            tone: termForm.isActive && activeTerm ? "danger" : "warning",
+            title: termForm.isActive
+                ? "Create and Activate Administration Term?"
+                : "Create Administration Term?",
+            message:
+                "Review the new administration term before it is created.",
+            details: [
+                `Term: ${termForm.termName.trim()}`,
+                `Dates: ${termForm.startsOn || "Not specified"} to ${
+                    termForm.endsOn || "Not specified"
+                }`,
+                `Copy current roster: ${
+                    termForm.copyCurrentRoster ? "Yes" : "No"
+                }`,
+                `Activate immediately: ${termForm.isActive ? "Yes" : "No"}`,
+            ],
+            warning:
+                termForm.isActive && activeTerm
+                    ? `"${activeTerm.termName}" is currently active. It will be deactivated immediately, and the new term will control the current personnel and certificate signatory roster.`
+                    : termForm.copyCurrentRoster
+                      ? "The current roster will be copied into the new term for editing."
+                      : "The new term will start with an empty roster.",
+            confirmLabel: termForm.isActive
+                ? "Create and Activate"
+                : "Create Term",
+        });
+    };
+
+    const requestCloseTermForm = () => {
+        if (hasTermChanges()) {
+            setConfirmation({
+                type: "discard-term-form",
+                tone: "danger",
+                title: "Discard New Term Details?",
+                message:
+                    "Closing this form will discard the administration-term details currently entered.",
+                warning: "Unsaved term details cannot be recovered.",
+                confirmLabel: "Discard Details",
+            });
+            return;
+        }
+        setShowTermForm(false);
+    };
+
+    const toggleTermForm = () => {
+        if (showTermForm) {
+            requestCloseTermForm();
+            return;
+        }
+        termBaselineRef.current = JSON.stringify(termForm);
+        setShowTermForm(true);
+    };
+
+    const performActivateSelectedTerm = async () => {
         if (!selectedTermId || String(data.activeTermId) === selectedTermId)
             return;
         setSaving(true);
@@ -339,8 +705,56 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
         }
     };
 
+    const requestActivateSelectedTerm = () => {
+        if (!selectedTermId || String(data.activeTermId) === selectedTermId)
+            return;
+        setConfirmation({
+            type: "activate-term",
+            tone: "danger",
+            title: "Change the Active Administration Term?",
+            message:
+                "This changes which personnel are treated as the current barangay roster.",
+            details: [
+                `Current active term: ${activeTerm?.termName || "None"}`,
+                `New active term: ${selectedTerm?.termName || "Selected term"}`,
+                `Assignments in new term: ${data.assignments.length}`,
+            ],
+            warning:
+                "Certificate signatory choices and the current personnel roster will immediately use the selected term. Historical records will remain available.",
+            confirmLabel: "Make Term Active",
+        });
+    };
+
+    const confirmPendingAction = async () => {
+        const pending = confirmation;
+        if (!pending || saving) return;
+        setConfirmation(null);
+
+        if (pending.type === "save-personnel") {
+            await performSaveAssignment();
+        } else if (pending.type === "create-term") {
+            await performSaveTerm();
+        } else if (pending.type === "activate-term") {
+            await performActivateSelectedTerm();
+        } else if (pending.type === "discard-personnel-form") {
+            setShowForm(false);
+        } else if (pending.type === "discard-term-form") {
+            setShowTermForm(false);
+        } else if (pending.type === "switch-to-new-personnel") {
+            showNewForm();
+        } else if (pending.type === "switch-personnel") {
+            showEditForm(pending.assignment);
+        }
+    };
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <PersonnelConfirmModal
+                confirmation={confirmation}
+                saving={saving}
+                onCancel={closeConfirmation}
+                onConfirm={confirmPendingAction}
+            />
             <div className="st-panel">
                 <div className="st-panel-header">
                     <div>
@@ -356,7 +770,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         <button
                             type="button"
                             className="st-btn-cancel"
-                            onClick={() => setShowTermForm((open) => !open)}
+                            onClick={toggleTermForm}
                         >
                             <CalendarPlus size={13} /> New Term
                         </button>
@@ -408,7 +822,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                                 !selectedTermId ||
                                 String(data.activeTermId) === selectedTermId
                             }
-                            onClick={activateSelectedTerm}
+                            onClick={requestActivateSelectedTerm}
                         >
                             <ShieldCheck size={13} />
                             {String(data.activeTermId) === selectedTermId
@@ -449,7 +863,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         <button
                             type="button"
                             className="st-btn-cancel"
-                            onClick={() => setShowTermForm(false)}
+                            onClick={requestCloseTermForm}
                         >
                             <X size={13} />
                         </button>
@@ -557,7 +971,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         <button
                             className="st-btn-save"
                             disabled={saving}
-                            onClick={saveTerm}
+                            onClick={requestSaveTerm}
                         >
                             <Save size={13} /> Create Term
                         </button>
@@ -585,7 +999,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         </div>
                         <button
                             className="st-btn-cancel"
-                            onClick={() => setShowForm(false)}
+                            onClick={requestCloseAssignmentForm}
                         >
                             <X size={13} />
                         </button>
@@ -916,7 +1330,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         <button
                             className="st-btn-save"
                             disabled={saving}
-                            onClick={saveAssignment}
+                            onClick={requestSaveAssignment}
                         >
                             <Save size={13} />{" "}
                             {saving ? "Saving..." : "Save Personnel"}

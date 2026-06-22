@@ -21,6 +21,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS certificate_templates_template_key_uidx
     ON certificate_templates (template_key)
     WHERE template_key IS NOT NULL;
 
+INSERT INTO barangay_settings (setting_key, setting_value)
+VALUES ('bagong_pilipinas_logo_url', '/bagong-pilipinas-logo.png')
+ON CONFLICT (setting_key) DO NOTHING;
+
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
 SELECT 'Barangay Permit: MLBB Tournament', 'doc3-mlbb-tournament-permit', 'MLBB tournament permit', 'doc3', true, 'Doc #3 barangay permit to hold a Mobile Legends tournament.', true, 570, '["eventName", "eventOrganizer", "eventPartner", "eventDate", "eventTime", "eventVenue"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc3-mlbb-tournament-permit');

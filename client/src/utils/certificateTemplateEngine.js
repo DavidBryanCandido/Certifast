@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
     kagawad_3_title: "Barangay Kagawad",
     city_logo_url: "/city-logo.png",
     brgy_logo_url: "/brgy-logo.png",
+    bagong_pilipinas_logo_url: "/bagong-pilipinas-logo.png",
     captain_sig_base64: "",
     secondary_sig_base64: "",
 };
@@ -1063,7 +1064,7 @@ function paragraphs(items) {
         .filter(Boolean)
         .map((item) => {
             if (typeof item === "string") {
-                return `<p>${item}</p>`;
+                return `<p class="cf-body-paragraph">${item}</p>`;
             }
             const className = item.className
                 ? ` class="${item.className}"`
@@ -2977,12 +2978,16 @@ export function getSignatoryTemplateUsage() {
     return usage;
 }
 
-export function getCertificateTemplate(templateKey, certType) {
+function resolveCertificateTemplateKey(templateKey, certType) {
     const directKey = String(templateKey || "").trim();
-    if (directKey && TEMPLATES[directKey]) return TEMPLATES[directKey];
+    if (directKey && TEMPLATES[directKey]) return directKey;
     const alias = TEMPLATE_ALIASES[normalizeKey(certType)];
-    if (alias && TEMPLATES[alias]) return TEMPLATES[alias];
-    return TEMPLATES["doc1-barangay-clearance"];
+    if (alias && TEMPLATES[alias]) return alias;
+    return "doc1-barangay-clearance";
+}
+
+export function getCertificateTemplate(templateKey, certType) {
+    return TEMPLATES[resolveCertificateTemplateKey(templateKey, certType)];
 }
 
 export function getTemplateProofRequirements(templateKey, certType) {
@@ -2996,10 +3001,15 @@ export function getTemplateProofRequirements(templateKey, certType) {
     return requirements.map((item) => ({ ...item }));
 }
 
-function buildHeader(settings) {
+function buildHeader(settings, templateKey) {
+    const bagongPilipinasLogo = String(templateKey || "").startsWith("doc3-")
+        ? `<img class="cf-logo cf-logo-bagong" src="${escapeHtml(settings.bagong_pilipinas_logo_url || DEFAULT_SETTINGS.bagong_pilipinas_logo_url)}" alt="" />`
+        : "";
+
     return `
         <header class="cf-cert-header">
             <img class="cf-logo cf-logo-left" src="${escapeHtml(settings.city_logo_url || DEFAULT_SETTINGS.city_logo_url)}" alt="" />
+            ${bagongPilipinasLogo}
             <img class="cf-logo cf-logo-right" src="${escapeHtml(settings.brgy_logo_url || DEFAULT_SETTINGS.brgy_logo_url)}" alt="" />
             <div class="cf-republic">Republic of the Pilipinas</div>
             <div class="cf-city">${escapeHtml(settings.brgy_city || DEFAULT_SETTINGS.brgy_city)}</div>
@@ -3062,6 +3072,11 @@ function baseStyles() {
             object-fit: contain;
         }
         .cf-logo-left { left: 0.02in; }
+        .cf-logo-bagong {
+            left: 1.02in;
+            width: 0.92in;
+            height: 0.82in;
+        }
         .cf-logo-right { right: 0.02in; }
         .cf-republic {
             font-family: Cambria, "Times New Roman", serif;
@@ -3110,15 +3125,20 @@ function baseStyles() {
             margin: 0 0 0.16in;
             text-align: justify;
         }
+        .cf-cert-body .cf-body-paragraph {
+            text-indent: 0.5in;
+        }
         .cf-cert-body .salutation {
             margin-bottom: 0.22in;
             text-align: left;
+            text-indent: 0;
         }
         .cf-cert-body .center-strong {
             text-align: center;
             font-size: 13pt;
             font-weight: 700;
             margin: -0.05in 0 0.14in;
+            text-indent: 0;
         }
         .cf-cert-body strong {
             font-weight: 700;
@@ -3154,6 +3174,9 @@ function baseStyles() {
         .cf-business-endorsement p {
             margin: 0 0 0.11in;
             text-align: left;
+        }
+        .cf-business-endorsement p:not(.cf-business-center) {
+            text-indent: 0.5in;
         }
         .cf-business-heading-row {
             display: grid;
@@ -3222,6 +3245,7 @@ function baseStyles() {
         .cf-business-center {
             margin-top: 0.10in;
             text-align: center !important;
+            text-indent: 0;
         }
         section:has(.cf-business-endorsement) .cf-signature-row.captain {
             margin-top: 0.20in;
@@ -3470,10 +3494,11 @@ export function buildCertificatePrintHtml({
         data?.extra_fields?.templateKey;
     const selectedCertType =
         certType || cert?.name || data?.certType || data?.type;
-    const template = getCertificateTemplate(
+    const resolvedTemplateKey = resolveCertificateTemplateKey(
         selectedTemplateKey,
         selectedCertType,
     );
+    const template = TEMPLATES[resolvedTemplateKey];
     const title =
         template.title || selectedCertType || "BARANGAY CERTIFICATION";
     const titleHtml = template.hideTitle
@@ -3511,7 +3536,7 @@ export function buildCertificatePrintHtml({
 <body>
     <main class="cf-cert-page">
         ${buildWatermark(mergedSettings)}
-        ${buildHeader(mergedSettings)}
+        ${buildHeader(mergedSettings, resolvedTemplateKey)}
         <section>
             ${titleHtml}
             <div class="cf-cert-body">${body}</div>
