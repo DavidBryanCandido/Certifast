@@ -49,6 +49,15 @@ const adminRequestService = {
         }
     },
 
+    saveSignatories: async (requestId, signatorySelections) => {
+        const res = await axios.put(
+            `${API}/admin/requests/${requestId}/signatories`,
+            { signatorySelections },
+            getAdminHeaders(),
+        );
+        return res.data;
+    },
+
     markReady: async (requestId) => {
         const res = await axios.post(
             `${API}/admin/requests/${requestId}/mark-ready`,

@@ -15,6 +15,7 @@ export const DEFAULT_PUBLIC_BRANDING = {
     address: "54 - 14th Street corner Gallagher Street, Olongapo City",
     contact: "(047) 123-4567",
     email: "brgy.easttapinac@olongapo.gov.ph",
+    passwordResetEmail: "it-admin@easttapinac.gov.ph",
     brgyLogoUrl: null,
     cityLogoUrl: null,
     officeSchedule: DEFAULT_OFFICE_SCHEDULE,
@@ -44,6 +45,10 @@ export function normalizePublicBranding(payload = {}) {
         address: clean(data.brgy_address, DEFAULT_PUBLIC_BRANDING.address),
         contact: clean(data.brgy_contact, DEFAULT_PUBLIC_BRANDING.contact),
         email: clean(data.brgy_email, DEFAULT_PUBLIC_BRANDING.email),
+        passwordResetEmail: clean(
+            data.password_reset_email,
+            DEFAULT_PUBLIC_BRANDING.passwordResetEmail,
+        ),
         brgyLogoUrl: clean(data.brgy_logo_url || payload.logo_url, ""),
         cityLogoUrl: clean(data.city_logo_url, ""),
         officeSchedule: getOfficeScheduleRows(data),

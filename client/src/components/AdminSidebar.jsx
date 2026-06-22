@@ -394,8 +394,9 @@ export function AdminSidebar({
     const role = String(admin?.role || "")
         .trim()
         .toLowerCase();
-    const isAdmin = role === "admin" || role === "superadmin";
-    const showAdminSection = isAdmin || role === "staff";
+    const isSuperadmin = role === "superadmin";
+    const isAdmin = role === "admin" || isSuperadmin;
+    const showAdminSection = isAdmin;
 
     // ── Main Menu (visible to all logged-in admin users incl. staff) ──
     const navItems = [
@@ -412,8 +413,18 @@ export function AdminSidebar({
 
     // ── Admin-only section (bottom) — hidden from staff ──
     const saItems = [
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
+        {
+            key: "manageAccounts",
+            label: "Manage Accounts",
+            Icon: UserCog,
+            superadminOnly: true,
+        },
+        {
+            key: "logs",
+            label: "Logs & Audit Trail",
+            Icon: ScrollText,
+            superadminOnly: true,
+        },
         { key: "settings", label: "System Settings", Icon: Settings },
     ];
 
@@ -493,12 +504,10 @@ export function AdminSidebar({
                         </div>
                     )}
                     {saItems
-                        .filter((item) => {
-                            if (role === "staff") {
-                                return item.key === "manageAccounts";
-                            }
-                            return true;
-                        })
+                        .filter(
+                            (item) =>
+                                !item.superadminOnly || isSuperadmin,
+                        )
                         .map((item) => navBtn({ item }))}
                 </div>
             )}
@@ -653,8 +662,9 @@ export function AdminMobileSidebar({
     const role = String(admin?.role || "")
         .trim()
         .toLowerCase();
-    const isAdmin = role === "admin" || role === "superadmin";
-    const showAdminSection = isAdmin || role === "staff";
+    const isSuperadmin = role === "superadmin";
+    const isAdmin = role === "admin" || isSuperadmin;
+    const showAdminSection = isAdmin;
 
     useEffect(() => {
         document.body.style.overflow = "hidden";
@@ -678,8 +688,18 @@ export function AdminMobileSidebar({
 
     // ── Admin-only section (bottom) ──
     const saItems = [
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
+        {
+            key: "manageAccounts",
+            label: "Manage Accounts",
+            Icon: UserCog,
+            superadminOnly: true,
+        },
+        {
+            key: "logs",
+            label: "Logs & Audit Trail",
+            Icon: ScrollText,
+            superadminOnly: true,
+        },
         { key: "settings", label: "System Settings", Icon: Settings },
     ];
 
@@ -790,12 +810,10 @@ export function AdminMobileSidebar({
                             Admin
                         </div>
                         {saItems
-                            .filter((item) => {
-                                if (role === "staff") {
-                                    return item.key === "manageAccounts";
-                                }
-                                return true;
-                            })
+                            .filter(
+                                (item) =>
+                                    !item.superadminOnly || isSuperadmin,
+                            )
                             .map((item) => navBtn({ item }))}
                     </div>
                 )}

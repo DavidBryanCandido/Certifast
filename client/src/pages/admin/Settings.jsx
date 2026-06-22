@@ -22,10 +22,13 @@ import {
     QrCode,
     Search,
     Upload,
+    UsersRound,
     X,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import * as settingsService from "../../services/settingsService";
+import * as personnelService from "../../services/personnelService";
+import BarangayPersonnelManager from "../../components/BarangayPersonnelManager";
 import { DEFAULT_OFFICE_SCHEDULE } from "../../services/publicBrandingService";
 import {
     SYSTEM_THEMES,
@@ -456,6 +459,7 @@ function useSettingsStyles() {
 
 const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
 const CERT_TYPES_PER_PAGE = 8;
+const SHOW_LEGACY_BRANDING_PREVIEW = false;
 
 function getResidentPortalLoginUrl() {
     const raw =
@@ -1005,13 +1009,12 @@ function TemplateActionConfirmModal({ action, cert, onCancel, onConfirm }) {
 }
 
 function FeeEditorModal({ cert, saving, onClose, onSave }) {
-    const [amount, setAmount] = useState("");
+    const [amount, setAmount] = useState(() =>
+        cert?.fee && cert?.feeAmount
+            ? formatFeeAmount(cert.feeAmount)
+            : "",
+    );
     const [error, setError] = useState("");
-
-    useEffect(() => {
-        setAmount(cert?.fee && cert?.feeAmount ? formatFeeAmount(cert.feeAmount) : "");
-        setError("");
-    }, [cert]);
 
     if (!cert) return null;
 
@@ -1442,7 +1445,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         .trim()
         .toLowerCase();
     const isSuperAdmin = role === "admin" || role === "superadmin";
-    const canManageSystemTheme = role === "admin";
+    const canManageSystemTheme =
+        role === "admin" || role === "superadmin";
 
     // layout
     const [width, setWidth] = useState(window.innerWidth);
@@ -1506,6 +1510,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         address: "54 - 14th Street corner Gallagher Street, Olongapo City",
         contact: "(047) 123-4567",
         email: "brgy.easttapinac@olongapo.gov.ph",
+        passwordResetEmail: "it-admin@easttapinac.gov.ph",
     });
     const [officeSchedule, setOfficeSchedule] = useState(
         DEFAULT_OFFICE_SCHEDULE,
@@ -1526,13 +1531,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         link.click();
     };
 
-    // branding – footer
-    const [footer, setFooter] = useState({
-        tagline: "Serbisyo Para sa Lahat ng Mamamayan",
-        address: "54 - 14th Street corner Gallagher Street, Olongapo City",
-        contact: "(047) 123-4567 | brgy.easttapinac@olongapo.gov.ph",
-    });
-
     // branding – officials / e-signatures
     const [officials, setOfficials] = useState({
         captainName: "Hon. Dante L. Hondo",
@@ -1552,6 +1550,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [sig2, setSig2] = useState(null);
     const [drawModal, setDrawModal] = useState({ open: false, target: null });
     const [templatePreviewCert, setTemplatePreviewCert] = useState(null);
+    const [personnelRoster, setPersonnelRoster] = useState(null);
     const [signatoryHelpSlot, setSignatoryHelpSlot] = useState(null);
     const signatoryUsage = useMemo(() => getSignatoryTemplateUsage(), []);
     const templatePreviewSettings = useMemo(
@@ -1577,8 +1576,25 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             secondary_title: officials.secondaryTitle,
             captain_sig_base64: sig1 || "",
             secondary_sig_base64: sig2 || "",
+            signatories: personnelRoster?.signatories
+                ? {
+                      captain: personnelRoster.signatories.captain,
+                      kagawad: personnelRoster.signatories.kagawads?.[0],
+                      kagawad1: personnelRoster.signatories.kagawads?.[0],
+                      kagawad2: personnelRoster.signatories.kagawads?.[1],
+                      kagawad3: personnelRoster.signatories.kagawads?.[2],
+                  }
+                : undefined,
         }),
-        [brgyInfo, brgyLogo, cityLogo, officials, sig1, sig2],
+        [
+            brgyInfo,
+            brgyLogo,
+            cityLogo,
+            officials,
+            sig1,
+            sig2,
+            personnelRoster,
+        ],
     );
 
     // cert types
@@ -1706,6 +1722,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                         ...prev,
                         email: data.brgy_email,
                     }));
+                if (data.password_reset_email)
+                    setBrgyInfo((prev) => ({
+                        ...prev,
+                        passwordResetEmail: data.password_reset_email,
+                    }));
 
                 if (data.brgy_logo_url) setBrgyLogo(data.brgy_logo_url);
                 if (data.city_logo_url) setCityLogo(data.city_logo_url);
@@ -1723,22 +1744,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                         };
                     }),
                 );
-
-                if (data.footer_tagline)
-                    setFooter((prev) => ({
-                        ...prev,
-                        tagline: data.footer_tagline,
-                    }));
-                if (data.footer_address)
-                    setFooter((prev) => ({
-                        ...prev,
-                        address: data.footer_address,
-                    }));
-                if (data.footer_contact)
-                    setFooter((prev) => ({
-                        ...prev,
-                        contact: data.footer_contact,
-                    }));
 
                 if (data.captain_name)
                     setOfficials((prev) => ({
@@ -1810,6 +1815,21 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         };
 
         loadSettings();
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+        personnelService
+            .getPersonnelRoster()
+            .then((result) => {
+                if (mounted) setPersonnelRoster(result);
+            })
+            .catch(() => {
+                if (mounted) setPersonnelRoster(null);
+            });
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -1896,6 +1916,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 brgy_address: brgyInfo.address,
                 brgy_contact: brgyInfo.contact,
                 brgy_email: brgyInfo.email,
+                password_reset_email: brgyInfo.passwordResetEmail,
                 brgy_logo_url: brgyLogo || "",
                 city_logo_url: cityLogo || "",
             };
@@ -1939,33 +1960,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
         } catch (err) {
             setMessage({
                 text: err.message || "Failed to save system theme",
-                type: "error",
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Save footer settings
-    const handleSaveFooter = async () => {
-        setLoading(true);
-        setMessage({ text: "", type: "success" });
-        try {
-            const token = localStorage.getItem("adminToken");
-            const settings = {
-                footer_tagline: footer.tagline,
-                footer_address: footer.address,
-                footer_contact: footer.contact,
-            };
-
-            await settingsService.updateBarangaySettings(settings, token);
-            setMessage({
-                text: "Footer updated successfully!",
-                type: "success",
-            });
-        } catch (err) {
-            setMessage({
-                text: err.message || "Failed to save footer",
                 type: "error",
             });
         } finally {
@@ -2182,6 +2176,13 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                 <path d="M8.56 2.75c4.37 6.03 6.02 9.42 8.03 17.72m2.54-15.38c-3.72 4.35-8.94 5.66-16.88 5.85m19.5 1.9c-3.5-.93-6.63-.82-8.94 0-2.58.92-5.01 2.86-7.44 6.32" />
                             </svg>
                             Barangay Branding
+                        </button>
+                        <button
+                            className={`st-tab-btn${activeTab === "personnel" ? " active" : ""}`}
+                            onClick={() => setActiveTab("personnel")}
+                        >
+                            <UsersRound size={13} />
+                            Personnel &amp; Terms
                         </button>
                         <button
                             className={`st-tab-btn${activeTab === "publicExperience" ? " active" : ""}`}
@@ -2430,6 +2431,12 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                             </div>
 
                         </>
+                    )}
+
+                    {activeTab === "personnel" && (
+                        <BarangayPersonnelManager
+                            onRosterChange={setPersonnelRoster}
+                        />
                     )}
 
                     {/* TAB: BRANDING */}
@@ -2798,7 +2805,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                     </div>
                                 </div>
 
-                                {false && (
+                                {SHOW_LEGACY_BRANDING_PREVIEW && (
                                     <div
                                         style={{
                                             padding: "20px 24px",
@@ -3038,43 +3045,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                 background: "#c0392b",
                                             }}
                                         />
-                                        <div
-                                            style={{
-                                                padding: "10px 24px 14px",
-                                                textAlign: "center",
-                                                background: "#fff",
-                                            }}
-                                        >
-                                            <div
-                                                style={{
-                                                    fontFamily:
-                                                        "'Playfair Display',serif",
-                                                    fontSize: 13,
-                                                    fontStyle: "italic",
-                                                    color: "#1a1a2e",
-                                                    marginBottom: 6,
-                                                }}
-                                            >
-                                                "{footer.tagline}"
-                                            </div>
-                                            <div
-                                                style={{
-                                                    fontSize: 9,
-                                                    color: "#9090aa",
-                                                }}
-                                            >
-                                                {footer.address}
-                                            </div>
-                                            <div
-                                                style={{
-                                                    fontSize: 9,
-                                                    color: "#9090aa",
-                                                    marginTop: 1,
-                                                }}
-                                            >
-                                                {footer.contact}
-                                            </div>
-                                        </div>
                                     </div>
                                     <div
                                         style={{
@@ -3180,7 +3150,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                         <div className="st-field">
                                             <label>Email Address</label>
                                             <input
-                                                type="text"
+                                                type="email"
                                                 value={brgyInfo.email}
                                                 onChange={(e) =>
                                                     setBrgyInfo({
@@ -3189,6 +3159,35 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                     })
                                                 }
                                             />
+                                        </div>
+                                        <div className="st-field">
+                                            <label>
+                                                Admin Password Reset Email
+                                            </label>
+                                            <input
+                                                type="email"
+                                                value={
+                                                    brgyInfo.passwordResetEmail
+                                                }
+                                                onChange={(e) =>
+                                                    setBrgyInfo({
+                                                        ...brgyInfo,
+                                                        passwordResetEmail:
+                                                            e.target.value,
+                                                    })
+                                                }
+                                                placeholder="it-admin@easttapinac.gov.ph"
+                                            />
+                                            <div
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "#9090aa",
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                Shown in the Admin Login
+                                                password-reset instructions.
+                                            </div>
                                         </div>
                                     </div>
                                     <div
@@ -3294,6 +3293,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                                         "54 - 14th Street corner Gallagher Street, Olongapo City",
                                                     contact: "(047) 123-4567",
                                                     email: "brgy.easttapinac@olongapo.gov.ph",
+                                                    passwordResetEmail:
+                                                        "it-admin@easttapinac.gov.ph",
                                                 });
                                                 setOfficeSchedule(
                                                     DEFAULT_OFFICE_SCHEDULE,
@@ -3329,133 +3330,8 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                                 </div>
                             </div>
 
-                            {/* CERTIFICATE FOOTER */}
-                            <div className="st-panel" style={{ display: "none" }}>
-                                <div className="st-panel-header">
-                                    <div>
-                                        <div className="st-panel-title">
-                                            Certificate Footer
-                                        </div>
-                                        <div className="st-panel-desc">
-                                            Tagline and contact info shown at
-                                            the bottom of every certificate and
-                                            permit.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="st-panel-body">
-                                    <div
-                                        className="st-form-grid-1"
-                                        style={{ marginBottom: 18 }}
-                                    >
-                                        <div className="st-field">
-                                            <label>
-                                                Barangay Tagline / Motto
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={footer.tagline}
-                                                onChange={(e) =>
-                                                    setFooter({
-                                                        ...footer,
-                                                        tagline: e.target.value,
-                                                    })
-                                                }
-                                                placeholder='e.g. "Serbisyo Para sa Lahat"'
-                                            />
-                                            <div
-                                                style={{
-                                                    fontSize: 10,
-                                                    color: "#9090aa",
-                                                    marginTop: 4,
-                                                }}
-                                            >
-                                                Displayed in italic inside
-                                                quotation marks at the bottom of
-                                                the certificate.
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="st-form-grid-2">
-                                        <div className="st-field">
-                                            <label>Footer Address Line</label>
-                                            <input
-                                                type="text"
-                                                value={footer.address}
-                                                onChange={(e) =>
-                                                    setFooter({
-                                                        ...footer,
-                                                        address: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                        <div className="st-field">
-                                            <label>
-                                                Footer Contact / Email
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={footer.contact}
-                                                onChange={(e) =>
-                                                    setFooter({
-                                                        ...footer,
-                                                        contact: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="st-save-bar">
-                                    <p>
-                                        <strong>Note:</strong> Footer updates
-                                        appear on newly generated certificates
-                                        only.
-                                    </p>
-                                    <div>
-                                        <button
-                                            className="st-btn-cancel"
-                                            onClick={() => {
-                                                setFooter({
-                                                    tagline:
-                                                        "Serbisyo Para sa Lahat ng Mamamayan",
-                                                    address:
-                                                        "54 - 14th Street corner Gallagher Street, Olongapo City",
-                                                    contact:
-                                                        "(047) 123-4567 | brgy.easttapinac@olongapo.gov.ph",
-                                                });
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            className="st-btn-save"
-                                            onClick={handleSaveFooter}
-                                            disabled={loading}
-                                        >
-                                            <svg
-                                                width="13"
-                                                height="13"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                            >
-                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                                <polyline points="17 21 17 13 7 13 7 21" />
-                                                <polyline points="7 3 7 8 15 8" />
-                                            </svg>
-                                            {loading
-                                                ? "Saving..."
-                                                : "Save Footer"}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* SIGNATORY OFFICIALS */}
-                            <div className="st-panel">
+                            <div className="st-panel" style={{ display: "none" }}>
                                 <div className="st-panel-header">
                                     <div>
                                         <div className="st-panel-title">
@@ -4137,6 +4013,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 onConfirm={confirmTemplateAction}
             />
             <FeeEditorModal
+                key={feeEditorCert?.id || "fee-editor"}
                 cert={feeEditorCert}
                 saving={savingTemplateId === feeEditorCertId}
                 onClose={() => {

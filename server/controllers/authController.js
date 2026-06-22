@@ -16,6 +16,19 @@ const supabase =
         ? createClient(supabaseUrl, supabaseServiceRoleKey)
         : null;
 
+function createPublicAuthClient() {
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    return supabaseUrl && anonKey
+        ? createClient(supabaseUrl, anonKey, {
+              auth: {
+                  autoRefreshToken: false,
+                  persistSession: false,
+                  detectSessionInUrl: false,
+              },
+          })
+        : null;
+}
+
 async function sendPasswordChangedEmailAfterUpdate(
     residentEmail,
     residentName,
@@ -428,10 +441,48 @@ async function adminLogin(req, res) {
         }
 
         const admin = result.rows[0];
-        const match = await bcrypt.compare(password, admin.password_hash);
 
-        if (!match) {
-            return res.status(401).json({ message: "Invalid credentials" });
+        if (admin.supabase_auth_id) {
+            const publicAuth = createPublicAuthClient();
+            if (!publicAuth) {
+                return res.status(503).json({
+                    message:
+                        "Supabase Auth is not fully configured on the server.",
+                });
+            }
+
+            const { data: authData, error: authError } =
+                await publicAuth.auth.signInWithPassword({
+                    email: admin.email,
+                    password,
+                });
+
+            if (authError) {
+                const authMessage = String(authError.message || "");
+                if (/email not confirmed|email.*confirm/i.test(authMessage)) {
+                    return res.status(403).json({
+                        message:
+                            "Please verify your email before signing in. Check your inbox for the Supabase confirmation link.",
+                    });
+                }
+                return res.status(401).json({ message: "Invalid credentials" });
+            }
+
+            if (
+                !authData?.user?.id ||
+                authData.user.id !== admin.supabase_auth_id
+            ) {
+                return res.status(401).json({ message: "Invalid credentials" });
+            }
+        } else {
+            // Legacy accounts created before Supabase email verification remain
+            // usable so the existing superadmin is not locked out.
+            const match = await bcrypt.compare(password, admin.password_hash);
+            if (!match) {
+                return res
+                    .status(401)
+                    .json({ message: "Invalid credentials" });
+            }
         }
 
         // Update last_login

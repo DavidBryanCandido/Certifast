@@ -635,7 +635,7 @@ export default function LogsAuditTrail({
     const role = String(admin?.role || "")
         .trim()
         .toLowerCase();
-    const isAdmin = role === "admin" || role === "superadmin";
+    const isAdmin = role === "superadmin";
 
     const [activePage, setActivePage] = useState("logs");
     const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -855,9 +855,9 @@ export default function LogsAuditTrail({
                         Restricted Access
                     </h2>
                     <p style={{ margin: "10px 0 0", color: "#4a4a6a" }}>
-                        This page is restricted to admin accounts only. All
-                        system activity is recorded automatically. Logs cannot
-                        be deleted or modified.
+                        This page is restricted to the designated superadmin.
+                        All system activity is recorded automatically. Logs
+                        cannot be deleted or modified.
                     </p>
                 </div>
             </div>

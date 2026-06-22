@@ -131,6 +131,7 @@ function useMAStyles() {
         .ma-badge-inactive { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; background: #f0ece4; color: #9090aa; border-radius: 20px; padding: 3px 10px; font-weight: 700; font-family: 'Source Serif 4', serif; }
         .ma-badge-pending  { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; background: #fff3e0; color: #b86800; border-radius: 20px; padding: 3px 10px; font-weight: 700; font-family: 'Source Serif 4', serif; }
         .ma-badge-admin { font-size: 10px; background: rgba(var(--color-accent-rgb, 201, 162, 39),0.15); color: var(--color-accent-dark, #9a7515); border: 1px solid rgba(var(--color-accent-rgb, 201, 162, 39),0.35); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
+        .ma-badge-superadmin { font-size: 10px; background: rgba(106,61,184,0.12); color: #6a3db8; border: 1px solid rgba(106,61,184,0.3); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
         .ma-badge-staff { font-size: 10px; background: rgba(var(--color-primary-rgb, 14, 37, 84),0.08); color: var(--color-primary-soft, #163066); border: 1px solid rgba(var(--color-primary-rgb, 14, 37, 84),0.2); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
         .ma-badge-resident { font-size: 10px; background: rgba(26,122,74,0.08); color: #1a7a4a; border: 1px solid rgba(26,122,74,0.2); border-radius: 10px; padding: 2px 9px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
         .ma-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--color-primary, #0e2554); color: #fff; padding: 11px 20px; border-radius: 6px; font-size: 13px; font-family: 'Source Serif 4', serif; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 300; display: flex; align-items: center; gap: 8px; animation: maToastIn 0.2s ease both; border-left: 3px solid var(--color-accent, #c9a227); }
@@ -249,6 +250,7 @@ function AccountModal({ mode, account, onClose, onSave }) {
     const [form, setForm] = useState({
         full_name: account?.full_name || "",
         username: account?.username || "",
+        email: account?.email || "",
         role: account?.role || "staff",
         password: "",
         confirm_password: "",
@@ -273,6 +275,12 @@ function AccountModal({ mode, account, onClose, onSave }) {
         }
         if (!form.full_name.trim()) return "Full name is required.";
         if (!form.username.trim()) return "Username is required.";
+        if (!isEdit && !form.email.trim()) return "Email is required.";
+        if (
+            !isEdit &&
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+        )
+            return "Enter a valid email address.";
         if (!isEdit && !form.password) return "Password is required.";
         if (!isEdit && form.password.length < 8)
             return "At least 8 characters.";
@@ -457,6 +465,24 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                     placeholder="e.g. Juan Dela Cruz"
                                 />
                             </div>
+                            {!isEdit && (
+                                <div className="ma-field">
+                                    <label>
+                                        Email Address{" "}
+                                        <span className="req">*</span>
+                                    </label>
+                                    <input
+                                        className="ma-input"
+                                        type="email"
+                                        autoComplete="email"
+                                        value={form.email}
+                                        onChange={(e) =>
+                                            set("email", e.target.value)
+                                        }
+                                        placeholder="e.g. j.delacruz@easttapinac.gov.ph"
+                                    />
+                                </div>
+                            )}
                             <div
                                 style={{
                                     display: "grid",
@@ -524,6 +550,9 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                         >
                                             <option value="staff">Staff</option>
                                             <option value="admin">Admin</option>
+                                            <option value="superadmin">
+                                                Superadmin (System Owner)
+                                            </option>
                                         </select>
                                         <div
                                             style={{
@@ -1454,7 +1483,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     const role = String(admin?.role || "")
         .trim()
         .toLowerCase();
-    const isSuperAdmin = role === "admin" || role === "superadmin";
+    const isSuperAdmin = role === "superadmin";
     const [searchParams] = useSearchParams();
     const requestedTab = String(searchParams.get("tab") || "").toLowerCase();
     const requestedResidentStatus = String(
@@ -1624,6 +1653,9 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     const totalAccounts = rows.length;
     const activeCount = rows.filter((r) => r.status === "active").length;
     const adminCount = rows.filter((r) => r.role === "admin").length;
+    const superadminCount = rows.filter(
+        (r) => r.role === "superadmin",
+    ).length;
     const staffCount = rows.filter((r) => r.role === "staff").length;
     const totalResidents = resRows.length;
 
@@ -1641,10 +1673,13 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                 await accountService.createAccount({
                     full_name: form.full_name,
                     username: form.username,
+                    email: form.email.trim(),
                     role: form.role,
                     password: form.password,
                 });
-                showToast(`Account for ${form.full_name} created.`);
+                showToast(
+                    `Account for ${form.full_name} created. Verification email sent.`,
+                );
             } else if (modal.mode === "edit") {
                 await accountService.updateAccount(modal.account.admin_id, {
                     full_name: form.full_name,
@@ -1873,8 +1908,8 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                 }}
                             >
                                 {isSuperAdmin
-                                    ? "Full admin controls"
-                                    : "Staff mode: Resident account access only"}
+                                    ? "System owner controls"
+                                    : "Account management is restricted to the system owner"}
                             </span>
                         )}
                     </div>
@@ -1915,9 +1950,9 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                 fontSize: 13,
                             }}
                         >
-                            <strong>Staff Mode:</strong> you can view and manage
-                            resident accounts only. Staff/admin account creation
-                            or edits are restricted to superadmins.
+                            <strong>Restricted:</strong> staff and admin account
+                            management is reserved for the designated
+                            superadmin.
                         </div>
                     )}
                     {/* Stats */}
@@ -1926,7 +1961,9 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                             display: "grid",
                             gridTemplateColumns: isMobile
                                 ? "1fr 1fr"
-                                : "repeat(5,1fr)",
+                                : isSuperAdmin
+                                  ? "repeat(6,1fr)"
+                                  : "repeat(4,1fr)",
                             gap: 14,
                             marginBottom: 24,
                         }}
@@ -1946,9 +1983,17 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                         {isSuperAdmin && (
                             <StatCard
                                 icon={Shield}
+                                label="System Owners"
+                                value={superadminCount}
+                                accent="var(--color-accent, #c9a227)"
+                            />
+                        )}
+                        {isSuperAdmin && (
+                            <StatCard
+                                icon={Shield}
                                 label="Admin"
                                 value={adminCount}
-                                accent="var(--color-accent, #c9a227)"
+                                accent="#b86800"
                             />
                         )}
                         <StatCard
@@ -2099,6 +2144,9 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                             }
                                         >
                                             <option value="">All Roles</option>
+                                            <option value="superadmin">
+                                                Superadmin
+                                            </option>
                                             <option value="admin">Admin</option>
                                             <option value="staff">Staff</option>
                                         </select>
@@ -2296,9 +2344,13 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                             <div>
                                                 <span
                                                     className={
-                                                        row.role === "admin"
-                                                            ? "ma-badge-admin"
-                                                            : "ma-badge-staff"
+                                                        row.role ===
+                                                        "superadmin"
+                                                            ? "ma-badge-superadmin"
+                                                            : row.role ===
+                                                                "admin"
+                                                              ? "ma-badge-admin"
+                                                              : "ma-badge-staff"
                                                     }
                                                 >
                                                     {row.role}

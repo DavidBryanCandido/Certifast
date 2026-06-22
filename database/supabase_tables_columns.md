@@ -17,6 +17,7 @@ Tables: 10
 | 7 | created_at | timestamp without time zone | YES | now() |
 | 8 | last_login | timestamp without time zone | YES |  |
 | 9 | email | character varying | YES |  |
+| 10 | supabase_auth_id | uuid | YES |  |
 
 ## public.audit_logs
 
@@ -76,6 +77,7 @@ Tables: 10
 | 11 | qr_code_data | text | YES |  |
 | 12 | template_id | integer | YES |  |
 | 13 | extra_fields | jsonb | YES | '{}'::jsonb |
+| 14 | signatory_snapshot | jsonb | NO | '{}'::jsonb |
 
 ## public.notifications
 
@@ -100,6 +102,78 @@ Tables: 10
 | 4 | sort_order | smallint | NO | 0 |
 | 5 | created_at | timestamp without time zone | NO | now() |
 
+## public.barangay_terms
+
+Stores election or administration periods. Only one term is active at a time.
+
+| # | Column | Data type | Nullable | Default |
+|---:|---|---|---|---|
+| 1 | term_id | integer | NO | identity |
+| 2 | term_name | character varying(160) | NO |  |
+| 3 | starts_on | date | YES |  |
+| 4 | ends_on | date | YES |  |
+| 5 | is_active | boolean | NO | false |
+| 6 | notes | text | YES |  |
+| 7 | created_at | timestamp without time zone | NO | now() |
+| 8 | updated_at | timestamp without time zone | NO | now() |
+
+## public.barangay_positions
+
+Catalog of elected, appointed, staff, and purok positions.
+
+| # | Column | Data type | Nullable | Default |
+|---:|---|---|---|---|
+| 1 | position_id | integer | NO | identity |
+| 2 | position_code | character varying(80) | NO |  |
+| 3 | position_name | character varying(160) | NO |  |
+| 4 | position_group | character varying(30) | NO | 'staff' |
+| 5 | default_honorific | character varying(30) | YES |  |
+| 6 | is_elected | boolean | NO | false |
+| 7 | is_signatory_eligible | boolean | NO | false |
+| 8 | requires_purok | boolean | NO | false |
+| 9 | sort_order | smallint | NO | 0 |
+| 10 | is_active | boolean | NO | true |
+| 11 | created_at | timestamp without time zone | NO | now() |
+
+## public.barangay_personnel
+
+Personal and signature details independent of a particular term or position.
+
+| # | Column | Data type | Nullable | Default |
+|---:|---|---|---|---|
+| 1 | personnel_id | integer | NO | identity |
+| 2 | full_name | character varying(180) | NO |  |
+| 3 | honorific | character varying(30) | YES |  |
+| 4 | contact_number | character varying(40) | YES |  |
+| 5 | email | character varying(180) | YES |  |
+| 6 | photo_url | text | YES |  |
+| 7 | signature_data | text | YES |  |
+| 8 | notes | text | YES |  |
+| 9 | is_active | boolean | NO | true |
+| 10 | created_at | timestamp without time zone | NO | now() |
+| 11 | updated_at | timestamp without time zone | NO | now() |
+
+## public.barangay_personnel_assignments
+
+Links personnel to a position and administration term, with optional committee
+and purok details.
+
+| # | Column | Data type | Nullable | Default |
+|---:|---|---|---|---|
+| 1 | assignment_id | integer | NO | identity |
+| 2 | personnel_id | integer | NO |  |
+| 3 | position_id | integer | NO |  |
+| 4 | term_id | integer | NO |  |
+| 5 | purok_id | integer | YES |  |
+| 6 | committee | text | YES |  |
+| 7 | title_override | character varying(160) | YES |  |
+| 8 | display_order | smallint | NO | 0 |
+| 9 | starts_on | date | YES |  |
+| 10 | ends_on | date | YES |  |
+| 11 | is_active | boolean | NO | true |
+| 12 | created_at | timestamp without time zone | NO | now() |
+| 13 | updated_at | timestamp without time zone | NO | now() |
+
 ## public.requests
 
 | # | Column | Data type | Nullable | Default |
@@ -110,16 +184,17 @@ Tables: 10
 | 4 | cert_type | character varying | NO |  |
 | 5 | purpose | character varying | YES |  |
 | 6 | extra_fields | jsonb | YES |  |
-| 7 | notes | text | YES |  |
-| 8 | source | character varying | YES |  |
-| 9 | status | character varying | YES | 'pending'::character varying |
-| 10 | rejection_reason | text | YES |  |
-| 11 | requested_at | timestamp without time zone | YES | now() |
-| 12 | processed_by | integer | YES |  |
-| 13 | processed_at | timestamp without time zone | YES |  |
-| 14 | released_by | integer | YES |  |
-| 15 | released_at | timestamp without time zone | YES |  |
-| 16 | denial_category | text | YES |  |
+| 7 | signatory_snapshot | jsonb | NO | '{}'::jsonb |
+| 8 | notes | text | YES |  |
+| 9 | source | character varying | YES |  |
+| 10 | status | character varying | YES | 'pending'::character varying |
+| 11 | rejection_reason | text | YES |  |
+| 12 | requested_at | timestamp without time zone | YES | now() |
+| 13 | processed_by | integer | YES |  |
+| 14 | processed_at | timestamp without time zone | YES |  |
+| 15 | released_by | integer | YES |  |
+| 16 | released_at | timestamp without time zone | YES |  |
+| 17 | denial_category | text | YES |  |
 
 ## public.residents
 

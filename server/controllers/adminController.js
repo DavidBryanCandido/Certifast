@@ -8,12 +8,36 @@ const {
     sendAccountActivatedEmail,
     sendPasswordChangedEmail,
 } = require("../utils/mailer");
+const { buildSignatorySnapshot } = require("../utils/signatories");
 
 const supabase = (() => {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     return url && key ? createClient(url, key) : null;
 })();
+
+function createPublicAuthClient() {
+    const url =
+        process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_ANON_KEY;
+    return url && key
+        ? createClient(url, key, {
+              auth: {
+                  autoRefreshToken: false,
+                  persistSession: false,
+                  detectSessionInUrl: false,
+              },
+          })
+        : null;
+}
+
+function getAdminEmailRedirectUrl() {
+    const clientUrl = String(process.env.CLIENT_URL || "")
+        .split(",")[0]
+        .trim()
+        .replace(/\/+$/, "");
+    return `${clientUrl || "http://localhost:5173"}/admin/login`;
+}
 
 function makeWalkInDocId(certificateId) {
     const now = new Date();
@@ -130,7 +154,7 @@ function mapAuditType(actionType, targetTable) {
 }
 
 function ensureSuperadmin(req, res) {
-    if (req.admin?.role !== "admin" && req.admin?.role !== "superadmin") {
+    if (req.admin?.role !== "superadmin") {
         res.status(403).json({ message: "Superadmin access only" });
         return false;
     }
@@ -143,6 +167,31 @@ function ensureAdminOrSuperadmin(req, res) {
         return false;
     }
     return true;
+}
+
+async function hasAnotherVerifiedActiveSuperadmin(excludedAdminId) {
+    const result = await pool.query(
+        `SELECT admin_id, supabase_auth_id
+         FROM admin_accounts
+         WHERE role = 'superadmin'
+           AND status = 'active'
+           AND admin_id <> $1`,
+        [excludedAdminId],
+    );
+
+    for (const account of result.rows) {
+        // Legacy accounts predate the Supabase Auth link and are already
+        // established accounts in CertiFast.
+        if (!account.supabase_auth_id) return true;
+        if (!supabase) continue;
+
+        const { data, error } = await supabase.auth.admin.getUserById(
+            account.supabase_auth_id,
+        );
+        if (!error && data?.user?.email_confirmed_at) return true;
+    }
+
+    return false;
 }
 
 // Helper to create notifications for residents
@@ -269,6 +318,10 @@ async function getRecentRequests(req, res) {
                 r.rejection_reason,
                 r.template_id,
                 r.extra_fields,
+                COALESCE(
+                    to_jsonb(r)->'signatory_snapshot',
+                    '{}'::jsonb
+                ) AS signatory_snapshot,
                 r.requested_at,
                 r.status,
                 COALESCE(res.full_name, 'Unknown Resident') AS resident_name,
@@ -737,7 +790,14 @@ async function updateCertificateTemplate(req, res) {
 }
 
 async function issueWalkIn(req, res) {
-    const { certType, residentName, address, purpose, extraFields } = req.body;
+    const {
+        certType,
+        residentName,
+        address,
+        purpose,
+        extraFields,
+        signatorySelections,
+    } = req.body;
 
     if (!certType || !String(certType).trim()) {
         return res
@@ -754,6 +814,17 @@ async function issueWalkIn(req, res) {
         return res.status(400).json({ message: "Purpose is required" });
     }
 
+    let signatorySnapshot;
+    try {
+        signatorySnapshot = await buildSignatorySnapshot(
+            signatorySelections || {},
+        );
+    } catch (err) {
+        return res
+            .status(err?.statusCode || 500)
+            .json({ message: err?.message || "Unable to resolve signatories" });
+    }
+
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -767,6 +838,7 @@ async function issueWalkIn(req, res) {
                 address,
                 purpose,
                 extra_fields,
+                signatory_snapshot,
                 issued_by,
                 issued_at,
                 source,
@@ -780,10 +852,11 @@ async function issueWalkIn(req, res) {
                 $3,
                 $4,
                 $5::jsonb,
-                $6,
+                $6::jsonb,
+                $7,
                 NOW(),
                 'walkin',
-                $7
+                $8
             )
             RETURNING certificate_id, issued_at`,
             [
@@ -792,6 +865,7 @@ async function issueWalkIn(req, res) {
                 String(address).trim(),
                 String(purpose).trim(),
                 JSON.stringify(extraFields || {}),
+                JSON.stringify(signatorySnapshot),
                 req.admin.id,
                 `walkin:${String(certType).trim()}:${String(residentName).trim()}`,
             ],
@@ -825,6 +899,7 @@ async function issueWalkIn(req, res) {
             id: `#WI-${String(certificateId).padStart(3, "0")}`,
             docId,
             issuedAt,
+            signatorySnapshot,
             entry: {
                 id: `#WI-${String(certificateId).padStart(3, "0")}`,
                 name: String(residentName).trim(),
@@ -840,6 +915,12 @@ async function issueWalkIn(req, res) {
     } catch (err) {
         await client.query("ROLLBACK");
         console.error("issueWalkIn error:", err);
+        if (err?.code === "42P01" || err?.code === "42703") {
+            return res.status(503).json({
+                message:
+                    "Run database/barangay_personnel_management.sql in Supabase first",
+            });
+        }
         return res.status(500).json({ message: "Server error" });
     } finally {
         client.release();
@@ -905,6 +986,10 @@ async function getWalkInReprint(req, res) {
                 ic.address,
                 ic.purpose,
                 ic.extra_fields,
+                COALESCE(
+                    to_jsonb(ic)->'signatory_snapshot',
+                    '{}'::jsonb
+                ) AS signatory_snapshot,
                 ic.issued_at,
                 COALESCE(a.full_name, a.username, 'Staff') AS issued_by_name
              FROM issued_certificates ic
@@ -932,6 +1017,7 @@ async function getWalkInReprint(req, res) {
                 address: row.address || "",
                 purpose: row.purpose || "",
                 extraFields: row.extra_fields || {},
+                signatorySnapshot: row.signatory_snapshot || {},
                 templateKey:
                     row.extra_fields?.templateKey ||
                     row.extra_fields?.template_key ||
@@ -1733,6 +1819,10 @@ async function getManageRequests(req, res) {
                 r.rejection_reason,
                 r.template_id,
                 r.extra_fields,
+                COALESCE(
+                    to_jsonb(r)->'signatory_snapshot',
+                    '{}'::jsonb
+                ) AS signatory_snapshot,
                 r.requested_at,
                 r.processed_at,
                 r.released_at,
@@ -1886,7 +1976,7 @@ async function releaseRequest(req, res) {
 }
 
 async function getAuditStats(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     try {
         const result = await pool.query(
@@ -1928,7 +2018,7 @@ async function getAuditStats(req, res) {
 }
 
 async function getAuditLogs(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     const search = String(req.query.search || "").trim();
     const type = String(req.query.type || "")
@@ -2051,7 +2141,7 @@ async function getAuditLogs(req, res) {
 }
 
 async function getAuditLogById(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     const logId = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(logId) || logId <= 0) {
@@ -2094,7 +2184,7 @@ async function getAuditLogById(req, res) {
 }
 
 async function getAccounts(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     try {
         const columnsResult = await pool.query(
@@ -2131,7 +2221,7 @@ async function getAccounts(req, res) {
 }
 
 async function createAccount(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     const fullName = String(req.body?.full_name || "").trim();
     const username = String(req.body?.username || "").trim();
@@ -2140,7 +2230,11 @@ async function createAccount(req, res) {
     const roleRaw = String(req.body?.role || "staff")
         .trim()
         .toLowerCase();
-    const role = roleRaw === "admin" ? "admin" : roleRaw === "superadmin" ? "superadmin" : "staff";
+    const allowedRoles = new Set(["staff", "admin", "superadmin"]);
+    if (!allowedRoles.has(roleRaw)) {
+        return res.status(400).json({ message: "Invalid account role" });
+    }
+    const role = roleRaw;
 
     if (!fullName || !username || !email || !password) {
         return res
@@ -2156,7 +2250,32 @@ async function createAccount(req, res) {
             .json({ message: "Password must be at least 8 characters" });
     }
 
+    let createdAuthUserId = null;
+    let accountInserted = false;
+
     try {
+        if (!supabase || !createPublicAuthClient()) {
+            return res.status(503).json({
+                message:
+                    "Supabase Auth is not fully configured. Add SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY to the server environment.",
+            });
+        }
+
+        const authColumn = await pool.query(
+            `SELECT 1
+             FROM information_schema.columns
+             WHERE table_schema = 'public'
+               AND table_name = 'admin_accounts'
+               AND column_name = 'supabase_auth_id'
+             LIMIT 1`,
+        );
+        if (authColumn.rows.length === 0) {
+            return res.status(503).json({
+                message:
+                    "Run database/admin_account_email_verification.sql in Supabase before creating verified accounts.",
+            });
+        }
+
         const existing = await pool.query(
             `SELECT admin_id FROM admin_accounts WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2) LIMIT 1`,
             [username, email],
@@ -2165,28 +2284,75 @@ async function createAccount(req, res) {
             return res.status(409).json({ message: "Username or email already exists" });
         }
 
-        let supabaseAuthId = null;
-        if (supabase) {
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        const publicAuth = createPublicAuthClient();
+        const { data: authData, error: authError } =
+            await publicAuth.auth.signUp({
                 email,
                 password,
-                email_confirm: true,
-                user_metadata: {
-                    username,
-                    full_name: fullName,
-                    role,
+                options: {
+                    emailRedirectTo: getAdminEmailRedirectUrl(),
+                    data: {
+                        username,
+                        full_name: fullName,
+                        role,
+                        account_type: "barangay_personnel",
+                    },
                 },
             });
 
-            if (authError) {
-                const isDuplicateEmail = authError.status === 422 || /already\s+registered|already\s+exists/i.test(authError.message || "");
-                return res.status(isDuplicateEmail ? 409 : 500).json({
+        if (authError) {
+            const authMessage = String(authError.message || "");
+            const isDuplicateEmail =
+                authError.status === 422 ||
+                /already\s+registered|already\s+exists/i.test(authMessage);
+            const isRateLimited =
+                authError.status === 429 ||
+                /rate.?limit|too many requests|email rate limit/i.test(
+                    authMessage,
+                );
+            const isUnauthorizedAddress =
+                /email address not authorized|not authorized/i.test(
+                    authMessage,
+                );
+            return res
+                .status(isDuplicateEmail ? 409 : isRateLimited ? 429 : 502)
+                .json({
                     message: isDuplicateEmail
-                        ? "Email is already registered in authentication."
-                        : "Failed to create authentication account. Please try again.",
+                        ? "Email is already registered in Supabase Auth."
+                        : isUnauthorizedAddress
+                          ? "Supabase's default email service only sends to project team addresses. Use a team email or configure custom SMTP."
+                          : isRateLimited
+                            ? "Supabase's verification-email rate limit was reached. Please wait and try again."
+                            : "Supabase could not send the verification email. Check the Auth email logs and configuration.",
                 });
-            }
-            supabaseAuthId = authData?.user?.id || null;
+        }
+
+        createdAuthUserId = authData?.user?.id || null;
+        if (!createdAuthUserId) {
+            return res.status(502).json({
+                message:
+                    "Supabase did not return an authentication user. The account was not created.",
+            });
+        }
+
+        if (authData?.session || authData?.user?.email_confirmed_at) {
+            await supabase.auth.admin
+                .deleteUser(createdAuthUserId)
+                .catch(() => {});
+            createdAuthUserId = null;
+            return res.status(503).json({
+                message:
+                    "Enable Confirm email in Supabase Authentication settings before creating verified accounts.",
+            });
+        }
+
+        if (
+            Array.isArray(authData?.user?.identities) &&
+            authData.user.identities.length === 0
+        ) {
+            return res.status(409).json({
+                message: "Email is already registered in Supabase Auth.",
+            });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -2198,11 +2364,20 @@ async function createAccount(req, res) {
                 password_hash,
                 role,
                 status,
-                created_at
-            ) VALUES ($1, $2, $3, $4, $5, 'active', NOW())
+                created_at,
+                supabase_auth_id
+            ) VALUES ($1, $2, $3, $4, $5, 'active', NOW(), $6)
             RETURNING admin_id, full_name, username, email, role, status, created_at, last_login`,
-            [fullName, username, email, passwordHash, role],
+            [
+                fullName,
+                username,
+                email,
+                passwordHash,
+                role,
+                createdAuthUserId,
+            ],
         );
+        accountInserted = true;
 
         const created = result.rows[0];
         await createAuditLog({
@@ -2217,17 +2392,28 @@ async function createAccount(req, res) {
         });
 
         return res.status(201).json({
-            message: "Account created successfully",
+            message:
+                "Account created. The user must verify their email before signing in.",
             data: created,
         });
     } catch (err) {
         console.error("createAccount error:", err);
+        if (createdAuthUserId && !accountInserted && supabase) {
+            await supabase.auth.admin
+                .deleteUser(createdAuthUserId)
+                .catch((cleanupError) => {
+                    console.error(
+                        "Supabase account cleanup error:",
+                        cleanupError.message || cleanupError,
+                    );
+                });
+        }
         return res.status(500).json({ message: "Server error" });
     }
 }
 
 async function updateAccount(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     const accountId = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(accountId) || accountId <= 0) {
@@ -2249,22 +2435,13 @@ async function updateAccount(req, res) {
             .json({ message: "full_name and username are required" });
     }
 
-    const role =
-        roleRaw === "admin"
-            ? "admin"
-            : roleRaw === "superadmin"
-              ? "superadmin"
-              : "staff";
+    if (!["staff", "admin", "superadmin"].includes(roleRaw)) {
+        return res.status(400).json({ message: "Invalid account role" });
+    }
+    const role = roleRaw;
     const status = statusRaw === "inactive" ? "inactive" : "active";
 
     try {
-        const { createClient } = require("@supabase/supabase-js");
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const supabase = supabaseUrl && supabaseServiceRoleKey
-            ? createClient(supabaseUrl, supabaseServiceRoleKey)
-            : null;
-
         const existing = await pool.query(
             `SELECT admin_id FROM admin_accounts WHERE LOWER(username) = LOWER($1) AND admin_id <> $2 LIMIT 1`,
             [username, accountId],
@@ -2274,12 +2451,40 @@ async function updateAccount(req, res) {
         }
 
         const accountBefore = await pool.query(
-            `SELECT status FROM admin_accounts WHERE admin_id = $1`,
+            `SELECT status, role, supabase_auth_id
+             FROM admin_accounts
+             WHERE admin_id = $1`,
             [accountId],
         );
 
         if (accountBefore.rows.length === 0) {
             return res.status(404).json({ message: "Account not found" });
+        }
+
+        const previous = accountBefore.rows[0];
+        if (
+            accountId === req.admin.id &&
+            (role !== previous.role || status !== "active")
+        ) {
+            return res.status(400).json({
+                message:
+                    "You cannot change your own superadmin role or deactivate your own account.",
+            });
+        }
+
+        const removesActiveSuperadmin =
+            previous.role === "superadmin" &&
+            previous.status === "active" &&
+            (role !== "superadmin" || status !== "active");
+        if (removesActiveSuperadmin) {
+            const hasReplacement =
+                await hasAnotherVerifiedActiveSuperadmin(accountId);
+            if (!hasReplacement) {
+                return res.status(400).json({
+                    message:
+                        "Verify and activate another superadmin before changing the final system-owner account.",
+                });
+            }
         }
 
         const result = await pool.query(
@@ -2295,12 +2500,25 @@ async function updateAccount(req, res) {
 
         const updated = result.rows[0];
 
-        if (supabase && updated.email && accountBefore.rows[0].status !== status) {
-            await supabase.auth.admin.updateUserById(updated.email, {
-                ban_duration: status === "inactive" ? "none" : "24h",
-            }).catch((err) => {
-                console.error("Supabase status sync error:", err.message);
-            });
+        const authUserId = previous.supabase_auth_id;
+        if (supabase && authUserId) {
+            const { error: statusSyncError } =
+                await supabase.auth.admin.updateUserById(authUserId, {
+                    ban_duration:
+                        status === "inactive" ? "876000h" : "none",
+                    user_metadata: {
+                        username,
+                        full_name: fullName,
+                        role,
+                        account_type: "barangay_personnel",
+                    },
+                });
+            if (statusSyncError) {
+                console.error(
+                    "Supabase status sync error:",
+                    statusSyncError.message,
+                );
+            }
         }
 
         await createAuditLog({
@@ -2325,7 +2543,7 @@ async function updateAccount(req, res) {
 }
 
 async function resetAccountPassword(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     const accountId = Number.parseInt(req.params.id, 10);
     const newPassword = String(req.body?.new_password || "");
@@ -2340,15 +2558,10 @@ async function resetAccountPassword(req, res) {
     }
 
     try {
-        const { createClient } = require("@supabase/supabase-js");
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const supabase = supabaseUrl && supabaseServiceRoleKey
-            ? createClient(supabaseUrl, supabaseServiceRoleKey)
-            : null;
-
         const accountRes = await pool.query(
-            `SELECT email FROM admin_accounts WHERE admin_id = $1`,
+            `SELECT email, supabase_auth_id
+             FROM admin_accounts
+             WHERE admin_id = $1`,
             [accountId],
         );
 
@@ -2358,13 +2571,17 @@ async function resetAccountPassword(req, res) {
 
         const account = accountRes.rows[0];
 
-        if (supabase && account.email) {
+        if (supabase && account.supabase_auth_id) {
             const { error: updateError } = await supabase.auth.admin.updateUserById(
-                account.email,
+                account.supabase_auth_id,
                 { password: newPassword },
             );
             if (updateError) {
                 console.error("Supabase password update error:", updateError.message);
+                return res.status(502).json({
+                    message:
+                        "Supabase could not update this verified account's password.",
+                });
             }
         }
 
@@ -2397,7 +2614,7 @@ async function resetAccountPassword(req, res) {
 }
 
 async function deactivateAccount(req, res) {
-    if (!ensureAdminOrSuperadmin(req, res)) return;
+    if (!ensureSuperadmin(req, res)) return;
 
     const accountId = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(accountId) || accountId <= 0) {
@@ -2411,15 +2628,10 @@ async function deactivateAccount(req, res) {
     }
 
     try {
-        const { createClient } = require("@supabase/supabase-js");
-        const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-        const supabase = supabaseUrl && supabaseServiceRoleKey
-            ? createClient(supabaseUrl, supabaseServiceRoleKey)
-            : null;
-
         const accountRes = await pool.query(
-            `SELECT email FROM admin_accounts WHERE admin_id = $1`,
+            `SELECT email, role, status, supabase_auth_id
+             FROM admin_accounts
+             WHERE admin_id = $1`,
             [accountId],
         );
 
@@ -2429,10 +2641,21 @@ async function deactivateAccount(req, res) {
 
         const account = accountRes.rows[0];
 
-        if (supabase && account.email) {
+        if (account.role === "superadmin" && account.status === "active") {
+            const hasReplacement =
+                await hasAnotherVerifiedActiveSuperadmin(accountId);
+            if (!hasReplacement) {
+                return res.status(400).json({
+                    message:
+                        "Verify and activate another superadmin before deactivating the final system-owner account.",
+                });
+            }
+        }
+
+        if (supabase && account.supabase_auth_id) {
             const { error: disableError } = await supabase.auth.admin.updateUserById(
-                account.email,
-                { ban_duration: "none" },
+                account.supabase_auth_id,
+                { ban_duration: "876000h" },
             );
             if (disableError) {
                 console.error("Supabase user disable error:", disableError.message);
@@ -2469,8 +2692,6 @@ async function deactivateAccount(req, res) {
 // Get all barangay settings
 async function getBarangaySettings(req, res) {
     try {
-        if (!ensureAdminOrSuperadmin(req, res)) return;
-
         const result = await pool.query(
             `SELECT setting_key, setting_value FROM barangay_settings ORDER BY setting_key`,
         );
@@ -2507,7 +2728,10 @@ async function updateBarangaySettings(req, res) {
 
         const themeUpdate = updates.find((item) => item.key === "system_theme");
         if (themeUpdate) {
-            if (req.admin?.role !== "admin") {
+            if (
+                req.admin?.role !== "admin" &&
+                req.admin?.role !== "superadmin"
+            ) {
                 return res.status(403).json({
                     message: "Admin access only",
                 });

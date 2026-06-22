@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 import authService from "../../services/authService";
 import { useAdminAuth } from "../../context/AdminAuthContext";
+import {
+    DEFAULT_PUBLIC_BRANDING,
+    getPublicBrandingSettings,
+} from "../../services/publicBrandingService";
+import { supabase } from "../../supabaseClient";
 
 // =============================================================
 // useWindowSize hook
@@ -160,7 +165,7 @@ if (!document.head.querySelector("[data-certifast-login]")) {
 // =============================================================
 // Forgot Password Modal
 // =============================================================
-function ForgotPasswordModal({ onClose }) {
+function ForgotPasswordModal({ onClose, passwordResetEmail }) {
     // Close on overlay click
     const handleOverlayClick = (e) => {
         if (e.target === e.currentTarget) onClose();
@@ -213,10 +218,10 @@ function ForgotPasswordModal({ onClose }) {
                     <p style={m.bodyText}>
                         To request a password reset, send an email to{" "}
                         <a
-                            href="mailto:it-admin@easttapinac.gov.ph"
+                            href={`mailto:${passwordResetEmail}`}
                             style={m.emailLink}
                         >
-                            [it-admin@easttapinac.gov.ph]
+                            [{passwordResetEmail}]
                         </a>{" "}
                         using your registered barangay email account.
                     </p>
@@ -315,7 +320,84 @@ export default function AdminLogin() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [verificationNotice, setVerificationNotice] = useState("");
     const [showForgotModal, setShowForgotModal] = useState(false);
+    const [passwordResetEmail, setPasswordResetEmail] = useState(
+        DEFAULT_PUBLIC_BRANDING.passwordResetEmail,
+    );
+
+    useEffect(() => {
+        let mounted = true;
+        getPublicBrandingSettings()
+            .then((branding) => {
+                if (mounted && branding.passwordResetEmail) {
+                    setPasswordResetEmail(branding.passwordResetEmail);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        const hashParams = new URLSearchParams(
+            window.location.hash.replace(/^#/, ""),
+        );
+        const queryParams = new URLSearchParams(window.location.search);
+        const isAuthCallback =
+            hashParams.has("access_token") ||
+            hashParams.has("error_description") ||
+            queryParams.has("code");
+
+        if (!isAuthCallback) return undefined;
+
+        const callbackError =
+            hashParams.get("error_description") ||
+            queryParams.get("error_description");
+        if (callbackError) {
+            setError(callbackError.replace(/\+/g, " "));
+            window.history.replaceState({}, "", "/admin/login");
+            return undefined;
+        }
+
+        let active = true;
+        let handled = false;
+
+        const handleVerifiedSession = (session) => {
+            if (
+                !active ||
+                handled ||
+                !session?.user?.email_confirmed_at
+            ) {
+                return;
+            }
+            handled = true;
+            setVerificationNotice(
+                "Email verified successfully. You may now sign in with your username and password.",
+            );
+            window.history.replaceState({}, "", "/admin/login");
+            window.setTimeout(() => {
+                supabase.auth.signOut({ scope: "local" }).catch(() => {});
+            }, 0);
+        };
+
+        supabase.auth
+            .getSession()
+            .then(({ data }) => handleVerifiedSession(data?.session))
+            .catch(() => {});
+
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+            handleVerifiedSession(session);
+        });
+
+        return () => {
+            active = false;
+            subscription.unsubscribe();
+        };
+    }, []);
 
     const handleChange = (e) => {
         setError("");
@@ -340,7 +422,11 @@ export default function AdminLogin() {
 
             if (response?.token) {
                 const role = String(response?.admin?.role || "").toLowerCase();
-                if (role !== "admin" && role !== "superadmin") {
+                if (
+                    role !== "staff" &&
+                    role !== "admin" &&
+                    role !== "superadmin"
+                ) {
                     throw new Error("This account does not have admin portal access.");
                 }
 
@@ -381,6 +467,7 @@ export default function AdminLogin() {
             {showForgotModal && (
                 <ForgotPasswordModal
                     onClose={() => setShowForgotModal(false)}
+                    passwordResetEmail={passwordResetEmail}
                 />
             )}
 
@@ -431,6 +518,14 @@ export default function AdminLogin() {
                     {error && (
                         <div style={s.errorBox}>
                             <span style={s.errorText}>{error}</span>
+                        </div>
+                    )}
+
+                    {verificationNotice && (
+                        <div style={s.successBox}>
+                            <span style={s.successText}>
+                                {verificationNotice}
+                            </span>
                         </div>
                     )}
 
@@ -681,6 +776,18 @@ const s = {
     errorText: {
         fontSize: "12px",
         color: "#c0392b",
+        fontFamily: "'Source Serif 4', serif",
+    },
+    successBox: {
+        background: "rgba(30,130,76,0.08)",
+        border: "1px solid rgba(30,130,76,0.28)",
+        borderRadius: "4px",
+        padding: "9px 14px",
+        marginBottom: "16px",
+    },
+    successText: {
+        fontSize: "12px",
+        color: "#176b3a",
         fontFamily: "'Source Serif 4', serif",
     },
     field: { marginBottom: "18px" },

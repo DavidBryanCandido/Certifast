@@ -24,9 +24,11 @@ import {
 } from "lucide-react";
 import walkInService from "../../services/walkInService";
 import * as settingsService from "../../services/settingsService";
+import * as personnelService from "../../services/personnelService";
 import {
     CERTIFICATE_TEMPLATE_OPTIONS,
     buildCertificatePrintHtml,
+    getCertificateSignatoryRequirements,
     getTemplateFieldLabels,
 } from "../../utils/certificateTemplateEngine";
 import {
@@ -35,6 +37,11 @@ import {
 } from "../../components/AdminSidebar";
 import AdminDateChip from "../../components/AdminDateChip";
 import AdminNotificationsBell from "../../components/AdminNotificationsBell";
+import CertificateSignatorySelector from "../../components/CertificateSignatorySelector";
+import {
+    buildClientSignatorySnapshot,
+    validateSignatorySelections,
+} from "../../utils/signatorySelection";
 
 // =============================================================
 // useWindowSize
@@ -291,7 +298,9 @@ function defaultWalkInValues(fields = []) {
 // Sidebar
 // =============================================================
 function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
-    const isSuperAdmin = admin?.role === "superadmin";
+    const role = String(admin?.role || "").toLowerCase();
+    const isSuperAdmin = role === "superadmin";
+    const isAdmin = role === "admin" || isSuperAdmin;
     const navItems = [
         { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
         { key: "walkIn", label: "Walk-in Issuance", Icon: FilePlus },
@@ -303,10 +312,20 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
         { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
     ];
     const saItems = [
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
+        {
+            key: "manageAccounts",
+            label: "Manage Accounts",
+            Icon: UserCog,
+            superadminOnly: true,
+        },
+        {
+            key: "logs",
+            label: "Logs & Audit Trail",
+            Icon: ScrollText,
+            superadminOnly: true,
+        },
         { key: "settings", label: "System Settings", Icon: Settings },
     ];
     return (
@@ -356,14 +375,19 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
                     </button>
                 ),
             )}
-            {isSuperAdmin && (
+            {isAdmin && (
                 <div style={sd.superAdminSection}>
                     {!collapsed && (
                         <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
-                            Superadmin
+                            Administration
                         </div>
                     )}
-                    {saItems.map((item) =>
+                    {saItems
+                        .filter(
+                            (item) =>
+                                !item.superadminOnly || isSuperAdmin,
+                        )
+                        .map((item) =>
                         collapsed ? (
                             <button
                                 key={item.key}
@@ -384,7 +408,7 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
                                 <span style={sd.navBadgeSA}>SA</span>
                             </button>
                         ),
-                    )}
+                        )}
                 </div>
             )}
             <div
@@ -419,7 +443,9 @@ function Sidebar({ admin, activePage, onNavigate, onLogout, collapsed }) {
 // Mobile sidebar overlay
 // =============================================================
 function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
-    const isSuperAdmin = admin?.role === "superadmin";
+    const role = String(admin?.role || "").toLowerCase();
+    const isSuperAdmin = role === "superadmin";
+    const isAdmin = role === "admin" || isSuperAdmin;
     const navItems = [
         { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
         { key: "walkIn", label: "Walk-in Issuance", Icon: FilePlus },
@@ -431,10 +457,20 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
         },
         { key: "residentRecords", label: "Resident Records", Icon: Users },
         { key: "reports", label: "Reports & Statistics", Icon: BarChart2 },
-        { key: "logs", label: "Logs & Audit Trail", Icon: ScrollText },
     ];
     const saItems = [
-        { key: "manageAccounts", label: "Manage Accounts", Icon: UserCog },
+        {
+            key: "manageAccounts",
+            label: "Manage Accounts",
+            Icon: UserCog,
+            superadminOnly: true,
+        },
+        {
+            key: "logs",
+            label: "Logs & Audit Trail",
+            Icon: ScrollText,
+            superadminOnly: true,
+        },
         { key: "settings", label: "System Settings", Icon: Settings },
     ];
     useEffect(() => {
@@ -521,12 +557,17 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
                         {item.badge && <span style={sd.navBadge}>{item.badge}</span>}
                     </button>
                 ))}
-                {isSuperAdmin && (
+                {isAdmin && (
                     <div style={sd.superAdminSection}>
                         <div style={{ ...sd.sectionLabel, paddingTop: 10 }}>
-                            Superadmin
+                            Administration
                         </div>
-                        {saItems.map((item) => (
+                        {saItems
+                            .filter(
+                                (item) =>
+                                    !item.superadminOnly || isSuperAdmin,
+                            )
+                            .map((item) => (
                             <button
                                 key={item.key}
                                 className={`wi-nav-item${activePage === item.key ? " active" : ""}`}
@@ -537,9 +578,11 @@ function MobileSidebar({ admin, activePage, onNavigate, onClose, onLogout }) {
                             >
                                 <item.Icon size={15} opacity={0.7} />
                                 {item.label}
-                                <span style={sd.navBadgeSA}>SA</span>
+                                {item.superadminOnly && (
+                                    <span style={sd.navBadgeSA}>SA</span>
+                                )}
                             </button>
-                        ))}
+                            ))}
                     </div>
                 )}
                 <div style={sd.userRow}>
@@ -781,6 +824,7 @@ function PrintPreviewModal({
     formData,
     docId,
     settings,
+    signatorySnapshot,
     onClose,
     onConfirm,
 }) {
@@ -808,6 +852,7 @@ function PrintPreviewModal({
                 ...formData,
                 templateKey: cert?.templateKey,
             },
+            signatories: signatorySnapshot,
         },
         settings,
     });
@@ -1206,6 +1251,11 @@ export default function WalkInIssuance({
     const [submitting, setSubmitting] = useState(false);
     const [certs, setCerts] = useState(ALL_CERTS);
     const [certificateSettings, setCertificateSettings] = useState({});
+    const [personnelSignatories, setPersonnelSignatories] = useState({
+        captain: null,
+        kagawads: [],
+    });
+    const [signatorySelections, setSignatorySelections] = useState({});
 
     // Log state
     const [log, setLog] = useState([]);
@@ -1220,6 +1270,17 @@ export default function WalkInIssuance({
     const walkInExtraFields = selectedCert
         ? getWalkInTemplateFields(selectedCert)
         : [];
+    const signatoryRequirements = selectedCert
+        ? getCertificateSignatoryRequirements(
+              selectedCert.templateKey,
+              selectedCert.name,
+          )
+        : [];
+    const signatorySnapshot = buildClientSignatorySnapshot(
+        personnelSignatories.captain,
+        personnelSignatories.kagawads,
+        signatorySelections,
+    );
 
     useEffect(() => {
         let mounted = true;
@@ -1229,10 +1290,14 @@ export default function WalkInIssuance({
             setLoadError("");
             try {
                 const token = localStorage.getItem("adminToken");
-                const [templatesRes, todayRes, settingsRes] = await Promise.all([
+                const [templatesRes, todayRes, settingsRes, personnelRes] =
+                    await Promise.all([
                     walkInService.getCertTemplates(),
                     walkInService.getTodayLog(),
                     settingsService.getBarangaySettings(token).catch(() => ({})),
+                    personnelService.getPersonnelRoster().catch(() => ({
+                        signatories: { captain: null, kagawads: [] },
+                    })),
                 ]);
 
                 if (!mounted) return;
@@ -1252,6 +1317,12 @@ export default function WalkInIssuance({
                 setCerts(templateRows.length > 0 ? templateRows : ALL_CERTS);
                 setLog(todayRows);
                 setCertificateSettings(settingsRes || {});
+                setPersonnelSignatories(
+                    personnelRes?.signatories || {
+                        captain: null,
+                        kagawads: [],
+                    },
+                );
             } catch (err) {
                 if (!mounted) return;
                 if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -1304,6 +1375,7 @@ export default function WalkInIssuance({
             ...defaultWalkInValues(templateFields),
         });
         setFormError("");
+        setSignatorySelections({});
     };
 
     const handleFormChange = (e) => {
@@ -1347,6 +1419,15 @@ export default function WalkInIssuance({
                 return;
             }
         }
+        const signatoryError = validateSignatorySelections(
+            signatoryRequirements,
+            signatorySelections,
+            personnelSignatories.kagawads,
+        );
+        if (signatoryError) {
+            setFormError(signatoryError);
+            return;
+        }
         setFormError("");
         setShowPreview(true);
     };
@@ -1366,6 +1447,7 @@ export default function WalkInIssuance({
                     ...formData,
                     templateKey: selectedCert.templateKey || "",
                 },
+                signatorySelections,
             });
 
             const latestEntry = result?.entry || null;
@@ -1395,6 +1477,8 @@ export default function WalkInIssuance({
                         ...formData,
                         templateKey: selectedCert.templateKey || "",
                     },
+                    signatories:
+                        result?.signatorySnapshot || signatorySnapshot,
                 },
                 settings: certificateSettings,
             });
@@ -1418,6 +1502,7 @@ export default function WalkInIssuance({
                 requestingInstitution: "",
             });
             setShowPreview(false);
+            setSignatorySelections({});
         } catch (err) {
             if (err?.response?.status === 401 || err?.response?.status === 403) {
                 onLogout?.();
@@ -1493,6 +1578,7 @@ p { margin: 4px 0; font-size: 14px; }
                     docId: data.docId || data.id,
                     issuedAt: data.issuedAt || new Date(),
                     extraFields: data.extraFields || {},
+                    signatories: data.signatorySnapshot || {},
                 },
                 settings: certificateSettings,
             });
@@ -1566,6 +1652,7 @@ p { margin: 4px 0; font-size: 14px; }
                     formData={formData}
                     docId={nextDocId}
                     settings={certificateSettings}
+                    signatorySnapshot={signatorySnapshot}
                     onClose={() => setShowPreview(false)}
                     onConfirm={handleConfirmPrint}
                 />
@@ -2056,6 +2143,18 @@ p { margin: 4px 0; font-size: 14px; }
                                             })}
                                         </div>
                                     )}
+
+                                    <CertificateSignatorySelector
+                                        templateKey={selectedCert.templateKey}
+                                        certType={selectedCert.name}
+                                        captain={personnelSignatories.captain}
+                                        kagawads={
+                                            personnelSignatories.kagawads
+                                        }
+                                        value={signatorySelections}
+                                        onChange={setSignatorySelections}
+                                        disabled={submitting}
+                                    />
 
                                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr auto", gap: 10, alignItems: "flex-end" }}>
                                         <div>

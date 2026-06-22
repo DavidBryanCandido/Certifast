@@ -54,7 +54,11 @@ import adminRequestService from "../../services/adminRequestService";
 import reportsService from "../../services/reportsService";
 import logsService from "../../services/logsService";
 import * as settingsService from "../../services/settingsService";
-import { buildCertificatePrintHtml } from "../../utils/certificateTemplateEngine";
+import * as personnelService from "../../services/personnelService";
+import {
+    buildCertificatePrintHtml,
+    getCertificateSignatoryRequirements,
+} from "../../utils/certificateTemplateEngine";
 import { formatResidentAddress } from "../../utils/address";
 import {
     AdminSidebar,
@@ -64,6 +68,11 @@ import AdminQRScannerModal from "../../components/AdminQRScannerModal";
 import AdminDateChip from "../../components/AdminDateChip";
 import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import AdminRequestDecisionFields from "../../components/AdminRequestDecisionFields";
+import CertificateSignatorySelector from "../../components/CertificateSignatorySelector";
+import {
+    buildClientSignatorySnapshot,
+    validateSignatorySelections,
+} from "../../utils/signatorySelection";
 
 // ── Report section constants ────────────────────────────────
 const REPORT_TYPES = [
@@ -555,6 +564,7 @@ function RequestDrawer({
     onOpenQRScanner,
     onLogout,
     certificateSettings,
+    personnelSignatories,
 }) {
     const [step, setStep] = useState("default");
     const [rejectReason, setRejectReason] = useState("");
@@ -563,6 +573,8 @@ function RequestDrawer({
     const [currentStatus, setCurrentStatus] = useState(null);
     const [hasPrinted, setHasPrinted] = useState(false);
     const [adminExtraFields, setAdminExtraFields] = useState({});
+    const [signatorySelections, setSignatorySelections] = useState({});
+    const [savedSignatorySnapshot, setSavedSignatorySnapshot] = useState({});
 
     useEffect(() => {
         if (!request) return;
@@ -572,6 +584,15 @@ function RequestDrawer({
         setRejectReason("");
         setActionError("");
         setAdminExtraFields({});
+        const snapshot = request.signatorySnapshot || {};
+        setSavedSignatorySnapshot(snapshot);
+        setSignatorySelections(
+            Object.fromEntries(
+                ["kagawad", "kagawad1", "kagawad2", "kagawad3"]
+                    .filter((slot) => snapshot?.[slot]?.assignmentId)
+                    .map((slot) => [slot, snapshot[slot].assignmentId]),
+            ),
+        );
     }, [request]);
 
     useEffect(() => {
@@ -595,6 +616,17 @@ function RequestDrawer({
         ...(request.extraFields || {}),
         ...adminExtraFields,
     };
+    const signatoryRequirements = getCertificateSignatoryRequirements(
+        request.templateKey,
+        request.certType,
+    );
+    const activeKagawads = personnelSignatories?.kagawads || [];
+    const activeCaptain = personnelSignatories?.captain || null;
+    const localSignatorySnapshot = buildClientSignatorySnapshot(
+        activeCaptain,
+        activeKagawads,
+        signatorySelections,
+    );
 
     const handleApiError = (err) => {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -663,7 +695,7 @@ function RequestDrawer({
         }
     };
 
-    const buildCertificateTemplateHtml = () =>
+    const buildCertificateTemplateHtml = (signatorySnapshot) =>
         buildCertificatePrintHtml({
             certType: request.certType,
             templateKey: request.templateKey,
@@ -676,28 +708,72 @@ function RequestDrawer({
                 civilStatus: request.civil,
                 nationality: request.nationality,
                 extraFields: mergedExtraFields,
+                signatories: signatorySnapshot,
                 issuedAt: new Date(),
             },
             settings: certificateSettings,
         });
 
-    const openCertificatePrintWindow = () => {
-        const win = window.open("", "_blank");
+    const openCertificatePrintWindow = (
+        signatorySnapshot =
+            Object.keys(savedSignatorySnapshot || {}).length > 0
+                ? savedSignatorySnapshot
+                : localSignatorySnapshot,
+        existingWindow = null,
+    ) => {
+        const win = existingWindow || window.open("", "_blank");
         if (!win) {
             setActionError("Unable to open print window. Please allow pop-ups.");
             return false;
         }
 
-        win.document.write(buildCertificateTemplateHtml());
+        win.document.open();
+        win.document.write(buildCertificateTemplateHtml(signatorySnapshot));
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 350);
         return true;
     };
 
-    const handlePrintCertificate = () => {
-        const opened = openCertificatePrintWindow();
-        if (opened) setHasPrinted(true);
+    const handlePrintCertificate = async () => {
+        const validationError = validateSignatorySelections(
+            signatoryRequirements,
+            signatorySelections,
+            activeKagawads,
+        );
+        if (validationError) {
+            setActionError(validationError);
+            return;
+        }
+
+        const win = window.open("", "_blank");
+        if (!win) {
+            setActionError(
+                "Unable to open print window. Please allow pop-ups.",
+            );
+            return;
+        }
+        win.document.write(
+            "<p style='font-family:serif;padding:24px'>Preparing certificate…</p>",
+        );
+
+        setActionLoading(true);
+        setActionError("");
+        try {
+            const result = await adminRequestService.saveSignatories(
+                request.rawId,
+                signatorySelections,
+            );
+            const snapshot = result?.data || localSignatorySnapshot;
+            setSavedSignatorySnapshot(snapshot);
+            openCertificatePrintWindow(snapshot, win);
+            setHasPrinted(true);
+        } catch (err) {
+            win.close();
+            handleApiError(err);
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const handleReprint = () => {
@@ -1267,6 +1343,21 @@ function RequestDrawer({
                         </div>
                     )}
 
+                    {status === "approved" && (
+                        <div className="cf-drawer-section">
+                            <SectionTitle>Signature Requirements</SectionTitle>
+                            <CertificateSignatorySelector
+                                templateKey={request.templateKey}
+                                certType={request.certType}
+                                captain={activeCaptain}
+                                kagawads={activeKagawads}
+                                value={signatorySelections}
+                                onChange={setSignatorySelections}
+                                disabled={actionLoading}
+                            />
+                        </div>
+                    )}
+
                     {/* Rejection reason */}
                     {status === "rejected" && request.rejection_reason && (
                         <div className="cf-drawer-section">
@@ -1568,6 +1659,10 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const [dashboardLoading, setDashboardLoading] = useState(true);
     const [dashboardError, setDashboardError] = useState("");
     const [certificateSettings, setCertificateSettings] = useState({});
+    const [personnelSignatories, setPersonnelSignatories] = useState({
+        captain: null,
+        kagawads: [],
+    });
 
     // ── Statistics & Reports section state ──
     const [reportPeriod, setReportPeriod] = useState("month");
@@ -1648,6 +1743,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             dateOfBirth: dateOfBirth || null,
             birthDateText: formatResidentBirthDate(dateOfBirth),
             extraFields,
+            signatorySnapshot: row.signatory_snapshot || {},
             templateId: row.template_id || null,
             templateKey:
                 row.template_key ||
@@ -1753,6 +1849,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             dateOfBirth: dateOfBirth || null,
                             birthDateText: formatResidentBirthDate(dateOfBirth),
                             extraFields,
+                            signatorySnapshot: row.signatory_snapshot || {},
                             templateId: row.template_id || null,
                             templateKey:
                                 row.template_key ||
@@ -1830,6 +1927,30 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             }
         }
         loadCertificateSettings();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        let mounted = true;
+        personnelService
+            .getPersonnelRoster()
+            .then((result) => {
+                if (mounted) {
+                    setPersonnelSignatories(
+                        result?.signatories || {
+                            captain: null,
+                            kagawads: [],
+                        },
+                    );
+                }
+            })
+            .catch(() => {
+                if (mounted) {
+                    setPersonnelSignatories({ captain: null, kagawads: [] });
+                }
+            });
         return () => {
             mounted = false;
         };
@@ -2119,6 +2240,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         }}
                         onLogout={onLogout}
                         certificateSettings={certificateSettings}
+                        personnelSignatories={personnelSignatories}
                     />
                 )}
 

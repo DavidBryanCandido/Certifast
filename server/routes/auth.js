@@ -32,6 +32,7 @@ const PUBLIC_BRANDING_KEYS = [
     "brgy_address",
     "brgy_contact",
     "brgy_email",
+    "password_reset_email",
     "brgy_logo_url",
     "city_logo_url",
     "office_schedule_line_1_label",

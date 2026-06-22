@@ -93,11 +93,25 @@ function adminAuth(req, res, next) {
 // Used for: logs, manage accounts, settings
 function adminOnlyAuth(req, res, next) {
     adminAuth(req, res, () => {
-        if (req.admin.role !== "admin") {
+        if (req.admin.role !== "admin" && req.admin.role !== "superadmin") {
             return res.status(403).json({ message: "Admin access only" });
         }
         next();
     });
 }
 
-module.exports = { residentAuth, adminAuth, adminOnlyAuth };
+function superadminOnlyAuth(req, res, next) {
+    adminAuth(req, res, () => {
+        if (req.admin.role !== "superadmin") {
+            return res.status(403).json({ message: "Superadmin access only" });
+        }
+        next();
+    });
+}
+
+module.exports = {
+    residentAuth,
+    adminAuth,
+    adminOnlyAuth,
+    superadminOnlyAuth,
+};

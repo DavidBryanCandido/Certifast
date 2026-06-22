@@ -70,13 +70,11 @@ function useResidentPageProps() {
     return { resident, onLogout: handleResidentLogout };
 }
 
-const ADMIN_ONLY_ROUTES = [
-    "/admin/logs-audit-trail",
-    "/admin/manage-accounts",
-    "/admin/settings",
-];
-
-function AdminPage({ PageComponent, adminOnly = false }) {
+function AdminPage({
+    PageComponent,
+    adminOnly = false,
+    superadminOnly = false,
+}) {
     const ResolvedPage = PageComponent;
     const navigate = useNavigate();
     const { admin } = useSessionData();
@@ -98,8 +96,18 @@ function AdminPage({ PageComponent, adminOnly = false }) {
         navigate("/admin/login");
     };
 
-    // Redirect staff away from admin-only pages
-    if (adminOnly && resolvedAdmin.role !== "admin") {
+    const normalizedRole = String(resolvedAdmin.role || "").toLowerCase();
+
+    if (superadminOnly && normalizedRole !== "superadmin") {
+        return <Navigate to="/admin/dashboard" replace />;
+    }
+
+    // Admin pages are available to both admin and superadmin.
+    if (
+        adminOnly &&
+        normalizedRole !== "admin" &&
+        normalizedRole !== "superadmin"
+    ) {
         return <Navigate to="/admin/dashboard" replace />;
     }
 
@@ -198,11 +206,21 @@ export default function App() {
             />
             <Route
                 path="/admin/logs-audit-trail"
-                element={<AdminPage PageComponent={LogsAuditTrail} adminOnly />}
+                element={
+                    <AdminPage
+                        PageComponent={LogsAuditTrail}
+                        superadminOnly
+                    />
+                }
             />
             <Route
                 path="/admin/manage-accounts"
-                element={<AdminPage PageComponent={ManageAccounts} adminOnly />}
+                element={
+                    <AdminPage
+                        PageComponent={ManageAccounts}
+                        superadminOnly
+                    />
+                }
             />
             <Route
                 path="/admin/settings"

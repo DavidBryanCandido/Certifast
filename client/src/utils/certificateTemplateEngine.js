@@ -1073,7 +1073,7 @@ function paragraphs(items) {
         .join("");
 }
 
-function signatoryHtml(settings, type = "captain") {
+function signatoryHtml(settings, type = "captain", signatories = {}) {
     const map = {
         captain: {
             name: settings.captain_name,
@@ -1101,7 +1101,14 @@ function signatoryHtml(settings, type = "captain") {
             sig: "",
         },
     };
-    const selected = map[type] || map.captain;
+    const selectedSnapshot = signatories?.[type];
+    const selected = selectedSnapshot
+        ? {
+              name: selectedSnapshot.name,
+              title: selectedSnapshot.title,
+              sig: selectedSnapshot.signatureData,
+          }
+        : map[type] || map.captain;
     const sig = selected.sig
         ? `<img class="cf-signature-img" src="${escapeHtml(selected.sig)}" alt="" />`
         : `<div class="cf-signature-spacer"></div>`;
@@ -1113,52 +1120,52 @@ function signatoryHtml(settings, type = "captain") {
         </div>`;
 }
 
-function renderSignatures(settings, mode = "captain-right") {
+function renderSignatures(settings, mode = "captain-right", signatories = {}) {
     if (mode === "none") return "";
     if (mode === "kagawad-right") {
-        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad")}</div>`;
+        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad", signatories)}</div>`;
     }
     if (mode === "kagawad1-right") {
-        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad1")}</div>`;
+        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad1", signatories)}</div>`;
     }
     if (mode === "kagawad2-right") {
-        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad2")}</div>`;
+        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad2", signatories)}</div>`;
     }
     if (mode === "kagawad3-right") {
-        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad3")}</div>`;
+        return `<div class="cf-signature-row captain">${signatoryHtml(settings, "kagawad3", signatories)}</div>`;
     }
     if (mode === "kagawad-left-captain-right") {
         return `
             <div class="cf-signature-row two">
-                ${signatoryHtml(settings, "kagawad")}
-                ${signatoryHtml(settings, "captain")}
+                ${signatoryHtml(settings, "kagawad", signatories)}
+                ${signatoryHtml(settings, "captain", signatories)}
             </div>`;
     }
     if (mode === "witnessed-by") {
         return `
             <div class="cf-witness-label">Witnessed By:</div>
             <div class="cf-signature-row two compact">
-                ${signatoryHtml(settings, "kagawad1")}
-                ${signatoryHtml(settings, "kagawad2")}
+                ${signatoryHtml(settings, "kagawad1", signatories)}
+                ${signatoryHtml(settings, "kagawad2", signatories)}
             </div>
             <div class="cf-signature-row captain-center">
-                ${signatoryHtml(settings, "captain")}
+                ${signatoryHtml(settings, "captain", signatories)}
             </div>`;
     }
     if (mode === "captain-right-witnessed-by") {
         return `
             <div class="cf-signature-row captain witness-captain">
-                ${signatoryHtml(settings, "captain")}
+                ${signatoryHtml(settings, "captain", signatories)}
             </div>
             <div class="cf-witness-block">
                 <div class="cf-witness-label">Witnessed By:</div>
                 <div class="cf-witness-stack">
-                    ${signatoryHtml(settings, "kagawad1")}
-                    ${signatoryHtml(settings, "kagawad2")}
+                    ${signatoryHtml(settings, "kagawad1", signatories)}
+                    ${signatoryHtml(settings, "kagawad2", signatories)}
                 </div>
             </div>`;
     }
-    return `<div class="cf-signature-row captain">${signatoryHtml(settings, "captain")}</div>`;
+    return `<div class="cf-signature-row captain">${signatoryHtml(settings, "captain", signatories)}</div>`;
 }
 
 function letterHeader(data, subjectFallback = "ENDORSEMENT") {
@@ -2916,6 +2923,23 @@ function signatureModeSlots(mode = "captain-right") {
     return map[normalized] || ["captain"];
 }
 
+export function getCertificateSignatoryRequirements(templateKey, certType) {
+    const template = getCertificateTemplate(templateKey, certType);
+    const mode = String(template.signatures || "captain-right");
+    const slots = signatureModeSlots(mode).filter((slot) => slot !== "captain");
+    const witnessed =
+        mode === "witnessed-by" || mode === "captain-right-witnessed-by";
+
+    return slots.map((slot, index) => ({
+        slot,
+        label: witnessed
+            ? `Witness Kagawad ${index + 1}`
+            : slots.length > 1
+              ? `Kagawad Signatory ${index + 1}`
+              : "Kagawad Signatory",
+    }));
+}
+
 export function getSignatoryTemplateUsage() {
     const optionByKey = new Map(
         CERTIFICATE_TEMPLATE_OPTIONS.map((cert, index) => [
@@ -3463,6 +3487,12 @@ export function buildCertificatePrintHtml({
     const signatures = renderSignatures(
         mergedSettings,
         template.signatures || "captain-right",
+        renderData?.signatories ||
+            renderData?.signatorySnapshot ||
+        renderData?.extraFields?.signatories ||
+        renderData?.extraFields?.signatorySnapshot ||
+        mergedSettings?.signatories ||
+        {},
     );
     const postSignatures = template.renderPostSignatures
         ? template.renderPostSignatures(renderData)
