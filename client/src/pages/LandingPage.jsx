@@ -25,7 +25,7 @@ import {
     DEFAULT_PUBLIC_BRANDING,
     getPublicBrandingSettings,
 } from "../services/publicBrandingService";
-import requestService from "../services/requestService";
+import { getPublicCertificateTemplates } from "../services/publicCertificateService";
 import "./LandingPage.css";
 
 const INITIAL_CERTIFICATE_LIMIT = 6;
@@ -187,8 +187,7 @@ export default function LandingPage() {
                 if (mounted) setBranding(DEFAULT_PUBLIC_BRANDING);
             });
 
-        requestService
-            .getCertificateTemplates()
+        getPublicCertificateTemplates()
             .then((result) => {
                 if (!mounted) return;
                 setCertificates(normalizeCertificates(result));
@@ -752,6 +751,10 @@ export default function LandingPage() {
                                 <img
                                     src="/east-tapinac-purok-map-no-street-names.png"
                                     alt="Illustrated color-coded map of the eleven puroks of Barangay East Tapinac"
+                                    loading="lazy"
+                                    decoding="async"
+                                    width="1536"
+                                    height="1024"
                                 />
                             </div>
                             <p>
@@ -828,12 +831,24 @@ export default function LandingPage() {
                             </div>
 
                             <div className="landing-government-marks">
-                                <img src={barangayLogo} alt="Barangay seal" />
-                                <img src={cityLogo} alt="City government seal" />
+                                <img
+                                    src={barangayLogo}
+                                    alt="Barangay seal"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                                <img
+                                    src={cityLogo}
+                                    alt="City government seal"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
                                 <img
                                     className="is-wide"
                                     src={bagongPilipinasLogo}
                                     alt="Bagong Pilipinas logo"
+                                    loading="lazy"
+                                    decoding="async"
                                 />
                             </div>
                         </div>
@@ -922,7 +937,12 @@ export default function LandingPage() {
                 <div className="landing-container landing-footer-grid">
                     <div className="landing-footer-brand">
                         <div>
-                            <img src={barangayLogo} alt="" />
+                            <img
+                                src={barangayLogo}
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                            />
                             <span>
                                 <strong>CertiFast</strong>
                                 <small>{branding.name}</small>

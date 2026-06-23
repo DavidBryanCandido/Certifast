@@ -33,6 +33,7 @@ import { DEFAULT_OFFICE_SCHEDULE } from "../../services/publicBrandingService";
 import {
     SYSTEM_THEMES,
     applySystemTheme,
+    cacheSystemTheme,
     normalizeSystemTheme,
 } from "../../theme";
 import {
@@ -1726,6 +1727,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 const loadedTheme = normalizeSystemTheme(data.system_theme);
                 setSystemTheme(loadedTheme);
                 applySystemTheme(loadedTheme);
+                cacheSystemTheme(loadedTheme);
 
                 if (data.brgy_name)
                     setBrgyInfo((prev) => ({ ...prev, name: data.brgy_name }));
@@ -1983,6 +1985,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                 token,
             );
             applySystemTheme(nextTheme);
+            cacheSystemTheme(nextTheme);
             setSystemTheme(nextTheme);
             setMessage({
                 text: "System theme updated successfully!",

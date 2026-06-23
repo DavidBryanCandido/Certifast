@@ -23,10 +23,37 @@ export const SYSTEM_THEMES = {
     },
 };
 
+export const SYSTEM_THEME_STORAGE_KEY = "certifast_system_theme";
+
 export function normalizeSystemTheme(value) {
     return Object.prototype.hasOwnProperty.call(SYSTEM_THEMES, value)
         ? value
         : "default";
+}
+
+export function getCachedSystemTheme() {
+    if (typeof window === "undefined") return "default";
+
+    try {
+        return normalizeSystemTheme(
+            window.localStorage.getItem(SYSTEM_THEME_STORAGE_KEY),
+        );
+    } catch {
+        return "default";
+    }
+}
+
+export function cacheSystemTheme(value) {
+    const key = normalizeSystemTheme(value);
+    if (typeof window === "undefined") return key;
+
+    try {
+        window.localStorage.setItem(SYSTEM_THEME_STORAGE_KEY, key);
+    } catch {
+        // The applied theme still works for this session if storage is blocked.
+    }
+
+    return key;
 }
 
 export function applySystemTheme(value = "default") {

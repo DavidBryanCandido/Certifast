@@ -2,6 +2,7 @@ import { getApiBase } from "../apiBase";
 import { normalizeSystemTheme } from "../theme";
 
 const API_URL = getApiBase();
+let publicBrandingRequest = null;
 
 export const DEFAULT_OFFICE_SCHEDULE = [
     { label: "Mon - Thu", time: "8:00 AM - 5:00 PM" },
@@ -61,9 +62,20 @@ export function normalizePublicBranding(payload = {}) {
     };
 }
 
-export async function getPublicBrandingSettings() {
-    const res = await fetch(`${API_URL}/auth/public-branding`);
-    if (!res.ok) return DEFAULT_PUBLIC_BRANDING;
-    const json = await res.json();
-    return normalizePublicBranding(json);
+export function getPublicBrandingSettings() {
+    if (publicBrandingRequest) return publicBrandingRequest;
+
+    publicBrandingRequest = fetch(`${API_URL}/auth/public-branding`)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Unable to load public branding");
+            }
+            return response.json();
+        })
+        .then(normalizePublicBranding)
+        .finally(() => {
+            publicBrandingRequest = null;
+        });
+
+    return publicBrandingRequest;
 }
