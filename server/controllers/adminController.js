@@ -169,6 +169,42 @@ function ensureAdminOrSuperadmin(req, res) {
     return true;
 }
 
+async function appendCorrectionHistory(rows = []) {
+    const ids = rows
+        .map((row) => Number.parseInt(row.request_id, 10))
+        .filter((id) => Number.isFinite(id) && id > 0);
+    if (!ids.length) return rows;
+
+    try {
+        const result = await pool.query(
+            `SELECT correction_history_id, request_id, revision_number,
+                    event_type, message, actor_type, actor_id, actor_name,
+                    request_snapshot, created_at
+             FROM request_correction_history
+             WHERE request_id = ANY($1::int[])
+             ORDER BY created_at ASC, correction_history_id ASC`,
+            [ids],
+        );
+        const grouped = new Map();
+        result.rows.forEach((event) => {
+            if (!grouped.has(event.request_id)) grouped.set(event.request_id, []);
+            grouped.get(event.request_id).push(event);
+        });
+        return rows.map((row) => ({
+            ...row,
+            correction_history: grouped.get(row.request_id) || [],
+        }));
+    } catch (err) {
+        if (
+            err?.code === "42P01" ||
+            /request_correction_history/i.test(err?.message || "")
+        ) {
+            return rows.map((row) => ({ ...row, correction_history: [] }));
+        }
+        throw err;
+    }
+}
+
 async function hasAnotherVerifiedActiveSuperadmin(excludedAdminId) {
     const result = await pool.query(
         `SELECT admin_id, supabase_auth_id
@@ -275,7 +311,7 @@ async function getDashboardStats(req, res) {
         const result = await pool.query(
             `SELECT
                 (SELECT COUNT(*)::int FROM requests) AS total_requests,
-                (SELECT COUNT(*)::int FROM requests WHERE status = 'pending') AS pending,
+                (SELECT COUNT(*)::int FROM requests WHERE status IN ('pending', 'needs_correction')) AS pending,
                 (SELECT COUNT(*)::int FROM requests WHERE status = 'released') AS released,
                 (SELECT COUNT(*)::int FROM requests WHERE status = 'ready') AS ready,
                 (SELECT COUNT(*)::int FROM residents WHERE status = 'active') AS residents,
@@ -324,6 +360,8 @@ async function getRecentRequests(req, res) {
                 ) AS signatory_snapshot,
                 r.requested_at,
                 r.status,
+                COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
+                to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
                 COALESCE(res.full_name, 'Unknown Resident') AS resident_name,
                 res.email AS resident_email,
                 res.contact_number AS resident_contact,
@@ -354,7 +392,8 @@ async function getRecentRequests(req, res) {
             [limit],
         );
 
-        const rows = await appendRequestAttachments(result.rows);
+        const rowsWithAttachments = await appendRequestAttachments(result.rows);
+        const rows = await appendCorrectionHistory(rowsWithAttachments);
         return res.json({ data: rows });
     } catch (err) {
         console.error("getRecentRequests error:", err);
@@ -431,40 +470,68 @@ async function rejectRequest(req, res) {
     if (!reason) {
         return res
             .status(400)
-            .json({ message: "Rejection reason is required" });
+            .json({ message: "Correction instructions are required" });
     }
 
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
+        await client.query("BEGIN");
+        const result = await client.query(
             `UPDATE requests
-             SET status = 'rejected',
+             SET status = 'needs_correction',
                  rejection_reason = $3,
                  processed_by = $2,
                  processed_at = NOW()
              WHERE request_id = $1
                AND status IN ('pending', 'approved')
-             RETURNING request_id, resident_id, status, rejection_reason, processed_at`,
+             RETURNING request_id, resident_id, cert_type, purpose, extra_fields,
+                       notes, status, rejection_reason, processed_at,
+                       COALESCE(revision_count, 0) AS revision_count`,
             [requestId, req.admin.id, reason],
         );
 
         if (result.rows.length === 0) {
+            await client.query("ROLLBACK");
             return res.status(400).json({
-                message: "Request cannot be rejected in its current status",
+                message:
+                    "Request cannot be returned for correction in its current status",
             });
         }
 
-        // Create notification for resident
         const request = result.rows[0];
+        await client.query(
+            `INSERT INTO request_correction_history (
+                request_id, revision_number, event_type, message,
+                actor_type, actor_id, actor_name, request_snapshot
+             ) VALUES ($1, $2, 'correction_requested', $3, 'admin', $4, $5, $6::jsonb)`,
+            [
+                request.request_id,
+                request.revision_count,
+                reason,
+                req.admin.id,
+                req.admin.username,
+                JSON.stringify({
+                    certType: request.cert_type,
+                    purpose: request.purpose,
+                    extraFields: request.extra_fields || {},
+                    notes: request.notes || "",
+                    status: request.status,
+                }),
+            ],
+        );
+        await client.query("COMMIT");
+
+        // Create notification for resident
         await sendRequestStatusEmailAfterUpdate(
             request.request_id,
-            "rejected",
+            "needs_correction",
             reason,
         );
         await createNotification({
             residentId: request.resident_id,
-            type: "request_update",
-            title: "Request Denied",
-            message: `Your certificate request has been denied. Reason: ${reason}`,
+            type: "request_needs_correction",
+            title: "Request Needs Correction",
+            message: `Please correct and resubmit your certificate request. Staff note: ${reason}`,
             requestId: request.request_id,
         });
 
@@ -475,17 +542,29 @@ async function rejectRequest(req, res) {
             actionType: "request",
             targetTable: "requests",
             targetId: requestId,
-            description: `Request #${requestId} status changed to rejected: ${reason}`,
+            description: `Request #${requestId} returned for correction: ${reason}`,
             ipAddress: req.ip,
         });
 
         return res.json({
-            message: "Request rejected successfully",
+            message: "Request returned to the resident for correction",
             request: result.rows[0],
         });
     } catch (err) {
+        await client.query("ROLLBACK").catch(() => {});
         console.error("rejectRequest error:", err);
+        if (
+            (err?.code === "42P01" || err?.code === "42703") &&
+            /request_correction_history|revision_count/i.test(err?.message || "")
+        ) {
+            return res.status(503).json({
+                message:
+                    "Request correction history is not initialized. Run database/request_correction_resubmission.sql first.",
+            });
+        }
         return res.status(500).json({ message: "Server error" });
+    } finally {
+        client.release();
     }
 }
 
@@ -1338,6 +1417,8 @@ async function scanResidentQr(req, res) {
                 r.rejection_reason,
                 r.template_id,
                 r.extra_fields,
+                COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
+                to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
                 ct.template_key,
                 COALESCE(ct.has_fee, false) AS has_fee
              FROM requests r
@@ -1420,7 +1501,8 @@ async function getResidentRequests(req, res) {
             [residentId],
         );
 
-        const rows = await appendRequestAttachments(result.rows);
+        const rowsWithAttachments = await appendRequestAttachments(result.rows);
+        const rows = await appendCorrectionHistory(rowsWithAttachments);
         return res.json({ data: rows });
     } catch (err) {
         console.error("getResidentRequests error:", err);
@@ -1707,7 +1789,7 @@ async function getReportsOverview(req, res) {
         const statusResult = await pool.query(
             `SELECT
                 COALESCE(SUM(CASE WHEN r.status = 'released' THEN 1 ELSE 0 END), 0)::int AS released,
-                COALESCE(SUM(CASE WHEN r.status IN ('pending', 'approved', 'ready') THEN 1 ELSE 0 END), 0)::int AS pending,
+                COALESCE(SUM(CASE WHEN r.status IN ('pending', 'approved', 'ready', 'needs_correction') THEN 1 ELSE 0 END), 0)::int AS pending,
                 COALESCE(SUM(CASE WHEN r.status = 'rejected' THEN 1 ELSE 0 END), 0)::int AS rejected
              FROM requests r
              WHERE 1 = 1 ${statusWhere}`,
@@ -1751,7 +1833,7 @@ async function getReportsOverview(req, res) {
             SELECT
                 d.day,
                 COALESCE(COUNT(r.request_id), 0)::int AS count,
-                COALESCE(SUM(CASE WHEN r.status IN ('pending', 'approved', 'ready') THEN 1 ELSE 0 END), 0)::int AS pending_count
+                COALESCE(SUM(CASE WHEN r.status IN ('pending', 'approved', 'ready', 'needs_correction') THEN 1 ELSE 0 END), 0)::int AS pending_count
             FROM days d
             LEFT JOIN requests r
               ON DATE(r.requested_at) = d.day
@@ -1826,6 +1908,8 @@ async function getManageRequests(req, res) {
                 r.requested_at,
                 r.processed_at,
                 r.released_at,
+                COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
+                to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
                 COALESCE(res.full_name, 'Unknown Resident') AS resident_name,
                 res.email AS resident_email,
                 res.contact_number AS resident_contact,
@@ -1854,7 +1938,8 @@ async function getManageRequests(req, res) {
              ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC`,
         );
 
-        const rows = await appendRequestAttachments(result.rows);
+        const rowsWithAttachments = await appendRequestAttachments(result.rows);
+        const rows = await appendCorrectionHistory(rowsWithAttachments);
         return res.json({ data: rows });
     } catch (err) {
         console.error("getManageRequests error:", err);

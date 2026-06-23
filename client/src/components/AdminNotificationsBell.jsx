@@ -7,6 +7,7 @@ import {
     FileText,
     PackageCheck,
     Printer,
+    RotateCcw,
     UserCheck,
 } from "lucide-react";
 import adminRequestService from "../services/adminRequestService";
@@ -72,6 +73,19 @@ function requestNotification(row) {
     };
 
     if (status === "pending") {
+        const isResubmitted =
+            Number(row.revision_count || 0) > 0 && row.last_resubmitted_at;
+        if (isResubmitted) {
+            return {
+                ...base,
+                id: `request-resubmitted-${requestId}-${row.last_resubmitted_at}`,
+                time: row.last_resubmitted_at,
+                kind: "resubmitted",
+                title: "Corrected request resubmitted",
+                message: `${residentName} corrected and resubmitted ${certType} for review.`,
+                tone: "amber",
+            };
+        }
         return {
             ...base,
             id: `request-pending-${requestId}-${row.requested_at || ""}`,
@@ -116,6 +130,7 @@ function residentNotification(row) {
 
 function notificationIcon(kind) {
     if (kind === "resident") return UserCheck;
+    if (kind === "resubmitted") return RotateCcw;
     if (kind === "ready") return PackageCheck;
     if (kind === "approved") return Printer;
     return FileText;

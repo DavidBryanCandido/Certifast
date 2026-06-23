@@ -117,6 +117,7 @@ const NOTIF_COLORS = {
     request_approved: { bg: "#e8eef8", color: "#1a4a8a", dot: "#1a4a8a" },
     request_ready: { bg: "#e8f5ee", color: "#1a7a4a", dot: "#1a7a4a" },
     request_rejected: { bg: "#fdecea", color: "#b02020", dot: "#b02020" },
+    request_needs_correction: { bg: "#fff7e6", color: "#9a5b00", dot: "#b86800" },
     request_released: { bg: "#e8f5ee", color: "#1a7a4a", dot: "var(--color-accent)" },
     default: { bg: "#f8f6f1", color: "#4a4a6a", dot: "#9090aa" },
 };
@@ -439,7 +440,11 @@ export default function ResidentTopbar({
                                                 onClick={() => {
                                                     markRead(n.notification_id);
                                                     navigate(
-                                                        "/resident/my-requests",
+                                                        n.type ===
+                                                            "request_needs_correction" &&
+                                                            n.request_id
+                                                            ? `/resident/submit-request?edit=${n.request_id}`
+                                                            : "/resident/my-requests",
                                                     );
                                                     setShowNotif(false);
                                                 }}

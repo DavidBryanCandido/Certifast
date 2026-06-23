@@ -576,6 +576,13 @@ const INITIAL_CERT_TYPES = CERTIFICATE_TEMPLATE_OPTIONS.map((cert, index) => ({
     active: true,
 }));
 
+const CERTIFICATE_TEMPLATE_SOURCE_INDEX = new Map(
+    CERTIFICATE_TEMPLATE_OPTIONS.map((cert, index) => [
+        cert.templateKey,
+        index,
+    ]),
+);
+
 function mapCertificateTemplate(template, index) {
     return {
         id: template.templateId || template.templateKey || `template-${index}`,
@@ -586,7 +593,28 @@ function mapCertificateTemplate(template, index) {
         fee: Boolean(template.hasFee ?? template.has_fee),
         feeAmount: normalizeFeeAmount(template.feeAmount ?? template.fee_amount),
         active: template.isActive !== false && template.is_active !== false,
+        displayOrder:
+            template.displayOrder ?? template.display_order ?? Number.MAX_SAFE_INTEGER,
     };
+}
+
+function sortCertificateTemplatesBySourceOrder(templates) {
+    return [...templates].sort((left, right) => {
+        const leftSourceIndex =
+            CERTIFICATE_TEMPLATE_SOURCE_INDEX.get(left.templateKey) ??
+            Number.MAX_SAFE_INTEGER;
+        const rightSourceIndex =
+            CERTIFICATE_TEMPLATE_SOURCE_INDEX.get(right.templateKey) ??
+            Number.MAX_SAFE_INTEGER;
+
+        if (leftSourceIndex !== rightSourceIndex) {
+            return leftSourceIndex - rightSourceIndex;
+        }
+        if (left.displayOrder !== right.displayOrder) {
+            return left.displayOrder - right.displayOrder;
+        }
+        return left.name.localeCompare(right.name);
+    });
 }
 
 function normalizeFeeAmount(value) {
@@ -1554,7 +1582,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
     const [sig2, setSig2] = useState(null);
     const [drawModal, setDrawModal] = useState({ open: false, target: null });
     const [templatePreviewCert, setTemplatePreviewCert] = useState(null);
-    const [personnelRoster, setPersonnelRoster] = useState(null);
+    const [, setPersonnelRoster] = useState(null);
     const [signatoryHelpSlot, setSignatoryHelpSlot] = useState(null);
     const signatoryUsage = useMemo(() => getSignatoryTemplateUsage(), []);
     const templatePreviewSettings = useMemo(
@@ -1581,15 +1609,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             secondary_title: officials.secondaryTitle,
             captain_sig_base64: sig1 || "",
             secondary_sig_base64: sig2 || "",
-            signatories: personnelRoster?.signatories
-                ? {
-                      captain: personnelRoster.signatories.captain,
-                      kagawad: personnelRoster.signatories.kagawads?.[0],
-                      kagawad1: personnelRoster.signatories.kagawads?.[0],
-                      kagawad2: personnelRoster.signatories.kagawads?.[1],
-                      kagawad3: personnelRoster.signatories.kagawads?.[2],
-                  }
-                : undefined,
         }),
         [
             brgyInfo,
@@ -1599,7 +1618,6 @@ export default function Settings({ admin, onNavigate, onLogout }) {
             officials,
             sig1,
             sig2,
-            personnelRoster,
         ],
     );
 
@@ -1850,7 +1868,11 @@ export default function Settings({ admin, onNavigate, onLogout }) {
                     includeInactive: true,
                 });
                 if (mounted && Array.isArray(data) && data.length > 0) {
-                    setCertTypes(data.map(mapCertificateTemplate));
+                    setCertTypes(
+                        sortCertificateTemplatesBySourceOrder(
+                            data.map(mapCertificateTemplate),
+                        ),
+                    );
                 }
             } catch (err) {
                 console.error("Failed to load certificate templates:", err);

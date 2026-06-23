@@ -3,6 +3,13 @@ import { CheckCircle2, UserRoundCheck } from "lucide-react";
 import { getCertificateSignatoryRequirements } from "../utils/certificateTemplateEngine";
 import { validateSignatorySelections } from "../utils/signatorySelection";
 
+function normalizePersonnelName(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/\bhon(?:orable)?\.?\s*/g, "")
+        .replace(/[^a-z0-9]/g, "");
+}
+
 export default function CertificateSignatorySelector({
     templateKey,
     certType,
@@ -37,9 +44,19 @@ export default function CertificateSignatorySelector({
 
         requirements.forEach((requirement) => {
             if (next[requirement.slot]) return;
-            const available = kagawads.find(
-                (item) => !used.has(String(item.assignmentId)),
-            );
+            const defaultName = normalizePersonnelName(requirement.defaultName);
+            const preferred = defaultName
+                ? kagawads.find(
+                      (item) =>
+                          !used.has(String(item.assignmentId)) &&
+                          normalizePersonnelName(item.name) === defaultName,
+                  )
+                : null;
+            const available =
+                preferred ||
+                kagawads.find(
+                    (item) => !used.has(String(item.assignmentId)),
+                );
             if (!available) return;
             next[requirement.slot] = available.assignmentId;
             used.add(String(available.assignmentId));

@@ -18,6 +18,7 @@ import {
     AlertCircle,
     Home,
     UserCircle,
+    Pencil,
 } from "lucide-react";
 import requestService from "../../services/requestService";
 import {
@@ -97,6 +98,7 @@ if (!document.head.querySelector("[data-resident-home]")) {
     .rh-badge-ready { font-size: 10px; background: #e8f5ee; color: #1a7a4a; border: 1px solid #a8d8bc; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
     .rh-badge-released { font-size: 10px; background: #e8f5ee; color: #1a7a4a; border: 1px solid #a8d8bc; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
     .rh-badge-rejected { font-size: 10px; background: #fdecea; color: #b02020; border: 1px solid #f5c6c6; border-radius: 20px; padding: 2px 10px; font-weight: 700; white-space: nowrap; }
+    .rh-badge-correction { font-size:10px; background:#fff7e6; color:#9a5b00; border:1px solid #f5d78e; border-radius:20px; padding:2px 10px; font-weight:700; white-space:nowrap; }
 
     @keyframes rhFadeUp {
         from { opacity: 0; transform: translateY(16px); }
@@ -178,6 +180,10 @@ function StatusBadge({ status }) {
         ready: { cls: "rh-badge-ready", label: "Ready for Pickup" },
         released: { cls: "rh-badge-released", label: "Released" },
         rejected: { cls: "rh-badge-rejected", label: "Denied" },
+        needs_correction: {
+            cls: "rh-badge-correction",
+            label: "Needs Correction",
+        },
     };
     const { cls, label } = map[normalized] || {
         cls: "rh-badge-pending",
@@ -197,6 +203,8 @@ function StatusIcon({ status }) {
         return <FileCheck {...props} color="#3730a3" />;
     if (normalized === "rejected")
         return <XCircle {...props} color="#b02020" />;
+    if (normalized === "needs_correction")
+        return <AlertCircle {...props} color="#b86800" />;
     return <Clock {...props} color="#b86800" />;
 }
 
@@ -322,7 +330,13 @@ export default function ResidentHome({ resident, onLogout }) {
         total: requests.length,
         pending: requests.filter((r) => {
             const s = String(r.status || "").toLowerCase();
-            return ["pending", "processing", "approved", "ready"].includes(s);
+            return [
+                "pending",
+                "processing",
+                "approved",
+                "ready",
+                "needs_correction",
+            ].includes(s);
         }).length,
         released: requests.filter(
             (r) => String(r.status || "").toLowerCase() === "released",
@@ -766,6 +780,10 @@ export default function ResidentHome({ resident, onLogout }) {
                             ) : (
                                 !loadingRequests &&
                                 recentRequests.map((req) => {
+                                    const needsCorrection =
+                                        String(
+                                            req.status || "",
+                                        ).toLowerCase() === "needs_correction";
                                     const isDenied =
                                         String(
                                             req.status || "",
@@ -842,18 +860,25 @@ export default function ResidentHome({ resident, onLogout }) {
                                                     <StatusBadge
                                                         status={req.status}
                                                     />
-                                                    {isDenied && (
+                                                    {(isDenied ||
+                                                        needsCorrection) && (
                                                         <div
                                                             style={{
                                                                 background:
-                                                                    "#fdecea",
-                                                                border: "1px solid #f5c6c6",
+                                                                    needsCorrection
+                                                                        ? "#fff7e6"
+                                                                        : "#fdecea",
+                                                                border: needsCorrection
+                                                                    ? "1px solid #f5d78e"
+                                                                    : "1px solid #f5c6c6",
                                                                 borderRadius: 6,
                                                                 padding:
                                                                     "5px 9px",
                                                                 marginTop: 4,
                                                                 fontSize: 10.5,
-                                                                color: "#7a1f1f",
+                                                                color: needsCorrection
+                                                                    ? "#7a4a00"
+                                                                    : "#7a1f1f",
                                                                 lineHeight: 1.4,
                                                                 textAlign:
                                                                     "right",
@@ -862,6 +887,39 @@ export default function ResidentHome({ resident, onLogout }) {
                                                         >
                                                             {rejectionReason}
                                                         </div>
+                                                    )}
+                                                    {needsCorrection && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                navigate(
+                                                                    `/resident/submit-request?edit=${req.request_id}`,
+                                                                )
+                                                            }
+                                                            style={{
+                                                                display:
+                                                                    "inline-flex",
+                                                                alignItems:
+                                                                    "center",
+                                                                gap: 5,
+                                                                border:
+                                                                    "1px solid #d7a545",
+                                                                borderRadius: 4,
+                                                                background:
+                                                                    "#fff",
+                                                                color:
+                                                                    "#8a5300",
+                                                                padding:
+                                                                    "5px 9px",
+                                                                fontSize: 10.5,
+                                                                fontWeight: 700,
+                                                                cursor:
+                                                                    "pointer",
+                                                            }}
+                                                        >
+                                                            <Pencil size={11} />{" "}
+                                                            Edit &amp; Resubmit
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>

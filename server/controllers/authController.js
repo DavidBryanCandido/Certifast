@@ -420,20 +420,21 @@ async function residentChangePassword(req, res) {
 }
 
 // POST /api/auth/admin/login
-// body: { username, password }
+// body: { email, password }
 async function adminLogin(req, res) {
-    const { username, password } = req.body;
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
 
-    if (!username || !password) {
+    if (!email || !password) {
         return res
             .status(400)
-            .json({ message: "Username and password are required" });
+            .json({ message: "Email and password are required" });
     }
 
     try {
         const result = await pool.query(
-            "SELECT * FROM admin_accounts WHERE username = $1 AND status = $2",
-            [username, "active"],
+            "SELECT * FROM admin_accounts WHERE LOWER(email) = $1 AND status = $2",
+            [email, "active"],
         );
 
         if (result.rows.length === 0) {
@@ -506,6 +507,7 @@ async function adminLogin(req, res) {
             {
                 id: admin.admin_id,
                 username: admin.username,
+                email: admin.email,
                 role: admin.role,
                 type: "admin",
             },
@@ -519,6 +521,7 @@ async function adminLogin(req, res) {
                 id: admin.admin_id,
                 name: admin.full_name,
                 username: admin.username,
+                email: admin.email,
                 role: admin.role,
             },
         });

@@ -314,6 +314,54 @@ const TEMPLATE_PROOF_REQUIREMENTS = {
     "doc3-business-new-endorsement": [PROOF_LIBRARY.business],
 };
 
+// BGRY.CERT# 1.docx contains repeated First Time Jobseeker and Guardianship
+// pages. Keep one template for each certificate at its first appearance.
+const DOC1_CERTIFICATE_SOURCE_ORDER = [
+    "doc1-endorsement-toda-courtesy-call",
+    "doc1-acceptance-letter-quarantine",
+    "doc1-household-angkas-pass",
+    "doc1-family-home-property",
+    "doc1-first-time-jobseeker",
+    "doc1-no-business",
+    "doc1-work-permit-certification",
+    "doc1-endorsement-financial-assistance",
+    "doc1-dswd-eligibility-certification",
+    "doc1-guardianship",
+    "doc1-barangay-clearance",
+    "doc1-lot-occupancy",
+    "doc1-undertaking-quarantine",
+    "doc1-detained-bail-certification",
+    "doc1-indigency-sibling-assistance",
+    "doc1-endorsement-medical-assistance",
+    "doc1-lockdown-residency-certification",
+    "doc1-good-moral",
+    "doc1-extended-duty-shift",
+    "doc1-burial-assistance",
+    "doc1-certificate-residency",
+    "doc1-telecom-nap-permit",
+    "doc1-cohabitation",
+    "doc1-live-birth-endorsement",
+    "doc1-indigency-medical",
+    "doc1-property-ownership",
+    "doc1-business-renewal-endorsement",
+    "doc1-certificate-appearance",
+    "doc1-indigency-educational-assistance",
+    "doc1-marital-separation-certification",
+    "doc1-business-owner-bir-certification",
+    "doc1-no-marriage-death-claim",
+    "doc1-hearing-impairment-certification",
+    "doc1-indigency-spes-leap",
+    "doc1-simple-residency-loan",
+    "doc1-solo-parent-certification",
+];
+
+const DOC1_CERTIFICATE_SOURCE_INDEX = new Map(
+    DOC1_CERTIFICATE_SOURCE_ORDER.map((templateKey, index) => [
+        templateKey,
+        index,
+    ]),
+);
+
 export const DOC1_CERTIFICATE_OPTIONS = [
     {
         name: "Barangay Clearance",
@@ -531,7 +579,11 @@ export const DOC1_CERTIFICATE_OPTIONS = [
         hasFee: false,
         desc: "Doc #1 solo parent residency certification.",
     },
-];
+].sort(
+    (left, right) =>
+        DOC1_CERTIFICATE_SOURCE_INDEX.get(left.templateKey) -
+        DOC1_CERTIFICATE_SOURCE_INDEX.get(right.templateKey),
+);
 
 export const DOC2_CERTIFICATE_OPTIONS = [
     {
@@ -1176,13 +1228,33 @@ function letterHeader(data, subjectFallback = "ENDORSEMENT") {
         value(data, "recipientOffice", "OLONGAPO CITY"),
         value(data, "recipientAddress", ""),
     ].filter(Boolean);
+    const issued = dateObj(data?.issuedAt || data?.issued_at) || new Date();
+    const sourceDate = `${String(issued.getDate()).padStart(2, "0")} ${issued.toLocaleDateString("en-US", { month: "long" })} ${issued.getFullYear()}`;
+    const subject = value(data, "subject", subjectFallback);
+    const normalizedSubject = upper(subject);
+    const subjectHtml = normalizedSubject.includes(
+        "NEWLY ELECTED, ZONE II TODA PRESIDENT & VICE PRESIDENT COURTESY CALL",
+    )
+        ? "ENDORSEMENT: NEWLY ELECTED, ZONE II TODA<br />PRESIDENT &amp; VICE PRESIDENT<br />COURTESY CALL"
+        : escapeHtml(subject);
 
     return `
-        <div class="cf-letter-date">${escapeHtml(formatDate(data?.issuedAt || new Date()))}</div>
-        <div class="cf-letter-to">
-            ${recipientLines.map((line) => `<div>${escapeHtml(upper(line))}</div>`).join("")}
+        <div class="cf-letter-date">${escapeHtml(sourceDate)}</div>
+        <div class="cf-letter-recipient-row">
+            <div class="cf-letter-label">TO</div>
+            <div class="cf-letter-to">
+                ${recipientLines
+                    .map(
+                        (line, index) =>
+                            `<div${index === 0 ? ' class="recipient-name"' : ""}>${escapeHtml(upper(line))}</div>`,
+                    )
+                    .join("")}
+            </div>
         </div>
-        <div class="cf-letter-subject">Subject: ${escapeHtml(value(data, "subject", subjectFallback))}</div>`;
+        <div class="cf-letter-subject-row">
+            <div class="cf-letter-label">Subject:</div>
+            <div class="cf-letter-subject">${subjectHtml}</div>
+        </div>`;
 }
 
 function letterClosing(closing = "Respectfully,") {
@@ -1371,6 +1443,364 @@ function signatureLine(label = "Signature over Printed Name") {
         </div>`;
 }
 
+const SOURCE_DOCUMENT_LAYOUTS = {
+    1: {
+        width: 612,
+        height: 792,
+        left: 78,
+        right: 59.15,
+        headerTop: 52,
+        republicText: "Republic of the Pilipinas",
+        barangaySize: 16,
+        officeSize: 14,
+        watermarkTop: 432,
+    },
+    2: {
+        width: 595.3,
+        height: 841.9,
+        left: 85.05,
+        right: 56.65,
+        headerTop: 52,
+        republicText: "Republic of the Philippines",
+        barangaySize: 14,
+        officeSize: 14,
+        watermarkTop: 438,
+    },
+    3: {
+        width: 595.35,
+        height: 842,
+        left: 78,
+        right: 56.7,
+        headerTop: 52,
+        republicText: "Republic of the Philippines",
+        barangaySize: 14,
+        officeSize: 16,
+        watermarkTop: 430,
+    },
+};
+
+function sourceTemplateLayout(
+    doc,
+    contentTop,
+    signatureTop,
+    bodyFont,
+    bodySize,
+    titleFont,
+    titleSize,
+    titleAlign = "center",
+    options = {},
+) {
+    return {
+        doc,
+        contentTop,
+        signatureTop,
+        bodyFont,
+        bodySize,
+        titleFont,
+        titleSize,
+        titleAlign,
+        titleBold: false,
+        titleGap: 34,
+        bodyAlign: "left",
+        paragraphIndent: 36,
+        lineHeight: 13,
+        paragraphAfter: 8,
+        salutationGap: 8,
+        signatureAlign: "right",
+        ...options,
+    };
+}
+
+// Measurements below come from the first occurrence of every unique template
+// in BGRY.CERT# 1-3. Values are Word points, not visual estimates.
+const SOURCE_TEMPLATE_LAYOUTS = {
+    "doc1-endorsement-toda-courtesy-call": sourceTemplateLayout(
+        1, 148.7, 581.6, "Calibri", 11, "Calibri", 11, "left",
+        { titleGap: 0, paragraphAfter: 12, templateType: "letter" },
+    ),
+    "doc1-acceptance-letter-quarantine": sourceTemplateLayout(
+        1, 189.8, 487.1, "Calibri", 11, "Times New Roman", 18, "left",
+    ),
+    "doc1-household-angkas-pass": sourceTemplateLayout(
+        1, 193.6, 517.1, "Calibri", 11, "Times New Roman", 18, "left",
+    ),
+    "doc1-family-home-property": sourceTemplateLayout(
+        1, 181.4, 461.9, "Calibri", 11, "Times New Roman", 18, "left",
+    ),
+    "doc1-first-time-jobseeker": sourceTemplateLayout(
+        1, 209.4, 485.3, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc1-no-business": sourceTemplateLayout(
+        1, 207.6, 453.5, "Calibri", 12, "Times New Roman", 18, "left",
+    ),
+    "doc1-work-permit-certification": sourceTemplateLayout(
+        1, 205.7, 486.2, "Calibri", 11, "Times New Roman", 18, "left",
+    ),
+    "doc1-endorsement-financial-assistance": sourceTemplateLayout(
+        1, 148.7, 604, "Calibri", 11, "Calibri", 11, "left",
+        { titleGap: 0, templateType: "letter" },
+    ),
+    "doc1-dswd-eligibility-certification": sourceTemplateLayout(
+        1, 204.8, 461, "Calibri", 11, "Times New Roman", 20, "left",
+    ),
+    "doc1-guardianship": sourceTemplateLayout(
+        1, 193.6, 404.9, "Calibri", 11, "Times New Roman", 20, "left",
+    ),
+    "doc1-barangay-clearance": sourceTemplateLayout(
+        1, 216, 535.8, "Calibri", 11, "Times New Roman", 20, "center",
+        { titleGap: 37, paragraphAfter: 12, salutationGap: 32 },
+    ),
+    "doc1-lot-occupancy": sourceTemplateLayout(
+        1, 213.2, 655.5, "Calibri", 11, "Times New Roman", 20,
+    ),
+    "doc1-undertaking-quarantine": sourceTemplateLayout(
+        1, 216, 631.2, "Calibri", 10, "Times New Roman", 16,
+    ),
+    "doc1-detained-bail-certification": sourceTemplateLayout(
+        1, 220.7, 518, "Calibri", 13, "Times New Roman", 18,
+    ),
+    "doc1-indigency-sibling-assistance": sourceTemplateLayout(
+        1, 202.9, 535.8, "Times New Roman", 12, "Times New Roman", 18, "center",
+        { titleGap: 48, salutationGap: 14 },
+    ),
+    "doc1-endorsement-medical-assistance": sourceTemplateLayout(
+        1, 165.5, 589.1, "Calibri", 12, "Calibri", 10, "left",
+        { titleGap: 0, templateType: "letter" },
+    ),
+    "doc1-lockdown-residency-certification": sourceTemplateLayout(
+        1, 184.2, 458.2, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-good-moral": sourceTemplateLayout(
+        1, 178.6, 518, "Times New Roman", 12, "Times New Roman", 20,
+    ),
+    "doc1-extended-duty-shift": sourceTemplateLayout(
+        1, 161.8, 461.9, "Cambria", 12, "Cambria", 12, "left",
+        { titleGap: 0, templateType: "memo" },
+    ),
+    "doc1-burial-assistance": sourceTemplateLayout(
+        1, 188.9, 433.9, "Calibri", 11, "Times New Roman", 20,
+    ),
+    "doc1-certificate-residency": sourceTemplateLayout(
+        1, 191.7, 461, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-telecom-nap-permit": sourceTemplateLayout(
+        1, 206.6, 412.4, "Calibri", 11, "Times New Roman", 20,
+    ),
+    "doc1-cohabitation": sourceTemplateLayout(
+        1, 193.6, 432, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-live-birth-endorsement": sourceTemplateLayout(
+        1, 214.1, 572.2, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-indigency-medical": sourceTemplateLayout(
+        1, 219.8, 511.5, "Calibri", 12, "Times New Roman", 20, "left",
+    ),
+    "doc1-property-ownership": sourceTemplateLayout(
+        1, 166.4, 576, "Calibri", 11, "Times New Roman", 20,
+    ),
+    "doc1-business-renewal-endorsement": sourceTemplateLayout(
+        1, 148.7, 531.1, "Calibri", 12, "Times New Roman", 16, "left",
+        { titleGap: 0, paragraphIndent: 0, templateType: "business" },
+    ),
+    "doc1-certificate-appearance": sourceTemplateLayout(
+        1, 204.8, 425.5, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-indigency-educational-assistance": sourceTemplateLayout(
+        1, 199.1, 476, "Calibri", 11, "Times New Roman", 20,
+    ),
+    "doc1-marital-separation-certification": sourceTemplateLayout(
+        1, 214.1, 500.2, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-business-owner-bir-certification": sourceTemplateLayout(
+        1, 217.9, 461, "Calibri", 13, "Times New Roman", 20,
+    ),
+    "doc1-no-marriage-death-claim": sourceTemplateLayout(
+        1, 245, 549.8, "Calibri", 12, "Times New Roman", 20, "center",
+        { titleGap: 45, salutationGap: 10 },
+    ),
+    "doc1-hearing-impairment-certification": sourceTemplateLayout(
+        1, 234.7, 528.3, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc1-indigency-spes-leap": sourceTemplateLayout(
+        1, 216.9, 512.4, "Times New Roman", 11, "Times New Roman", 20,
+    ),
+    "doc1-simple-residency-loan": sourceTemplateLayout(
+        1, 216, 489, "Calibri", 11, "Times New Roman", 20, "center",
+        { bodyAlign: "justify" },
+    ),
+    "doc1-solo-parent-certification": sourceTemplateLayout(
+        1, 219.8, 528.3, "Calibri", 12, "Times New Roman", 18,
+    ),
+
+    "doc2-indigency-income-means": sourceTemplateLayout(
+        2, 200.1, 577.8, "Calibri", 12, "Times New Roman", 18, "center",
+        { bodyAlign: "justify" },
+    ),
+    "doc2-flooded-residence-certification": sourceTemplateLayout(
+        2, 204.8, 508.7, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc2-indigent-good-moral-medical": sourceTemplateLayout(
+        2, 194.5, 488.1, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc2-residency-bank-record": sourceTemplateLayout(
+        2, 201.9, 460, "Times New Roman", 11, "Times New Roman", 18,
+    ),
+    "doc2-minor-athlete-financial-assistance": sourceTemplateLayout(
+        2, 195.4, 475, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc2-parent-relationship-spes": sourceTemplateLayout(
+        2, 191.7, 537.7, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc2-business-closure-court-records": sourceTemplateLayout(
+        2, 193.6, 449.8, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc2-general-legal-records": sourceTemplateLayout(
+        2, 201.1, 448.9, "Calibri", 12, "Times New Roman", 18,
+    ),
+    "doc2-centenarian-living-veteran": sourceTemplateLayout(
+        2, 216, 502.1, "Calibri", 12, "Times New Roman", 18,
+    ),
+    "doc2-first-time-jobseeker-oath": sourceTemplateLayout(
+        2, 175.8, null, "Georgia", 8, "Georgia", 14, "center",
+        { titleBold: true, paragraphIndent: 0 },
+    ),
+    "doc2-funeral-covered-court-indigency": sourceTemplateLayout(
+        2, 210.4, 473.1, "Calibri", 11, "Times New Roman", 18, "center",
+        { bodyAlign: "justify" },
+    ),
+    "doc2-endorsement-hospital-return": sourceTemplateLayout(
+        2, 178.6, 638.7, "Cambria", 11, "Cambria", 11, "left",
+        { titleGap: 0, bodyAlign: "justify", templateType: "letter" },
+    ),
+    "doc2-business-assessor-permit": sourceTemplateLayout(
+        2, 196.4, 493.7, "Calibri", 11, "Times New Roman", 18,
+    ),
+    "doc2-residency-school-requirement": sourceTemplateLayout(
+        2, 184.2, 514.3, "Calibri", 12, "Times New Roman", 20,
+    ),
+    "doc2-registered-business-bank": sourceTemplateLayout(
+        2, 216.9, 537.7, "Calibri", 12, "Times New Roman", 18, "center",
+        { bodyAlign: "justify" },
+    ),
+    "doc2-guardian-psa-certification": sourceTemplateLayout(
+        2, 216, 537.7, "Calibri", 12, "Times New Roman", 18,
+    ),
+    "doc2-indigency-guardian-medical": sourceTemplateLayout(
+        2, 232.9, 536.8, "Calibri", 12, "Bookman Old Style", 16, "center",
+        { bodyAlign: "justify" },
+    ),
+    "doc2-organization-water-clearance": sourceTemplateLayout(
+        2, 224.4, 522.7, "Times New Roman", 12, "Times New Roman", 18, "center",
+        { bodyAlign: "justify" },
+    ),
+    "doc2-unemployment-spes-certification": sourceTemplateLayout(
+        2, 213.2, 524.5, "Times New Roman", 12, "Times New Roman", 20,
+    ),
+    "doc2-lpg-house-to-house-permit": sourceTemplateLayout(
+        2, 209.4, 649.8, "Times New Roman", 11, "Times New Roman", 20, "center",
+        { bodyAlign: "justify" },
+    ),
+
+    "doc3-mlbb-tournament-permit": sourceTemplateLayout(
+        3, 175.8, 520.8, "Calibri", 11, "Calibri", 18, "left",
+        { titleGap: 44, paragraphAfter: 26 },
+    ),
+    "doc3-business-renewal-travel": sourceTemplateLayout(
+        3, 158.1, 616.2, "Calibri", 12, "Times New Roman", 16, "left",
+        {
+            titleGap: 0,
+            paragraphIndent: 0,
+            signatureAlign: "center",
+            templateType: "business",
+        },
+    ),
+    "doc3-child-details-4ps": sourceTemplateLayout(
+        3, 175.8, 460, "Calibri", 11, "Times New Roman", 18, "left",
+        { bodyAlign: "justify" },
+    ),
+    "doc3-non-resident-persons": sourceTemplateLayout(
+        3, 215.1, 562, "Times New Roman", 12, "Times New Roman", 18, "left",
+        { bodyAlign: "justify" },
+    ),
+    "doc3-indigency-medical-assistance": sourceTemplateLayout(
+        3, 209.4, 534.8, "Times New Roman", 11, "Times New Roman", 18, "left",
+    ),
+    "doc3-road-damage-permit": sourceTemplateLayout(
+        3, 215.1, 466.6, "Times New Roman", 11, "Times New Roman", 18, "left",
+    ),
+    "doc3-bmbe-business-certificate": sourceTemplateLayout(
+        3, 234.7, 669.5, "Calibri", 11, "Times New Roman", 18, "left",
+    ),
+    "doc3-senior-alive-well": sourceTemplateLayout(
+        3, 219.8, 533.9, "Times New Roman", 12, "Times New Roman", 18, "left",
+    ),
+    "doc3-minor-stepbrother-birth-record": sourceTemplateLayout(
+        3, 226.3, 556.3, "Times New Roman", 11, "Times New Roman", 18, "left",
+        { bodyAlign: "justify" },
+    ),
+    "doc3-fire-damage-certification": sourceTemplateLayout(
+        3, 196.4, 459.1, "Times New Roman", 12, "Times New Roman", 18, "justify",
+        { bodyAlign: "justify" },
+    ),
+    "doc3-first-time-jobseeker-clearance": sourceTemplateLayout(
+        3, 204.8, 461.9, "Times New Roman", 12, "Times New Roman", 18, "left",
+        { bodyAlign: "justify" },
+    ),
+    "doc3-repatriated-ofw-unemployment": sourceTemplateLayout(
+        3, 208.5, 484.4, "Times New Roman", 12, "Times New Roman", 18, "justify",
+    ),
+    "doc3-pandemic-business-non-operation": sourceTemplateLayout(
+        3, 189.8, 460, "Times New Roman", 13, "Times New Roman", 18, "left",
+    ),
+    "doc3-sole-guardian-travel-assistance": sourceTemplateLayout(
+        3, 185.1, 538.6, "Times New Roman", 13, "Times New Roman", 18, "left",
+    ),
+    "doc3-business-closure": sourceTemplateLayout(
+        3, 192.6, 494.6, "Times New Roman", 13, "Times New Roman", 18, "left",
+    ),
+    "doc3-renovation-non-operational-business": sourceTemplateLayout(
+        3, 192.6, 432, "Times New Roman", 13, "Times New Roman", 18, "left",
+    ),
+    "doc3-flood-victim-financial-assistance": sourceTemplateLayout(
+        3, 173.9, 573.2, "Times New Roman", 13, "Times New Roman", 18, "left",
+        { titleBold: true },
+    ),
+    "doc3-flood-victim-calamity-loan": sourceTemplateLayout(
+        3, 168.3, 565.7, "Times New Roman", 13, "Times New Roman", 18, "left",
+        { titleBold: true },
+    ),
+    "doc3-low-income-purok-leader": sourceTemplateLayout(
+        3, 179.6, 476.9, "Times New Roman", 14, "Times New Roman", 20, "left",
+    ),
+    "doc3-low-income-tricycle-driver": sourceTemplateLayout(
+        3, 176.8, 491.9, "Times New Roman", 14, "Times New Roman", 20, "left",
+    ),
+    "doc3-blank-indigency-form": sourceTemplateLayout(
+        3, 144, 442.3, "Calibri", 11, "Times New Roman", 18, "left",
+        { bodyAlign: "justify" },
+    ),
+    "doc3-business-renewal-store": sourceTemplateLayout(
+        3, 144, 562, "Calibri", 12, "Times New Roman", 16, "center",
+        {
+            titleBold: true,
+            titleGap: 0,
+            paragraphIndent: 0,
+            signatureAlign: "center",
+            templateType: "business",
+        },
+    ),
+    "doc3-business-new-endorsement": sourceTemplateLayout(
+        3, 144, 621.8, "Calibri", 12, "Times New Roman", 16, "center",
+        {
+            titleBold: true,
+            titleGap: 0,
+            paragraphIndent: 0,
+            signatureAlign: "center",
+            templateType: "business",
+        },
+    ),
+};
+
 const TEMPLATES = {
     "doc1-barangay-clearance": {
         title: "BARANGAY CLEARANCE",
@@ -1386,7 +1816,7 @@ const TEMPLATES = {
     },
     "doc1-certificate-residency": {
         title: "BARANGAY CERTIFICATE",
-        signatures: "kagawad-left-captain-right",
+        signatures: "captain-right",
         render(data) {
             return paragraphs([
                 { className: "salutation", html: "To Whom it my concern:" },
@@ -1560,6 +1990,7 @@ const TEMPLATES = {
     },
     "doc1-business-renewal-endorsement": {
         title: "ENDORSEMENT",
+        hideTitle: true,
         signatures: "captain-right",
         fields: [
             "businessPermitNo",
@@ -1567,6 +1998,8 @@ const TEMPLATES = {
             "businessAddress",
             "operatorName",
             "businessOwnerAddress",
+            "dateIssued",
+            "validUntil",
         ],
         render(data) {
             const permitNo = value(
@@ -1587,20 +2020,27 @@ const TEMPLATES = {
                 address(data),
             );
             return `
-                <div class="cf-renewal">RENEWAL</div>
-                <div class="cf-form-lines">
-                    <div>${escapeHtml(permitNo)}</div><small>Barangay Permit No.</small>
-                    <div>${escapeHtml(upper(business))}</div><small>(Business Name or Trade Activity)</small>
-                    <div>${escapeHtml(upper(businessAddress))}</div><small>(Location)</small>
-                    <div>${escapeHtml(upper(operator))}</div><small>(Operator/Manager)</small>
-                    <div>${escapeHtml(upper(operatorAddress))}</div><small>(Address)</small>
+                <div class="cf-doc1-renewal-form">
+                    <div class="cf-doc1-renewal-type">( RENEWAL</div>
+                    <div class="cf-doc1-renewal-heading">ENDORSEMENT</div>
+                    <div class="cf-doc1-renewal-permit">${escapeHtml(upper(permitNo))}</div>
+                    <div class="cf-doc1-renewal-lines">
+                        <div>${escapeHtml(upper(business))}</div><small>(Business Name or Trade Activity)</small>
+                        <div>${escapeHtml(upper(businessAddress))}</div><small>(Location)</small>
+                        <div>${escapeHtml(upper(operator))}</div><small>(Operator/Manager)</small>
+                        <div>${escapeHtml(upper(operatorAddress))}</div><small>(Address)</small>
+                    </div>
+                    ${paragraphs([
+                        "being applied for the corresponding Business Permit has been found to be:",
+                        "COMPLIANT with the provisions of existing Barangay Ordinance, rules and regulations being enforced in this barangay:",
+                        "In view of the foregoing, this Barangay, thru the undersigned,",
+                        "Interposes No Objection for the issuance of the corresponding Mayor's Permit being applied for.",
+                    ])}
                 </div>
-                ${paragraphs([
-                    "being applied for the corresponding Business Permit has been found to be:",
-                    "COMPLIANT with the provisions of existing Barangay Ordinance, rules and regulations being enforced in this barangay:",
-                    "In view of the foregoing, this Barangay, thru the undersigned,",
-                    "Interposes No Objection for the issuance of the corresponding Mayor's Permit being applied for.",
-                ])}`;
+            `;
+        },
+        renderPostSignatures(data) {
+            return validityBlock(data, "");
         },
     },
     "doc1-property-ownership": {
@@ -1883,7 +2323,7 @@ const TEMPLATES = {
     },
     "doc1-indigency-sibling-assistance": {
         title: "BARANGAY INDIGENCY",
-        signatures: "captain-right",
+        signatures: "kagawad-right",
         fields: ["assistanceRecipientName", "assistanceType"],
         render(data) {
             return paragraphs([
@@ -1970,7 +2410,7 @@ const TEMPLATES = {
     },
     "doc1-indigency-educational-assistance": {
         title: "BARANGAY INDIGENCY",
-        signatures: "captain-right",
+        signatures: "kagawad-right",
         fields: ["assistanceType"],
         render(data) {
             return paragraphs([
@@ -2010,7 +2450,7 @@ const TEMPLATES = {
     },
     "doc1-business-owner-bir-certification": {
         title: "BARANGAY CERTIFICATE",
-        signatures: "captain-right",
+        signatures: "kagawad1-right",
         fields: [
             "businessOwnerName",
             "businessName",
@@ -2083,7 +2523,7 @@ const TEMPLATES = {
     },
     "doc1-simple-residency-loan": {
         title: "BARANGAY CERTIFICATE",
-        signatures: "captain-right",
+        signatures: "kagawad3-right",
         fields: ["age", "loanPurpose"],
         render(data) {
             return paragraphs([
@@ -2924,6 +3364,29 @@ function signatureModeSlots(mode = "captain-right") {
     return map[normalized] || ["captain"];
 }
 
+const SOURCE_SIGNATORY_DEFAULTS = {
+    captain: {
+        name: DEFAULT_SETTINGS.captain_name,
+        title: DEFAULT_SETTINGS.captain_title,
+    },
+    kagawad: {
+        name: DEFAULT_SETTINGS.kagawad_name,
+        title: DEFAULT_SETTINGS.kagawad_title,
+    },
+    kagawad1: {
+        name: DEFAULT_SETTINGS.kagawad_1_name,
+        title: DEFAULT_SETTINGS.kagawad_1_title,
+    },
+    kagawad2: {
+        name: DEFAULT_SETTINGS.kagawad_2_name,
+        title: DEFAULT_SETTINGS.kagawad_2_title,
+    },
+    kagawad3: {
+        name: DEFAULT_SETTINGS.kagawad_3_name,
+        title: DEFAULT_SETTINGS.kagawad_3_title,
+    },
+};
+
 export function getCertificateSignatoryRequirements(templateKey, certType) {
     const template = getCertificateTemplate(templateKey, certType);
     const mode = String(template.signatures || "captain-right");
@@ -2933,6 +3396,8 @@ export function getCertificateSignatoryRequirements(templateKey, certType) {
 
     return slots.map((slot, index) => ({
         slot,
+        defaultName: SOURCE_SIGNATORY_DEFAULTS[slot]?.name || "",
+        defaultTitle: SOURCE_SIGNATORY_DEFAULTS[slot]?.title || "",
         label: witnessed
             ? `Witness Kagawad ${index + 1}`
             : slots.length > 1
@@ -3001,8 +3466,62 @@ export function getTemplateProofRequirements(templateKey, certType) {
     return requirements.map((item) => ({ ...item }));
 }
 
-function buildHeader(settings, templateKey) {
-    const bagongPilipinasLogo = String(templateKey || "").startsWith("doc3-")
+function cssFontStack(fontName) {
+    const stacks = {
+        Calibri: "Calibri, Arial, sans-serif",
+        Cambria: "Cambria, Times New Roman, serif",
+        Georgia: "Georgia, Times New Roman, serif",
+        "Bookman Old Style": "Bookman Old Style, Georgia, serif",
+        "Times New Roman": "Times New Roman, Times, serif",
+    };
+    return stacks[fontName] || stacks["Times New Roman"];
+}
+
+function sourceLayoutStyle(layout) {
+    const documentLayout =
+        SOURCE_DOCUMENT_LAYOUTS[layout.doc] || SOURCE_DOCUMENT_LAYOUTS[1];
+    const signatureOffset =
+        layout.signatureTop == null
+            ? 0
+            : Math.max(0, layout.signatureTop - layout.contentTop);
+
+    return [
+        `--cf-page-width:${documentLayout.width}pt`,
+        `--cf-page-height:${documentLayout.height}pt`,
+        `--cf-content-left:${documentLayout.left}pt`,
+        `--cf-content-right:${documentLayout.right}pt`,
+        `--cf-content-top:${layout.contentTop}pt`,
+        `--cf-signature-offset:${signatureOffset}pt`,
+        `--cf-body-font:${cssFontStack(layout.bodyFont)}`,
+        `--cf-body-size:${layout.bodySize}pt`,
+        `--cf-body-align:${layout.bodyAlign}`,
+        `--cf-line-height:${layout.lineHeight}pt`,
+        `--cf-paragraph-after:${layout.paragraphAfter}pt`,
+        `--cf-salutation-gap:${layout.salutationGap}pt`,
+        `--cf-paragraph-indent:${layout.paragraphIndent}pt`,
+        `--cf-title-font:${cssFontStack(layout.titleFont)}`,
+        `--cf-title-size:${layout.titleSize}pt`,
+        `--cf-title-align:center`,
+        `--cf-title-weight:${layout.titleBold ? 700 : 400}`,
+        `--cf-title-gap:${layout.titleGap}pt`,
+        `--cf-signature-align:${
+            layout.signatureAlign === "center"
+                ? "center"
+                : layout.signatureAlign === "left"
+                  ? "flex-start"
+                  : "flex-end"
+        }`,
+        `--cf-header-top:${documentLayout.headerTop}pt`,
+        `--cf-barangay-size:${documentLayout.barangaySize}pt`,
+        `--cf-office-size:${documentLayout.officeSize}pt`,
+        `--cf-watermark-top:${documentLayout.watermarkTop}pt`,
+    ].join(";");
+}
+
+function buildHeader(settings, templateKey, layout) {
+    const documentLayout =
+        SOURCE_DOCUMENT_LAYOUTS[layout.doc] || SOURCE_DOCUMENT_LAYOUTS[1];
+    const bagongPilipinasLogo = layout.doc === 3
         ? `<img class="cf-logo cf-logo-bagong" src="${escapeHtml(settings.bagong_pilipinas_logo_url || DEFAULT_SETTINGS.bagong_pilipinas_logo_url)}" alt="" />`
         : "";
 
@@ -3011,7 +3530,7 @@ function buildHeader(settings, templateKey) {
             <img class="cf-logo cf-logo-left" src="${escapeHtml(settings.city_logo_url || DEFAULT_SETTINGS.city_logo_url)}" alt="" />
             ${bagongPilipinasLogo}
             <img class="cf-logo cf-logo-right" src="${escapeHtml(settings.brgy_logo_url || DEFAULT_SETTINGS.brgy_logo_url)}" alt="" />
-            <div class="cf-republic">Republic of the Pilipinas</div>
+            <div class="cf-republic">${escapeHtml(documentLayout.republicText)}</div>
             <div class="cf-city">${escapeHtml(settings.brgy_city || DEFAULT_SETTINGS.brgy_city)}</div>
             <div class="cf-barangay">${escapeHtml(upper(settings.brgy_name || DEFAULT_SETTINGS.brgy_name))}</div>
             <div class="cf-header-rule"></div>
@@ -3025,16 +3544,18 @@ function buildWatermark(settings) {
     return `<img class="cf-bg-watermark" src="${escapeHtml(logo)}" alt="" />`;
 }
 
-function baseStyles() {
+function baseStyles(layout) {
+    const documentLayout =
+        SOURCE_DOCUMENT_LAYOUTS[layout.doc] || SOURCE_DOCUMENT_LAYOUTS[1];
     return `
-        @page { size: Letter; margin: 0; }
+        @page { size: ${documentLayout.width}pt ${documentLayout.height}pt; margin: 0; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #ffffff; }
-        body { color: #000; font-family: "Times New Roman", Times, serif; }
+        body { color: #000; font-family: var(--cf-body-font); }
         .cf-cert-page {
-            width: 8.5in;
-            min-height: 11in;
-            padding: 0.44in 0.60in 0.5in 0.72in;
+            width: var(--cf-page-width);
+            min-height: var(--cf-page-height);
+            padding: 0;
             background: #fff;
             position: relative;
             overflow: hidden;
@@ -3042,94 +3563,118 @@ function baseStyles() {
         .cf-bg-watermark {
             position: absolute;
             left: 50%;
-            top: 53%;
-            width: 5.45in;
-            height: 5.45in;
+            top: var(--cf-watermark-top);
+            width: 408pt;
+            height: 389pt;
             object-fit: contain;
             transform: translate(-50%, -50%);
-            opacity: 0.13;
+            opacity: 0.12;
             z-index: 0;
             pointer-events: none;
         }
         .cf-cert-header {
-            height: 1.52in;
-            position: relative;
+            position: absolute;
+            top: var(--cf-header-top);
+            left: var(--cf-content-left);
+            right: var(--cf-content-right);
+            height: 96pt;
             z-index: 1;
             text-align: center;
-            padding-top: 0.10in;
-            margin: 0 auto 0.36in;
-            width: 6.95in;
+            padding: 0;
+            margin: 0;
         }
         .cf-cert-page section {
-            position: relative;
+            position: absolute;
+            top: var(--cf-content-top);
+            left: var(--cf-content-left);
+            right: var(--cf-content-right);
             z-index: 1;
         }
         .cf-logo {
             position: absolute;
-            top: 0.03in;
-            width: 0.86in;
-            height: 0.86in;
+            top: -5pt;
             object-fit: contain;
         }
-        .cf-logo-left { left: 0.02in; }
-        .cf-logo-bagong {
-            left: 1.02in;
-            width: 0.92in;
-            height: 0.82in;
+        .cf-logo-left {
+            left: 0;
+            width: 74pt;
+            height: 63pt;
         }
-        .cf-logo-right { right: 0.02in; }
+        .cf-logo-bagong {
+            left: 44pt;
+            width: 80pt;
+            height: 67pt;
+        }
+        .cf-logo-right {
+            right: 0;
+            width: 68pt;
+            height: 60pt;
+        }
+        .cf-doc-1 .cf-logo-left { width: 79pt; height: 65pt; }
+        .cf-doc-1 .cf-logo-right { width: 74pt; height: 63pt; }
+        .cf-doc-2 .cf-logo-left { width: 74pt; height: 61pt; }
+        .cf-doc-2 .cf-logo-right { width: 67pt; height: 57pt; }
+        .cf-doc-3 .cf-logo-left { left: -36pt; width: 72pt; height: 66pt; }
+        .cf-doc-3 .cf-logo-right { width: 67pt; height: 60pt; }
         .cf-republic {
-            font-family: Cambria, "Times New Roman", serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 12pt;
-            line-height: 1.05;
-            margin-top: 0.01in;
+            font-weight: 400;
+            line-height: 12pt;
+            color: #666;
+            margin: 0;
         }
         .cf-city {
-            font-family: Cambria, "Times New Roman", serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 12pt;
-            line-height: 1.05;
+            font-weight: 400;
+            line-height: 12pt;
+            color: #666;
         }
         .cf-barangay {
             font-family: "Times New Roman", Times, serif;
-            font-size: 16pt;
-            font-weight: 700;
-            line-height: 1.16;
-            margin-top: 0.04in;
+            font-size: var(--cf-barangay-size);
+            font-weight: 400;
+            line-height: 16pt;
+            color: #666;
+            margin-top: 2pt;
         }
         .cf-header-rule {
-            width: 6.48in;
+            width: 100%;
             border-top: 1px solid #000;
-            margin: 0.30in auto 0;
+            margin: 18pt auto 0;
         }
         .cf-office {
-            font-family: Georgia, "Times New Roman", serif;
-            font-size: 12pt;
-            font-weight: 700;
-            line-height: 1.12;
-            margin-top: 0.04in;
+            font-family: "Times New Roman", Times, serif;
+            font-size: var(--cf-office-size);
+            font-weight: 400;
+            line-height: 16pt;
+            color: #666;
+            margin-top: 3pt;
         }
         .cf-cert-title {
-            text-align: center;
-            font-family: "Times New Roman", Times, serif;
-            font-size: 18pt;
-            font-weight: 700;
-            line-height: 1.2;
-            margin: 0.06in 0 0.20in;
+            text-align: var(--cf-title-align);
+            font-family: var(--cf-title-font);
+            font-size: var(--cf-title-size);
+            font-weight: var(--cf-title-weight);
+            line-height: 1.08;
+            margin: 0 0 var(--cf-title-gap);
             letter-spacing: 0;
         }
         .cf-cert-body {
-            font-size: 12pt;
-            line-height: 1.45;
+            font-family: var(--cf-body-font);
+            font-size: var(--cf-body-size);
+            line-height: var(--cf-line-height);
         }
         .cf-cert-body p {
-            margin: 0 0 0.16in;
-            text-align: justify;
+            margin: 0 0 var(--cf-paragraph-after);
+            text-align: var(--cf-body-align);
         }
         .cf-cert-body .cf-body-paragraph {
-            text-indent: 0.5in;
+            text-indent: var(--cf-paragraph-indent);
         }
         .cf-cert-body .salutation {
-            margin-bottom: 0.22in;
+            margin-bottom: var(--cf-salutation-gap);
             text-align: left;
             text-indent: 0;
         }
@@ -3165,11 +3710,69 @@ function baseStyles() {
             font-size: 10pt;
             font-style: italic;
         }
-        .cf-business-endorsement {
+        .cf-doc1-renewal-form {
             font-family: Calibri, Arial, sans-serif;
-            font-size: 11pt;
-            line-height: 1.45;
-            margin-top: -0.06in;
+            font-size: 12pt;
+            line-height: 13pt;
+        }
+        .cf-doc1-renewal-type {
+            font-size: 12pt;
+            line-height: 13pt;
+        }
+        .cf-doc1-renewal-heading {
+            margin-top: 26pt;
+            font-size: 14pt;
+            font-weight: 700;
+            line-height: 16pt;
+            text-align: center;
+        }
+        .cf-doc1-renewal-permit {
+            margin-top: 2pt;
+            font-size: 14pt;
+            line-height: 16pt;
+            text-align: center;
+        }
+        .cf-doc1-renewal-lines {
+            font-size: 14pt;
+            line-height: 16pt;
+            text-align: center;
+            margin-bottom: 8pt;
+        }
+        .cf-doc1-renewal-lines div {
+            margin-top: 10pt;
+            font-weight: 700;
+        }
+        .cf-doc1-renewal-lines small {
+            display: block;
+            font-size: 12pt;
+            line-height: 13pt;
+        }
+        .cf-doc1-renewal-lines small:last-child {
+            font-size: 10pt;
+        }
+        .cf-doc1-renewal-lines small:nth-of-type(2) + div,
+        .cf-doc1-renewal-lines small:nth-of-type(3) + div {
+            margin-top: 15pt;
+        }
+        .cf-doc1-renewal-form .cf-body-paragraph {
+            margin-bottom: 11pt;
+            font-size: 12pt;
+            line-height: 13pt;
+            text-align: left;
+            text-indent: 0;
+        }
+        .cf-template-doc1-business-renewal-endorsement .cf-signature-layer .cf-validity-block {
+            margin-top: 138pt;
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 9pt;
+            font-weight: 400;
+            line-height: 12pt;
+        }
+        .cf-business-endorsement {
+            font-family: var(--cf-body-font);
+            font-size: var(--cf-body-size);
+            line-height: var(--cf-line-height);
+            margin-top: 0;
         }
         .cf-business-endorsement p {
             margin: 0 0 0.11in;
@@ -3179,63 +3782,74 @@ function baseStyles() {
             text-indent: 0.5in;
         }
         .cf-business-heading-row {
-            display: grid;
-            grid-template-columns: 1fr 2fr 1fr;
-            align-items: start;
-            margin: 0 0 0.24in;
+            display: block;
+            margin: 0 0 24pt;
         }
         .cf-business-document-type {
-            grid-column: 1;
-            font-size: 11pt;
+            font-size: var(--cf-body-size);
             font-weight: 400;
-            padding-left: 0.04in;
+            line-height: var(--cf-line-height);
+            padding-left: 0;
             text-align: left;
         }
         .cf-business-heading {
-            grid-column: 2;
+            margin-top: 2pt;
             text-align: center;
         }
         .cf-business-heading > div {
             display: inline-block;
-            border-bottom: 1px solid #000;
             font-family: "Times New Roman", Times, serif;
             font-size: 16pt;
-            line-height: 1.05;
-            margin-bottom: 0.02in;
+            font-weight: 700;
+            line-height: 18pt;
+            margin-bottom: 1pt;
         }
         .cf-business-heading small {
             display: block;
-            font-size: 11pt;
-            line-height: 1.1;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 12pt;
+            font-weight: 400;
+            line-height: 14pt;
         }
         .cf-business-endorse {
-            margin-bottom: 0.14in;
+            margin-bottom: 8pt;
             text-transform: uppercase;
         }
         .cf-business-lines {
-            margin-bottom: 0.20in;
-            font-size: 11pt;
-            line-height: 1.13;
+            margin-bottom: 18pt;
+            font-size: 12pt;
+            line-height: 13pt;
+            text-align: left;
         }
         .cf-business-lines div {
-            margin-top: 0.07in;
+            margin-top: 6pt;
+            font-weight: 700;
         }
         .cf-business-lines small {
-            font-size: 9pt;
+            font-size: 10pt;
             font-style: normal;
+            text-align: left;
+        }
+        .cf-business-lines small:first-of-type {
+            margin-top: 10pt;
+        }
+        .cf-business-lines div:last-of-type {
+            margin-top: 0;
         }
         .cf-business-checks {
-            line-height: 1.45;
+            line-height: 13pt;
         }
         .cf-business-checks p {
-            margin-bottom: 0.04in;
+            line-height: 13pt;
+            margin-bottom: 0;
         }
         .cf-business-check-row {
             display: grid;
             grid-template-columns: 0.18in 1fr;
             gap: 0.04in;
-            margin: 0.03in 0 0.10in;
+            margin: 2pt 0 14pt;
             text-align: left;
+            line-height: 13pt;
         }
         .cf-business-box {
             font-family: "Times New Roman", Times, serif;
@@ -3244,6 +3858,7 @@ function baseStyles() {
         }
         .cf-business-center {
             margin-top: 0.10in;
+            margin-bottom: 8pt !important;
             text-align: center !important;
             text-indent: 0;
         }
@@ -3269,26 +3884,77 @@ function baseStyles() {
             text-align: left;
         }
         section:has(.cf-business-endorsement) .cf-validity-block {
-            margin-top: -0.02in;
+            margin-top: 75pt;
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 8pt;
+            font-weight: 400;
+            line-height: 11pt;
         }
         .cf-letter-date {
-            font-size: 12pt;
-            margin: 0 0 0.18in;
+            font-size: var(--cf-body-size);
+            line-height: var(--cf-line-height);
+            margin: 0;
+        }
+        .cf-letter-recipient-row,
+        .cf-letter-subject-row {
+            display: grid;
+            grid-template-columns: 38pt minmax(0, 1fr);
+            column-gap: 0;
+            align-items: start;
+        }
+        .cf-letter-recipient-row {
+            margin-top: 56pt;
+        }
+        .cf-letter-subject-row {
+            grid-template-columns: 62pt minmax(0, 1fr);
+            margin-top: 36pt;
+        }
+        .cf-letter-label {
+            font-size: var(--cf-body-size);
+            line-height: var(--cf-line-height);
+            text-align: left;
         }
         .cf-letter-to {
-            font-size: 12pt;
+            font-size: var(--cf-body-size);
+            font-weight: 400;
+            line-height: var(--cf-line-height);
+            margin: 0;
+        }
+        .cf-letter-to .recipient-name {
             font-weight: 700;
-            line-height: 1.25;
-            margin-bottom: 0.12in;
         }
         .cf-letter-subject {
-            font-size: 12pt;
+            max-width: 225pt;
+            font-size: var(--cf-body-size);
             font-weight: 700;
-            margin-bottom: 0.08in;
+            line-height: var(--cf-line-height);
+            text-align: center;
+            text-transform: uppercase;
+            margin: 0;
         }
         .cf-letter-rule {
             border-top: 1px solid #000;
-            margin: 0.03in 0 0.18in;
+            margin: 5pt 0 43pt;
+        }
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body .salutation {
+            margin-bottom: 8pt;
+        }
+        .cf-template-doc3-mlbb-tournament-permit .cf-cert-body > p.salutation:first-child {
+            margin-bottom: 32pt;
+        }
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body > p {
+            text-align: left;
+        }
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body > p.cf-body-paragraph {
+            text-indent: 36pt;
+        }
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body > p.salutation,
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body > p:last-child {
+            text-indent: 0;
+        }
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body > p:nth-of-type(3),
+        .cf-template-doc1-endorsement-toda-courtesy-call .cf-cert-body > p:nth-of-type(4) {
+            margin-bottom: 32pt;
         }
         .cf-cert-table {
             border-collapse: collapse;
@@ -3384,79 +4050,135 @@ function baseStyles() {
         }
         .cf-signature-row {
             display: flex;
-            margin-top: 0.46in;
+            margin: 0;
             width: 100%;
         }
         .cf-signature-row.captain {
-            justify-content: flex-end;
+            justify-content: var(--cf-signature-align);
         }
         .cf-signature-row.two {
-            justify-content: space-between;
-            gap: 0.42in;
+            justify-content: flex-start;
+            gap: 42pt;
         }
         .cf-signature-row.compact {
-            margin-top: 0.16in;
+            margin-top: 10pt;
         }
         .cf-signature-row.captain-center {
-            justify-content: center;
-            margin-top: 0.28in;
+            justify-content: flex-start;
+            margin-top: 20pt;
         }
         .cf-signature-row.witness-captain {
-            margin-top: 0.36in;
+            margin-top: 0;
         }
         .cf-signatory {
-            width: 2.45in;
-            text-align: center;
-            min-height: 0.76in;
+            width: 180pt;
+            text-align: left;
+            min-height: 34pt;
+            position: relative;
         }
         .cf-signature-img {
+            position: absolute;
+            left: 0;
+            bottom: 24pt;
             display: block;
-            max-width: 1.75in;
-            max-height: 0.42in;
+            max-width: 126pt;
+            max-height: 30pt;
             object-fit: contain;
-            margin: 0 auto -0.05in;
+            margin: 0;
         }
         .cf-signature-spacer {
-            height: 0.38in;
+            height: 0;
         }
         .cf-signatory-name {
-            font-size: 12pt;
+            width: max-content;
+            max-width: 180pt;
+            font-family: var(--cf-body-font);
+            font-size: var(--cf-body-size);
             font-weight: 700;
-            line-height: 1.1;
+            line-height: var(--cf-line-height);
+            text-decoration: underline;
         }
         .cf-signatory-title {
-            font-size: 11pt;
-            line-height: 1.15;
+            width: 126pt;
+            font-family: var(--cf-body-font);
+            font-size: var(--cf-body-size);
+            line-height: var(--cf-line-height);
+            text-align: center;
+        }
+        .cf-signature-layer {
+            position: absolute;
+            top: var(--cf-signature-offset);
+            left: 0;
+            right: 0;
+        }
+        .cf-signature-layer .cf-signature-row {
+            margin-top: 0;
+        }
+        section:has(.cf-business-endorsement) .cf-signature-layer .cf-signature-row.captain {
+            margin-top: 0;
+        }
+        .cf-signature-layer.align-center .cf-signature-row.captain,
+        .cf-signature-layer.align-center .cf-signature-row.captain-center,
+        .cf-signature-layer.align-center .cf-signature-row.witness-captain {
+            justify-content: center;
+        }
+        .cf-signature-layer.align-center .cf-signatory {
+            text-align: center;
+        }
+        .cf-signature-layer.align-center .cf-signatory-name {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cf-signature-layer.align-center .cf-signatory-title {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .cf-signature-layer.align-right .cf-witness-block {
+            align-items: flex-end;
         }
         .cf-witness-label {
-            font-size: 11pt;
-            margin-top: 0.28in;
+            font-size: var(--cf-body-size);
+            margin-top: 18pt;
         }
         .cf-witness-block {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
-            margin-top: 0.20in;
+            align-items: flex-start;
+            margin-top: 14pt;
         }
         .cf-witness-block .cf-witness-label {
-            width: 2.45in;
+            width: 180pt;
             margin-top: 0;
-            margin-bottom: 0.06in;
+            margin-bottom: 12pt;
             text-align: left;
-            font-size: 9pt;
+            font-size: calc(var(--cf-body-size) - 2pt);
         }
         .cf-witness-stack {
-            width: 2.45in;
+            width: 180pt;
             display: flex;
             flex-direction: column;
-            gap: 0.18in;
+            gap: 28pt;
         }
         .cf-witness-stack .cf-signatory {
             width: 100%;
-            min-height: 0.46in;
+            min-height: 32pt;
         }
         .cf-witness-stack .cf-signature-spacer {
-            height: 0.14in;
+            height: 0;
+        }
+        .cf-template-doc1-no-marriage-death-claim .cf-signature-row.witness-captain .cf-signatory-name {
+            font-family: "Times New Roman", Times, serif;
+            font-size: 11pt;
+        }
+        .cf-template-doc1-no-marriage-death-claim .cf-signature-row.witness-captain .cf-signatory-title,
+        .cf-template-doc1-no-marriage-death-claim .cf-witness-label,
+        .cf-template-doc1-no-marriage-death-claim .cf-witness-stack .cf-signatory-title {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 10pt;
+        }
+        .cf-template-doc1-no-marriage-death-claim .cf-witness-stack .cf-signatory-name {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 12pt;
         }
         @media screen {
             body {
@@ -3499,6 +4221,17 @@ export function buildCertificatePrintHtml({
         selectedCertType,
     );
     const template = TEMPLATES[resolvedTemplateKey];
+    const sourceLayout =
+        SOURCE_TEMPLATE_LAYOUTS[resolvedTemplateKey] ||
+        sourceTemplateLayout(
+            1,
+            204,
+            520,
+            "Times New Roman",
+            12,
+            "Times New Roman",
+            18,
+        );
     const title =
         template.title || selectedCertType || "BARANGAY CERTIFICATION";
     const titleHtml = template.hideTitle
@@ -3509,6 +4242,14 @@ export function buildCertificatePrintHtml({
         extraFields: data?.extraFields || data?.extra_fields || {},
     };
     const body = template.render(renderData);
+    const hasRespectfulClosing = /Respectfully\s*,/i.test(
+        body.replace(/<[^>]*>/g, " "),
+    );
+    const renderLayout = {
+        ...sourceLayout,
+        titleAlign: "center",
+        signatureAlign: hasRespectfulClosing ? "left" : "right",
+    };
     const signatures = renderSignatures(
         mergedSettings,
         template.signatures || "captain-right",
@@ -3525,23 +4266,41 @@ export function buildCertificatePrintHtml({
     const printScript = autoPrint
         ? `<script>window.addEventListener("load", () => setTimeout(() => window.print(), 250));</script>`
         : "";
+    const pageClass = [
+        "cf-cert-page",
+        `cf-doc-${sourceLayout.doc}`,
+        `cf-template-${resolvedTemplateKey}`,
+        sourceLayout.templateType
+            ? `cf-template-type-${sourceLayout.templateType}`
+            : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
+    const signatureClass = [
+        "cf-signature-layer",
+        `align-${renderLayout.signatureAlign}`,
+    ]
+        .filter(Boolean)
+        .join(" ");
 
     return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(selectedCertType || title)}</title>
-<style>${baseStyles()}</style>
+<style>${baseStyles(renderLayout)}</style>
 </head>
 <body>
-    <main class="cf-cert-page">
+    <main class="${pageClass}" style="${sourceLayoutStyle(renderLayout)}">
         ${buildWatermark(mergedSettings)}
-        ${buildHeader(mergedSettings, resolvedTemplateKey)}
+        ${buildHeader(mergedSettings, resolvedTemplateKey, renderLayout)}
         <section>
             ${titleHtml}
             <div class="cf-cert-body">${body}</div>
-            ${signatures}
-            ${postSignatures}
+            <div class="${signatureClass}">
+                ${signatures}
+                ${postSignatures}
+            </div>
         </section>
     </main>
     ${printScript}

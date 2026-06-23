@@ -5,7 +5,8 @@
 // =============================================================
 
 import { useEffect, useState } from "react";
-import { Bell, Check, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertCircle, Bell, Check, Clock } from "lucide-react";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
@@ -126,6 +127,9 @@ function formatTime(dateStr) {
 
 function NotificationIcon({ type }) {
     const normalized = String(type || "").toLowerCase();
+    if (normalized.includes("correction")) {
+        return <AlertCircle size={18} color="#b86800" />;
+    }
     if (normalized.includes("ready") || normalized.includes("released")) {
         return <Check size={18} color="#1a7a4a" />;
     }
@@ -136,6 +140,7 @@ function NotificationIcon({ type }) {
 }
 
 export default function ResidentNotifications({ resident, onLogout }) {
+    const navigate = useNavigate();
     const [width, setWidth] = useState(window.innerWidth);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -243,6 +248,22 @@ export default function ResidentNotifications({ resident, onLogout }) {
                                 <div
                                     key={notif.notification_id}
                                     className={`rn-item${notif.is_read ? "" : " unread"}`}
+                                    onClick={() => {
+                                        markRead(notif.notification_id);
+                                        if (notif.request_id) {
+                                            navigate(
+                                                notif.type ===
+                                                    "request_needs_correction"
+                                                    ? `/resident/submit-request?edit=${notif.request_id}`
+                                                    : "/resident/my-requests",
+                                            );
+                                        }
+                                    }}
+                                    style={{
+                                        cursor: notif.request_id
+                                            ? "pointer"
+                                            : "default",
+                                    }}
                                 >
                                     <div className="rn-dot" />
                                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -262,11 +283,12 @@ export default function ResidentNotifications({ resident, onLogout }) {
                                                 <button
                                                     type="button"
                                                     className="rn-action"
-                                                    onClick={() =>
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
                                                         markRead(
                                                             notif.notification_id,
-                                                        )
-                                                    }
+                                                        );
+                                                    }}
                                                 >
                                                     Mark as read
                                                 </button>

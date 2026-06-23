@@ -60,6 +60,7 @@ async function residentAuth(req, res, next) {
             id: resident.resident_id,
             email: resident.email,
             full_name: resident.full_name,
+            supabase_uid: user.id,
         };
         next();
     } catch (error) {

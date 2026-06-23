@@ -172,6 +172,7 @@ const STATUS_TABS = [
     { key: "approved", label: "Approved",          activeClass: "active-blue",  color: "#1a4a8a" },
     { key: "ready",    label: "Ready for Pickup",  activeClass: "active-green", color: "#1a7a4a" },
     { key: "released", label: "Released",          activeClass: "active-grey",  color: "#666" },
+    { key: "needs_correction", label: "Needs Correction", activeClass: "active-amber", color: "#b86800" },
     { key: "rejected", label: "Rejected",          activeClass: "active-red",   color: "#b02020" },
 ];
 
@@ -180,6 +181,7 @@ const BADGE_CFG = {
     approved: { bg: "#e8eef8", color: "#1a4a8a", dot: "#1a4a8a", label: "Approved" },
     ready:    { bg: "#e8f5ee", color: "#1a7a4a", dot: "#1a7a4a", label: "Ready for Pickup" },
     released: { bg: "#f0f0f0", color: "#666",    dot: "#999",    label: "Released" },
+    needs_correction: { bg: "#fff7e6", color: "#9a5b00", dot: "#b86800", label: "Needs Correction" },
     rejected: { bg: "#fdecea", color: "#b02020", dot: "#b02020", label: "Rejected" },
 };
 
@@ -208,6 +210,18 @@ function timelineTime(value, fallback = "") {
         day: "numeric",
         year: "numeric",
         hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function correctionEventTime(value) {
+    const date = new Date(value || 0);
+    if (Number.isNaN(date.getTime())) return "Time unavailable";
+    return date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
         minute: "2-digit",
     });
 }
@@ -303,6 +317,14 @@ function buildTimeline(request, status) {
         return [
             { dot: "gold", text: "Request submitted by resident", time: requestedAt },
             { dot: "red", text: "Rejected by staff", time: processedAt || "Rejected" },
+        ];
+    }
+
+    if (status === "needs_correction") {
+        return [
+            { dot: "gold", text: "Request submitted by resident", time: requestedAt },
+            { dot: "amber", text: "Correction requested by staff", time: processedAt || "Waiting" },
+            { dot: "grey", text: "Awaiting resident resubmission", time: "Resident action" },
         ];
     }
 
@@ -419,7 +441,7 @@ function RequestDrawer({
 
     // ── Reject — close after ──
     const handleRejectConfirm = async () => {
-        if (!rejectReason.trim()) { setActionError("Please provide a rejection reason."); return; }
+        if (!rejectReason.trim()) { setActionError("Please describe what the resident must correct."); return; }
         if (actionLoading) return;
         setActionLoading(true);
         setActionError("");
@@ -552,7 +574,7 @@ function RequestDrawer({
                     style={{ flex: 2, background: "#b02020", color: "#fff" }}
                     onClick={handleRejectConfirm}
                     disabled={actionLoading}>
-                    <X size={13} /> {actionLoading ? "Saving…" : "Confirm Rejection"}
+                    <X size={13} /> {actionLoading ? "Saving…" : "Send Correction Request"}
                 </button>
             </>
         );
@@ -564,7 +586,7 @@ function RequestDrawer({
                     type="button"
                     style={{ background: "#fdecea", color: "#b02020", border: "1px solid #f5c0c0" }}
                     onClick={() => setStep("reject")}>
-                    <X size={11} /> Reject
+                    <X size={11} /> Request Correction
                 </button>
                 <button className="mr-drawer-btn"
                     style={{ flex: 2, background: "#1a7a4a", color: "#fff" }}
@@ -581,7 +603,7 @@ function RequestDrawer({
                 <button className="mr-drawer-btn"
                     style={{ background: "#fdecea", color: "#b02020", border: "1px solid #f5c0c0" }}
                     onClick={() => setStep("reject")}>
-                    <X size={11} /> Reject
+                    <X size={11} /> Request Correction
                 </button>
                 <button className="mr-drawer-btn"
                     type="button"
@@ -635,6 +657,12 @@ function RequestDrawer({
         if (status === "rejected") return (
             <div style={{ fontSize: 11.5, color: "#9090aa", textAlign: "center", width: "100%", padding: "4px 0" }}>
                 This request has been rejected. No further action available.
+            </div>
+        );
+
+        if (status === "needs_correction") return (
+            <div style={{ fontSize: 11.5, color: "#9a5b00", textAlign: "center", width: "100%", padding: "4px 0" }}>
+                Waiting for the resident to edit and resubmit this request.
             </div>
         );
 
@@ -905,11 +933,76 @@ function RequestDrawer({
                     )}
 
                     {/* ── Rejection reason (view) ── */}
-                    {status === "rejected" && (
+                    {(status === "rejected" || status === "needs_correction") && (
                         <div className="mr-drawer-section">
-                            <SectionTitle>Rejection Reason</SectionTitle>
+                            <SectionTitle>{status === "needs_correction" ? "Correction Required" : "Rejection Reason"}</SectionTitle>
                             <div style={{ background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 4, padding: "10px 12px", fontSize: 12, color: "#4a4a6a", lineHeight: 1.6 }}>
                                 {request.rejection_reason || "No rejection reason was provided."}
+                            </div>
+                        </div>
+                    )}
+
+                    {request.correctionHistory?.length > 0 && (
+                        <div className="mr-drawer-section">
+                            <SectionTitle>
+                                Correction History ({request.revisionCount})
+                            </SectionTitle>
+                            <div style={{ display: "grid", gap: 8 }}>
+                                {request.correctionHistory.map((event) => {
+                                    const resubmitted =
+                                        event.event_type ===
+                                        "resident_resubmitted";
+                                    return (
+                                        <div
+                                            key={event.correction_history_id}
+                                            style={{
+                                                border: "1px solid #e4dfd4",
+                                                borderLeft: `3px solid ${resubmitted ? "#1a7a4a" : "#b86800"}`,
+                                                borderRadius: 5,
+                                                background: "#fff",
+                                                padding: "9px 11px",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: 11.5,
+                                                    fontWeight: 700,
+                                                    color: resubmitted
+                                                        ? "#1a7a4a"
+                                                        : "#9a5b00",
+                                                }}
+                                            >
+                                                {resubmitted
+                                                    ? `Revision ${event.revision_number} resubmitted`
+                                                    : "Staff requested correction"}
+                                            </div>
+                                            {event.message && (
+                                                <div
+                                                    style={{
+                                                        fontSize: 11.5,
+                                                        color: "#4a4a6a",
+                                                        lineHeight: 1.5,
+                                                        marginTop: 3,
+                                                    }}
+                                                >
+                                                    {event.message}
+                                                </div>
+                                            )}
+                                            <div
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "#9090aa",
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                {event.actor_name || "System"} ·{" "}
+                                                {correctionEventTime(
+                                                    event.created_at,
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
@@ -917,10 +1010,10 @@ function RequestDrawer({
                     {/* ── Reject input ── */}
                     {step === "reject" && (
                         <div className="mr-drawer-section">
-                            <SectionTitle>Reason for Rejection *</SectionTitle>
+                            <SectionTitle>What must the resident correct? *</SectionTitle>
                             <textarea
                                 className="mr-reject-textarea"
-                                placeholder="Enter reason for rejection — this will be visible to the resident…"
+                                placeholder="Describe what is missing or incorrect. This will be visible to the resident..."
                                 value={rejectReason}
                                 onChange={(e) => { setRejectReason(e.target.value); if (actionError) setActionError(""); }}
                             />
@@ -1080,6 +1173,10 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             attachments: Array.isArray(row.attachments) && row.attachments.length > 0
                 ? row.attachments
                 : fallbackAttachments,
+            correctionHistory: Array.isArray(row.correction_history)
+                ? row.correction_history
+                : [],
+            revisionCount: Number(row.revision_count || 0),
             rejection_reason: row.rejection_reason || "",
             requestedAtIso:   row.requested_at || null,
             processedAtIso:   row.processed_at || null,
@@ -1402,7 +1499,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                                                                 {req.status === "ready" && (
                                                                     <span className="mr-btn mr-btn-scan"><QrCode size={11} /> Scan QR</span>
                                                                 )}
-                                                                {(req.status === "released" || req.status === "rejected") && (
+                                                                {(req.status === "released" || req.status === "rejected" || req.status === "needs_correction") && (
                                                                     <span className="mr-btn mr-btn-view"><Eye size={11} /> View</span>
                                                                 )}
                                                             </div>

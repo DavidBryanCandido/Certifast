@@ -42,13 +42,13 @@ SET template_key = 'doc1-barangay-clearance',
     has_fee = true,
     description = 'Doc #1 barangay clearance with no derogatory record wording.',
     is_active = true,
-    display_order = 10,
+    display_order = 110,
     required_fields = '[]'::jsonb
 WHERE name = 'Barangay Clearance'
   AND (template_key IS NULL OR template_key = 'doc1-barangay-clearance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Barangay Clearance', 'doc1-barangay-clearance', 'No derogatory record', 'doc1', true, 'Doc #1 barangay clearance with no derogatory record wording.', true, 10, '[]'::jsonb
+SELECT 'Barangay Clearance', 'doc1-barangay-clearance', 'No derogatory record', 'doc1', true, 'Doc #1 barangay clearance with no derogatory record wording.', true, 110, '[]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-barangay-clearance');
 
 UPDATE certificate_templates
@@ -58,13 +58,13 @@ SET template_key = 'doc1-certificate-residency',
     has_fee = false,
     description = 'Doc #1 barangay certificate for bona fide residency.',
     is_active = true,
-    display_order = 20,
+    display_order = 210,
     required_fields = '[]'::jsonb
 WHERE name = 'Certificate of Residency'
   AND (template_key IS NULL OR template_key = 'doc1-certificate-residency');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Residency', 'doc1-certificate-residency', 'Bona fide resident', 'doc1', false, 'Doc #1 barangay certificate for bona fide residency.', true, 20, '[]'::jsonb
+SELECT 'Certificate of Residency', 'doc1-certificate-residency', 'Bona fide resident', 'doc1', false, 'Doc #1 barangay certificate for bona fide residency.', true, 210, '[]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-certificate-residency');
 
 UPDATE certificate_templates
@@ -74,13 +74,13 @@ SET template_key = 'doc1-indigency-medical',
     has_fee = false,
     description = 'Doc #1 indigency certification for medical, educational, or assistance purposes.',
     is_active = true,
-    display_order = 30,
+    display_order = 250,
     required_fields = '["requesterName", "requesterRelationship", "assistanceType"]'::jsonb
 WHERE name = 'Certificate of Indigency'
   AND (template_key IS NULL OR template_key = 'doc1-indigency-medical');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Indigency', 'doc1-indigency-medical', 'Assistance purposes', 'doc1', false, 'Doc #1 indigency certification for medical, educational, or assistance purposes.', true, 30, '["requesterName", "requesterRelationship", "assistanceType"]'::jsonb
+SELECT 'Certificate of Indigency', 'doc1-indigency-medical', 'Assistance purposes', 'doc1', false, 'Doc #1 indigency certification for medical, educational, or assistance purposes.', true, 250, '["requesterName", "requesterRelationship", "assistanceType"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-indigency-medical');
 
 UPDATE certificate_templates
@@ -90,13 +90,13 @@ SET template_key = 'doc1-work-permit-certification',
     has_fee = true,
     description = 'Doc #1 certification for work or business permit clearance.',
     is_active = true,
-    display_order = 40,
+    display_order = 70,
     required_fields = '["businessName", "businessAddress", "businessType", "businessArea"]'::jsonb
 WHERE name = 'Business Permit'
   AND (template_key IS NULL OR template_key = 'doc1-work-permit-certification');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Business Permit', 'doc1-work-permit-certification', 'Work/business permit', 'doc1', true, 'Doc #1 certification for work or business permit clearance.', true, 40, '["businessName", "businessAddress", "businessType", "businessArea"]'::jsonb
+SELECT 'Business Permit', 'doc1-work-permit-certification', 'Work/business permit', 'doc1', true, 'Doc #1 certification for work or business permit clearance.', true, 70, '["businessName", "businessAddress", "businessType", "businessArea"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-work-permit-certification');
 
 UPDATE certificate_templates
@@ -106,13 +106,13 @@ SET template_key = 'doc1-good-moral',
     has_fee = false,
     description = 'Doc #1 certification for good moral character and no pending case.',
     is_active = true,
-    display_order = 50,
+    display_order = 180,
     required_fields = '["requestingInstitution"]'::jsonb
 WHERE name = 'Good Moral Certificate'
   AND (template_key IS NULL OR template_key = 'doc1-good-moral');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Good Moral Certificate', 'doc1-good-moral', 'Good moral and no pending case', 'doc1', false, 'Doc #1 certification for good moral character and no pending case.', true, 50, '["requestingInstitution"]'::jsonb
+SELECT 'Good Moral Certificate', 'doc1-good-moral', 'Good moral and no pending case', 'doc1', false, 'Doc #1 certification for good moral character and no pending case.', true, 180, '["requestingInstitution"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-good-moral');
 
 UPDATE certificate_templates
@@ -122,13 +122,13 @@ SET template_key = 'doc1-live-birth-endorsement',
     has_fee = false,
     description = 'Doc #1 endorsement for late registration of a minor child.',
     is_active = true,
-    display_order = 60,
+    display_order = 240,
     required_fields = '["partnerName", "childName", "childDOB", "childBirthPlace", "fatherName", "motherName"]'::jsonb
 WHERE name = 'Certificate of Live Birth (Endorsement)'
   AND (template_key IS NULL OR template_key = 'doc1-live-birth-endorsement');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Live Birth (Endorsement)', 'doc1-live-birth-endorsement', 'Late birth registration', 'doc1', false, 'Doc #1 endorsement for late registration of a minor child.', true, 60, '["partnerName", "childName", "childDOB", "childBirthPlace", "fatherName", "motherName"]'::jsonb
+SELECT 'Certificate of Live Birth (Endorsement)', 'doc1-live-birth-endorsement', 'Late birth registration', 'doc1', false, 'Doc #1 endorsement for late registration of a minor child.', true, 240, '["partnerName", "childName", "childDOB", "childBirthPlace", "fatherName", "motherName"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-live-birth-endorsement');
 
 UPDATE certificate_templates
@@ -138,13 +138,13 @@ SET template_key = 'doc1-cohabitation',
     has_fee = false,
     description = 'Doc #1 common-law partner certification.',
     is_active = true,
-    display_order = 70,
+    display_order = 230,
     required_fields = '["partnerName"]'::jsonb
 WHERE name = 'Certificate of Cohabitation'
   AND (template_key IS NULL OR template_key = 'doc1-cohabitation');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Cohabitation', 'doc1-cohabitation', 'Common-law spouse', 'doc1', false, 'Doc #1 common-law partner certification.', true, 70, '["partnerName"]'::jsonb
+SELECT 'Certificate of Cohabitation', 'doc1-cohabitation', 'Common-law spouse', 'doc1', false, 'Doc #1 common-law partner certification.', true, 230, '["partnerName"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-cohabitation');
 
 UPDATE certificate_templates
@@ -154,13 +154,13 @@ SET template_key = 'doc1-no-business',
     has_fee = false,
     description = 'Doc #1 certification that a business is no longer existing in the barangay.',
     is_active = true,
-    display_order = 80,
+    display_order = 60,
     required_fields = '["businessName", "businessAddress", "requesterName", "requestingInstitution"]'::jsonb
 WHERE name = 'Certificate of No Business'
   AND (template_key IS NULL OR template_key = 'doc1-no-business');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of No Business', 'doc1-no-business', 'No longer existing business', 'doc1', false, 'Doc #1 certification that a business is no longer existing in the barangay.', true, 80, '["businessName", "businessAddress", "requesterName", "requestingInstitution"]'::jsonb
+SELECT 'Certificate of No Business', 'doc1-no-business', 'No longer existing business', 'doc1', false, 'Doc #1 certification that a business is no longer existing in the barangay.', true, 60, '["businessName", "businessAddress", "requesterName", "requestingInstitution"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-no-business');
 
 UPDATE certificate_templates
@@ -170,13 +170,13 @@ SET template_key = 'doc1-guardianship',
     has_fee = false,
     description = 'Doc #1 legal guardian certification.',
     is_active = true,
-    display_order = 90,
+    display_order = 100,
     required_fields = '["wardName", "relationship"]'::jsonb
 WHERE name = 'Certificate of Guardianship'
   AND (template_key IS NULL OR template_key = 'doc1-guardianship');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Guardianship', 'doc1-guardianship', 'Legal guardian', 'doc1', false, 'Doc #1 legal guardian certification.', true, 90, '["wardName", "relationship"]'::jsonb
+SELECT 'Certificate of Guardianship', 'doc1-guardianship', 'Legal guardian', 'doc1', false, 'Doc #1 legal guardian certification.', true, 100, '["wardName", "relationship"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-guardianship');
 
 UPDATE certificate_templates
@@ -186,13 +186,13 @@ SET template_key = 'doc1-business-renewal-endorsement',
     has_fee = true,
     description = 'Doc #1 renewal endorsement for corresponding Mayor''s Permit.',
     is_active = true,
-    display_order = 100,
-    required_fields = '["businessPermitNo", "businessName", "businessAddress", "operatorName", "businessOwnerAddress"]'::jsonb
+    display_order = 270,
+    required_fields = '["businessPermitNo", "businessName", "businessAddress", "operatorName", "businessOwnerAddress", "dateIssued", "validUntil"]'::jsonb
 WHERE name = 'Barangay Business Clearance (Renewal)'
   AND (template_key IS NULL OR template_key = 'doc1-business-renewal-endorsement');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Barangay Business Clearance (Renewal)', 'doc1-business-renewal-endorsement', 'Renewal endorsement', 'doc1', true, 'Doc #1 renewal endorsement for corresponding Mayor''s Permit.', true, 100, '["businessPermitNo", "businessName", "businessAddress", "operatorName", "businessOwnerAddress"]'::jsonb
+SELECT 'Barangay Business Clearance (Renewal)', 'doc1-business-renewal-endorsement', 'Renewal endorsement', 'doc1', true, 'Doc #1 renewal endorsement for corresponding Mayor''s Permit.', true, 270, '["businessPermitNo", "businessName", "businessAddress", "operatorName", "businessOwnerAddress", "dateIssued", "validUntil"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-business-renewal-endorsement');
 
 UPDATE certificate_templates
@@ -202,13 +202,13 @@ SET template_key = 'doc1-property-ownership',
     has_fee = false,
     description = 'Doc #1 property ownership and lot details certification.',
     is_active = true,
-    display_order = 110,
+    display_order = 260,
     required_fields = '["propertyLocation", "taxDeclarationNo", "propertyArea"]'::jsonb
 WHERE name = 'Certificate of Ownership'
   AND (template_key IS NULL OR template_key = 'doc1-property-ownership');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Ownership', 'doc1-property-ownership', 'Lot ownership', 'doc1', false, 'Doc #1 property ownership and lot details certification.', true, 110, '["propertyLocation", "taxDeclarationNo", "propertyArea"]'::jsonb
+SELECT 'Certificate of Ownership', 'doc1-property-ownership', 'Lot ownership', 'doc1', false, 'Doc #1 property ownership and lot details certification.', true, 260, '["propertyLocation", "taxDeclarationNo", "propertyArea"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-property-ownership');
 
 UPDATE certificate_templates
@@ -218,82 +218,82 @@ SET template_key = 'doc1-certificate-appearance',
     has_fee = false,
     description = 'Doc #1 certificate of appearance.',
     is_active = true,
-    display_order = 120,
+    display_order = 280,
     required_fields = '["requestingInstitution", "appearanceDate"]'::jsonb
 WHERE name = 'Certificate of Appearance'
   AND (template_key IS NULL OR template_key = 'doc1-certificate-appearance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certificate of Appearance', 'doc1-certificate-appearance', 'Appearance at barangay', 'doc1', false, 'Doc #1 certificate of appearance.', true, 120, '["requestingInstitution", "appearanceDate"]'::jsonb
+SELECT 'Certificate of Appearance', 'doc1-certificate-appearance', 'Appearance at barangay', 'doc1', false, 'Doc #1 certificate of appearance.', true, 280, '["requestingInstitution", "appearanceDate"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-certificate-appearance');
 
 -- Additional distinct Doc #1 variants found in BGRY.CERT# 1.docx.
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Endorsement: TODA Courtesy Call', 'doc1-endorsement-toda-courtesy-call', 'TODA courtesy call endorsement', 'doc1', false, 'Doc #1 endorsement letter for elected TODA officers.', true, 130, '["recipientName", "recipientTitle", "recipientOffice", "subject", "organizationName", "presidentName", "vicePresidentName", "appointmentDate", "appointmentTime"]'::jsonb
+SELECT 'Endorsement: TODA Courtesy Call', 'doc1-endorsement-toda-courtesy-call', 'TODA courtesy call endorsement', 'doc1', false, 'Doc #1 endorsement letter for elected TODA officers.', true, 10, '["recipientName", "recipientTitle", "recipientOffice", "subject", "organizationName", "presidentName", "vicePresidentName", "appointmentDate", "appointmentTime"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-endorsement-toda-courtesy-call');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Acceptance Letter', 'doc1-acceptance-letter-quarantine', 'Return-to-barangay quarantine', 'doc1', false, 'Doc #1 acceptance letter for return-to-barangay quarantine.', true, 140, '["originAddress", "destinationAddress", "quarantineDays"]'::jsonb
+SELECT 'Acceptance Letter', 'doc1-acceptance-letter-quarantine', 'Return-to-barangay quarantine', 'doc1', false, 'Doc #1 acceptance letter for return-to-barangay quarantine.', true, 20, '["originAddress", "destinationAddress", "quarantineDays"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-acceptance-letter-quarantine');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Household Certification', 'doc1-household-angkas-pass', 'Angkas pass household', 'doc1', false, 'Doc #1 household certification for Angkas pass requirements.', true, 150, '["companionName", "companionRole", "companionTwoName", "companionTwoRole"]'::jsonb
+SELECT 'Household Certification', 'doc1-household-angkas-pass', 'Angkas pass household', 'doc1', false, 'Doc #1 household certification for Angkas pass requirements.', true, 30, '["companionName", "companionRole", "companionTwoName", "companionTwoRole"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-household-angkas-pass');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Family Home Certification', 'doc1-family-home-property', 'Family home property declaration', 'doc1', false, 'Doc #1 property certification for family home declaration.', true, 160, '["propertyLocation", "propertyOwner", "titleNumber", "taxDeclarationNo", "taxDeclarationBuildingNo", "familyHomeYears", "deceasedName", "deceasedDate"]'::jsonb
+SELECT 'Family Home Certification', 'doc1-family-home-property', 'Family home property declaration', 'doc1', false, 'Doc #1 property certification for family home declaration.', true, 40, '["propertyLocation", "propertyOwner", "titleNumber", "taxDeclarationNo", "taxDeclarationBuildingNo", "familyHomeYears", "deceasedName", "deceasedDate"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-family-home-property');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'First Time Jobseeker Certificate', 'doc1-first-time-jobseeker', 'RA 11261 first time jobseeker', 'doc1', false, 'Doc #1 RA 11261 first time jobseeker certification.', true, 170, '["yearStarted"]'::jsonb
+SELECT 'First Time Jobseeker Certificate', 'doc1-first-time-jobseeker', 'RA 11261 first time jobseeker', 'doc1', false, 'Doc #1 RA 11261 first time jobseeker certification.', true, 50, '["yearStarted"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-first-time-jobseeker');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Endorsement: Financial Assistance', 'doc1-endorsement-financial-assistance', 'Financial assistance endorsement', 'doc1', false, 'Doc #1 endorsement letter for financial assistance.', true, 180, '["recipientName", "recipientTitle", "recipientOffice", "subject"]'::jsonb
+SELECT 'Endorsement: Financial Assistance', 'doc1-endorsement-financial-assistance', 'Financial assistance endorsement', 'doc1', false, 'Doc #1 endorsement letter for financial assistance.', true, 80, '["recipientName", "recipientTitle", "recipientOffice", "subject"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-endorsement-financial-assistance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'DSWD Eligibility Certification', 'doc1-dswd-eligibility-certification', 'DSWD eligibility document', 'doc1', false, 'Doc #1 certification for DSWD eligibility documents.', true, 190, '["eligibilityDocument", "requesterName", "relationshipDetail"]'::jsonb
+SELECT 'DSWD Eligibility Certification', 'doc1-dswd-eligibility-certification', 'DSWD eligibility document', 'doc1', false, 'Doc #1 certification for DSWD eligibility documents.', true, 90, '["eligibilityDocument", "requesterName", "relationshipDetail"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-dswd-eligibility-certification');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certification of Lot Occupancy', 'doc1-lot-occupancy', 'Lot occupancy and boundaries', 'doc1', false, 'Doc #1 lot occupancy and boundary certification.', true, 200, '["occupantName", "propertyLocation", "boundaryNorth", "boundaryEast", "boundarySouth", "boundaryWest", "propertyArea"]'::jsonb
+SELECT 'Certification of Lot Occupancy', 'doc1-lot-occupancy', 'Lot occupancy and boundaries', 'doc1', false, 'Doc #1 lot occupancy and boundary certification.', true, 120, '["occupantName", "propertyLocation", "boundaryNorth", "boundaryEast", "boundarySouth", "boundaryWest", "propertyArea"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-lot-occupancy');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Certification of Undertaking', 'doc1-undertaking-quarantine', 'Quarantine undertaking', 'doc1', false, 'Doc #1 quarantine undertaking certification.', true, 210, '["age", "purposeDetail"]'::jsonb
+SELECT 'Certification of Undertaking', 'doc1-undertaking-quarantine', 'Quarantine undertaking', 'doc1', false, 'Doc #1 quarantine undertaking certification.', true, 130, '["age", "purposeDetail"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-undertaking-quarantine');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Detained Resident Bail Certification', 'doc1-detained-bail-certification', 'Detained resident bail', 'doc1', false, 'Doc #1 certification for detained resident applying for bail.', true, 220, '["detainedFacility", "bailRequesterName", "bailRequesterRelationship"]'::jsonb
+SELECT 'Detained Resident Bail Certification', 'doc1-detained-bail-certification', 'Detained resident bail', 'doc1', false, 'Doc #1 certification for detained resident applying for bail.', true, 140, '["detainedFacility", "bailRequesterName", "bailRequesterRelationship"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-detained-bail-certification');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Indigency: Sibling Assistance', 'doc1-indigency-sibling-assistance', 'Sibling assistance indigency', 'doc1', false, 'Doc #1 indigency certification requested for a sibling.', true, 230, '["assistanceRecipientName", "assistanceType"]'::jsonb
+SELECT 'Indigency: Sibling Assistance', 'doc1-indigency-sibling-assistance', 'Sibling assistance indigency', 'doc1', false, 'Doc #1 indigency certification requested for a sibling.', true, 150, '["assistanceRecipientName", "assistanceType"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-indigency-sibling-assistance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Endorsement: Medical Assistance', 'doc1-endorsement-medical-assistance', 'Medical assistance endorsement', 'doc1', false, 'Doc #1 endorsement letter for medical assistance.', true, 240, '["recipientName", "recipientTitle", "recipientOffice", "subject", "assistanceType"]'::jsonb
+SELECT 'Endorsement: Medical Assistance', 'doc1-endorsement-medical-assistance', 'Medical assistance endorsement', 'doc1', false, 'Doc #1 endorsement letter for medical assistance.', true, 160, '["recipientName", "recipientTitle", "recipientOffice", "subject", "assistanceType"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-endorsement-medical-assistance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Lockdown Residency Certificate', 'doc1-lockdown-residency-certification', 'COVID lockdown residency', 'doc1', false, 'Doc #1 quarantine lockdown residency certification.', true, 250, '["lockdownAddress", "lockdownStartDate", "programName"]'::jsonb
+SELECT 'Lockdown Residency Certificate', 'doc1-lockdown-residency-certification', 'COVID lockdown residency', 'doc1', false, 'Doc #1 quarantine lockdown residency certification.', true, 170, '["lockdownAddress", "lockdownStartDate", "programName"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-lockdown-residency-certification');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Extended Duty Shift Notice', 'doc1-extended-duty-shift', 'Extended duty shift memo', 'doc1', false, 'Doc #1 duty shift memorandum for rescuers.', true, 260, '["recipientName", "recipientOffice", "subject", "effectivePeriod"]'::jsonb
+SELECT 'Extended Duty Shift Notice', 'doc1-extended-duty-shift', 'Extended duty shift memo', 'doc1', false, 'Doc #1 duty shift memorandum for rescuers.', true, 190, '["recipientName", "recipientOffice", "subject", "effectivePeriod"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-extended-duty-shift');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Burial Assistance Certification', 'doc1-burial-assistance', 'Burial assistance indigency', 'doc1', false, 'Doc #1 indigency certification for burial assistance.', true, 270, '["burialRelativeName", "deceasedDate", "assistanceType"]'::jsonb
+SELECT 'Burial Assistance Certification', 'doc1-burial-assistance', 'Burial assistance indigency', 'doc1', false, 'Doc #1 indigency certification for burial assistance.', true, 200, '["burialRelativeName", "deceasedDate", "assistanceType"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-burial-assistance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Indigency: Educational Assistance', 'doc1-indigency-educational-assistance', 'Educational assistance indigency', 'doc1', false, 'Doc #1 indigency certification for educational assistance.', true, 280, '["assistanceType"]'::jsonb
+SELECT 'Indigency: Educational Assistance', 'doc1-indigency-educational-assistance', 'Educational assistance indigency', 'doc1', false, 'Doc #1 indigency certification for educational assistance.', true, 290, '["assistanceType"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-indigency-educational-assistance');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)
-SELECT 'Telecom Permit Certification', 'doc1-telecom-nap-permit', 'Telecom NAP permit', 'doc1', false, 'Doc #1 certification for telecom NAP build or rectification permits.', true, 290, '["telecomCompany", "businessAddress", "permitPurpose"]'::jsonb
+SELECT 'Telecom Permit Certification', 'doc1-telecom-nap-permit', 'Telecom NAP permit', 'doc1', false, 'Doc #1 certification for telecom NAP build or rectification permits.', true, 220, '["telecomCompany", "businessAddress", "permitPurpose"]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM certificate_templates WHERE template_key = 'doc1-telecom-nap-permit');
 
 INSERT INTO certificate_templates (name, template_key, variant_label, doc_source, has_fee, description, is_active, display_order, required_fields)

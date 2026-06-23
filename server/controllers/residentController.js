@@ -80,6 +80,146 @@ function cleanProfileDetails(value) {
     );
 }
 
+function normalizeRequestAttachments(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter(Boolean)
+        .slice(0, 8)
+        .map((file) => ({
+            proofKey: String(file.proofKey || file.proof_key || "proof").slice(
+                0,
+                80,
+            ),
+            label: String(file.label || "Supporting proof").slice(0, 160),
+            fileName: String(
+                file.fileName || file.file_name || file.name || "uploaded-file",
+            ).slice(0, 255),
+            filePath: String(file.filePath || file.file_path || "").slice(
+                0,
+                500,
+            ),
+            fileUrl: String(file.fileUrl || file.file_url || "").slice(0, 1000),
+            mimeType: String(file.mimeType || file.mime_type || "").slice(
+                0,
+                120,
+            ),
+            fileSize: Math.max(
+                0,
+                Number(file.fileSize || file.file_size || file.size || 0),
+            ),
+        }))
+        .filter((file) => file.filePath || file.fileUrl);
+}
+
+async function insertRequestAttachments(
+    client,
+    requestId,
+    residentId,
+    attachments,
+) {
+    if (!attachments.length) return;
+
+    const values = [];
+    const params = [];
+    attachments.forEach((file, index) => {
+        const offset = index * 9;
+        values.push(
+            `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`,
+        );
+        params.push(
+            requestId,
+            residentId,
+            file.proofKey,
+            file.label,
+            file.fileName,
+            file.filePath,
+            file.fileUrl,
+            file.mimeType,
+            file.fileSize,
+        );
+    });
+
+    await client.query(
+        `INSERT INTO request_attachments
+            (request_id, resident_id, proof_key, label, file_name, file_path, file_url, mime_type, file_size)
+         VALUES ${values.join(", ")}`,
+        params,
+    );
+}
+
+async function appendResidentRequestAttachments(rows = []) {
+    const ids = rows
+        .map((row) => Number.parseInt(row.request_id, 10))
+        .filter((id) => Number.isFinite(id) && id > 0);
+    if (!ids.length) return rows;
+
+    try {
+        const result = await pool.query(
+            `SELECT request_attachment_id, request_id, proof_key, label,
+                    file_name, file_path, file_url, mime_type, file_size, uploaded_at
+             FROM request_attachments
+             WHERE request_id = ANY($1::int[])
+             ORDER BY uploaded_at ASC, request_attachment_id ASC`,
+            [ids],
+        );
+        const grouped = new Map();
+        result.rows.forEach((attachment) => {
+            if (!grouped.has(attachment.request_id)) {
+                grouped.set(attachment.request_id, []);
+            }
+            grouped.get(attachment.request_id).push(attachment);
+        });
+        return rows.map((row) => ({
+            ...row,
+            attachments: grouped.get(row.request_id) || [],
+        }));
+    } catch (err) {
+        if (
+            err?.code === "42P01" ||
+            /request_attachments/i.test(err?.message || "")
+        ) {
+            return rows.map((row) => ({ ...row, attachments: [] }));
+        }
+        throw err;
+    }
+}
+
+async function appendCorrectionHistory(rows = []) {
+    const ids = rows
+        .map((row) => Number.parseInt(row.request_id, 10))
+        .filter((id) => Number.isFinite(id) && id > 0);
+    if (!ids.length) return rows;
+
+    try {
+        const result = await pool.query(
+            `SELECT correction_history_id, request_id, revision_number,
+                    event_type, message, actor_type, actor_id, actor_name,
+                    request_snapshot, created_at
+             FROM request_correction_history
+             WHERE request_id = ANY($1::int[])
+             ORDER BY created_at ASC, correction_history_id ASC`,
+            [ids],
+        );
+        const grouped = new Map();
+        result.rows.forEach((event) => {
+            if (!grouped.has(event.request_id)) grouped.set(event.request_id, []);
+            grouped.get(event.request_id).push(event);
+        });
+        return rows.map((row) => ({
+            ...row,
+            correction_history: grouped.get(row.request_id) || [],
+        }));
+    } catch (err) {
+        if (
+            err?.code === "42P01" ||
+            /request_correction_history/i.test(err?.message || "")
+        ) {
+            return rows.map((row) => ({ ...row, correction_history: [] }));
+        }
+        throw err;
+    }
+}
+
 const PROFILE_SELECT = `SELECT r.resident_id, r.full_name, r.first_name, r.middle_name, r.last_name,
               r.email, r.contact_number,
               r.address_house, r.address_street,
@@ -282,45 +422,20 @@ async function createRequest(req, res) {
         );
 
         const requestId = result.rows[0].request_id;
-        const proofFiles = (
+        const proofFiles = normalizeRequestAttachments(
             Array.isArray(attachments)
                 ? attachments
                 : Array.isArray(extraFields?.proofAttachments)
                   ? extraFields.proofAttachments
-                  : []
-        )
-            .filter(Boolean)
-            .slice(0, 8);
+                  : [],
+        );
 
-        if (proofFiles.length > 0) {
-            const values = [];
-            const params = [];
-
-            proofFiles.forEach((file, index) => {
-                const offset = index * 9;
-                values.push(
-                    `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`,
-                );
-                params.push(
-                    requestId,
-                    resident_id,
-                    String(file.proofKey || "proof").slice(0, 80),
-                    String(file.label || "Supporting proof").slice(0, 160),
-                    String(file.fileName || "uploaded-file").slice(0, 255),
-                    String(file.filePath || "").slice(0, 500),
-                    String(file.fileUrl || "").slice(0, 1000),
-                    String(file.mimeType || "").slice(0, 120),
-                    Number(file.fileSize || 0),
-                );
-            });
-
-            await client.query(
-                `INSERT INTO request_attachments
-                    (request_id, resident_id, proof_key, label, file_name, file_path, file_url, mime_type, file_size)
-                 VALUES ${values.join(", ")}`,
-                params,
-            );
-        }
+        await insertRequestAttachments(
+            client,
+            requestId,
+            resident_id,
+            proofFiles,
+        );
 
         await client.query("COMMIT");
 
@@ -351,17 +466,219 @@ async function getMyRequests(req, res) {
     const resident_id = req.resident.id;
     try {
         const result = await pool.query(
-            `SELECT request_id, cert_type, purpose, status,
-              rejection_reason, requested_at, released_at
-       FROM requests
-       WHERE resident_id = $1
-       ORDER BY requested_at DESC`,
+            `SELECT r.request_id, r.template_id, r.cert_type, r.purpose,
+                    r.extra_fields, r.notes, r.source, r.status,
+                    r.rejection_reason, r.requested_at, r.processed_at,
+                    r.released_at,
+                    COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
+                    to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
+                    ct.template_key
+             FROM requests r
+             LEFT JOIN certificate_templates ct ON ct.template_id = r.template_id
+             WHERE r.resident_id = $1
+             ORDER BY r.requested_at DESC`,
             [resident_id],
         );
-        return res.json({ data: result.rows });
+        const rowsWithAttachments =
+            await appendResidentRequestAttachments(result.rows);
+        const rows = await appendCorrectionHistory(rowsWithAttachments);
+        return res.json({ data: rows });
     } catch (err) {
         console.error("getMyRequests error:", err);
         return res.status(500).json({ message: "Server error" });
+    }
+}
+
+async function getMyRequest(req, res) {
+    const residentId = req.resident.id;
+    const requestId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(requestId) || requestId <= 0) {
+        return res.status(400).json({ message: "Invalid request ID" });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT r.request_id, r.template_id, r.cert_type, r.purpose,
+                    r.extra_fields, r.notes, r.source, r.status,
+                    r.rejection_reason, r.requested_at, r.processed_at,
+                    r.released_at,
+                    COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
+                    to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
+                    ct.template_key
+             FROM requests r
+             LEFT JOIN certificate_templates ct ON ct.template_id = r.template_id
+             WHERE r.request_id = $1 AND r.resident_id = $2
+             LIMIT 1`,
+            [requestId, residentId],
+        );
+        if (!result.rows.length) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+        const rowsWithAttachments =
+            await appendResidentRequestAttachments(result.rows);
+        const [request] = await appendCorrectionHistory(rowsWithAttachments);
+        return res.json({ request });
+    } catch (err) {
+        console.error("getMyRequest error:", err);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+async function resubmitRequest(req, res) {
+    const residentId = req.resident.id;
+    const requestId = Number.parseInt(req.params.id, 10);
+    const purpose = cleanText(req.body?.purpose);
+    const notes = cleanText(req.body?.notes) || "";
+    const extraFields = cleanObject(
+        req.body?.extraFields || req.body?.extra_fields,
+    );
+    const attachments = normalizeRequestAttachments(
+        Array.isArray(req.body?.attachments)
+            ? req.body.attachments
+            : extraFields.proofAttachments,
+    );
+
+    if (!Number.isFinite(requestId) || requestId <= 0) {
+        return res.status(400).json({ message: "Invalid request ID" });
+    }
+    if (!purpose) {
+        return res.status(400).json({ message: "Purpose is required" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const currentResult = await client.query(
+            `SELECT request_id, cert_type, status
+             FROM requests
+             WHERE request_id = $1 AND resident_id = $2
+             FOR UPDATE`,
+            [requestId, residentId],
+        );
+        const current = currentResult.rows[0];
+        if (!current) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Request not found" });
+        }
+        if (String(current.status).toLowerCase() !== "needs_correction") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message:
+                    "Only requests returned for correction can be resubmitted.",
+            });
+        }
+
+        const allowedExisting = await client.query(
+            `SELECT file_path
+             FROM request_attachments
+             WHERE request_id = $1 AND resident_id = $2`,
+            [requestId, residentId],
+        );
+        const existingPaths = new Set(
+            allowedExisting.rows.map((row) => String(row.file_path || "")),
+        );
+        const uploadPrefix = `request-proofs/${req.resident.supabase_uid}/`;
+        const safeAttachments = attachments.filter(
+            (file) =>
+                existingPaths.has(file.filePath) ||
+                file.filePath.startsWith(uploadPrefix),
+        );
+        const nextExtraFields = {
+            ...extraFields,
+            proofAttachments: safeAttachments,
+        };
+
+        const result = await client.query(
+            `UPDATE requests
+             SET purpose = $3,
+                 extra_fields = $4::jsonb,
+                 notes = $5,
+                 status = 'pending',
+                 rejection_reason = NULL,
+                 processed_by = NULL,
+                 processed_at = NULL,
+                 signatory_snapshot = '{}'::jsonb,
+                 revision_count = COALESCE(revision_count, 0) + 1,
+                 last_resubmitted_at = NOW()
+             WHERE request_id = $1 AND resident_id = $2
+             RETURNING request_id, cert_type, status, requested_at,
+                       revision_count, last_resubmitted_at`,
+            [
+                requestId,
+                residentId,
+                purpose,
+                JSON.stringify(nextExtraFields),
+                notes,
+            ],
+        );
+
+        await client.query(
+            "DELETE FROM request_attachments WHERE request_id = $1 AND resident_id = $2",
+            [requestId, residentId],
+        );
+        await insertRequestAttachments(
+            client,
+            requestId,
+            residentId,
+            safeAttachments,
+        );
+        const updated = result.rows[0];
+        await client.query(
+            `INSERT INTO request_correction_history (
+                request_id, revision_number, event_type, message,
+                actor_type, actor_id, actor_name, request_snapshot
+             ) VALUES ($1, $2, 'resident_resubmitted', $3, 'resident', $4, $5, $6::jsonb)`,
+            [
+                requestId,
+                updated.revision_count,
+                "Resident corrected and resubmitted the request.",
+                residentId,
+                req.resident?.full_name || req.resident?.email || "Resident",
+                JSON.stringify({
+                    certType: current.cert_type,
+                    purpose,
+                    extraFields: nextExtraFields,
+                    notes,
+                    attachments: safeAttachments,
+                    status: updated.status,
+                }),
+            ],
+        );
+        await client.query("COMMIT");
+
+        await createAuditLog({
+            actorId: residentId,
+            actorName:
+                req.resident?.full_name || req.resident?.email || "Resident",
+            actorRole: "resident",
+            actionType: "request",
+            targetTable: "requests",
+            targetId: requestId,
+            description: `Resident corrected and resubmitted request #${requestId} for ${current.cert_type}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({
+            message: "Request corrected and resubmitted for review",
+            request: updated,
+        });
+    } catch (err) {
+        await client.query("ROLLBACK").catch(() => {});
+        console.error("resubmitRequest error:", err);
+        if (
+            err?.code === "42703" &&
+            /revision_count|last_resubmitted_at|request_correction_history/i.test(
+                err?.message || "",
+            )
+        ) {
+            return res.status(503).json({
+                message:
+                    "Request correction is not initialized. Run database/request_correction_resubmission.sql first.",
+            });
+        }
+        return res.status(500).json({ message: "Server error" });
+    } finally {
+        client.release();
     }
 }
 
@@ -443,6 +760,8 @@ module.exports = {
     updateProfile,
     createRequest,
     getMyRequests,
+    getMyRequest,
+    resubmitRequest,
     getNotifications,
     getUnreadCount,
     markRead,

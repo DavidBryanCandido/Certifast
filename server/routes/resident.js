@@ -7,6 +7,8 @@ const {
     updateProfile,
     createRequest,
     getMyRequests,
+    getMyRequest,
+    resubmitRequest,
     getNotifications,
     getUnreadCount,
     markRead,
@@ -17,7 +19,9 @@ const { residentAuth } = require("../middleware/authMiddleware");
 router.get("/profile", residentAuth, getProfile);
 router.put("/profile", residentAuth, updateProfile);
 router.get("/requests", residentAuth, getMyRequests);
+router.get("/requests/:id", residentAuth, getMyRequest);
 router.post("/requests", residentAuth, createRequest);
+router.put("/requests/:id/resubmit", residentAuth, resubmitRequest);
 router.put("/change-password", residentAuth, residentChangePassword);
 
 router.get("/notifications", residentAuth, getNotifications);

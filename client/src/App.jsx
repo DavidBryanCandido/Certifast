@@ -19,6 +19,7 @@ import MyRequests from "./pages/resident/MyRequests";
 import MyQRCode from "./pages/resident/MyQRCode";
 import ResidentProfile from "./pages/resident/ResidentProfile";
 import ResidentNotifications from "./pages/resident/ResidentNotifications";
+import LandingPage from "./pages/LandingPage";
 import { getPublicBrandingSettings } from "./services/publicBrandingService";
 import { applySystemTheme } from "./theme";
 
@@ -182,10 +183,7 @@ export default function App() {
 
     return (
         <Routes>
-            <Route
-                path="/"
-                element={<Navigate to="/resident/login" replace />}
-            />
+            <Route path="/" element={<LandingPage />} />
 
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route
@@ -267,10 +265,7 @@ export default function App() {
                 element={<ResidentProfileRoute />}
             />
 
-            <Route
-                path="*"
-                element={<Navigate to="/resident/login" replace />}
-            />
+            <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
     );
 }

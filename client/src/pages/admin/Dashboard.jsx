@@ -398,6 +398,11 @@ const TIMELINE_MAP = {
         { dot: "gold", text: "Request submitted by resident", time: "" },
         { dot: "red", text: "Rejected by staff", time: "" },
     ],
+    needs_correction: [
+        { dot: "gold", text: "Request submitted by resident", time: "" },
+        { dot: "amber", text: "Correction requested by staff", time: "" },
+        { dot: "grey", text: "Awaiting resident resubmission", time: "Resident action" },
+    ],
 };
 
 const DOT_COLORS = {
@@ -414,6 +419,7 @@ const BADGE = {
     approved: { bg: "#e8eef8", color: "#1a4a8a", label: "Approved" },
     ready: { bg: "#e8f5ee", color: "#1a7a4a", label: "Ready" },
     released: { bg: "#f0f0f0", color: "#666", label: "Released" },
+    needs_correction: { bg: "#fff7e6", color: "#9a5b00", label: "Needs Correction" },
     rejected: { bg: "#fdecea", color: "#b02020", label: "Rejected" },
 };
 
@@ -443,6 +449,12 @@ const BADGE_DRAWER = {
         dot: "#b02020",
         label: "Rejected",
     },
+    needs_correction: {
+        bg: "#fff7e6",
+        color: "#9a5b00",
+        dot: "#b86800",
+        label: "Needs Correction",
+    },
 };
 
 // Maps status → table action button appearance
@@ -467,7 +479,23 @@ const STATUS_MAP = {
         btnLabel: "View",
         btnStyle: { background: "#fdecea", color: "#b02020" },
     },
+    needs_correction: {
+        btnLabel: "View",
+        btnStyle: { background: "#fff7e6", color: "#9a5b00" },
+    },
 };
+
+function correctionEventTime(value) {
+    const date = new Date(value || 0);
+    if (Number.isNaN(date.getTime())) return "Time unavailable";
+    return date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
 
 // ── Helpers ──
 function activityDot(type, description) {
@@ -659,7 +687,7 @@ function RequestDrawer({
     // ── Reject — close after ──
     const handleRejectConfirm = async () => {
         if (!rejectReason.trim()) {
-            setActionError("Please provide a rejection reason.");
+            setActionError("Please describe what the resident must correct.");
             return;
         }
         if (actionLoading) return;
@@ -814,7 +842,7 @@ function RequestDrawer({
                         disabled={actionLoading}
                     >
                         <X size={13} />{" "}
-                        {actionLoading ? "Saving…" : "Confirm Rejection"}
+                        {actionLoading ? "Saving…" : "Send Correction Request"}
                     </button>
                 </>
             );
@@ -831,7 +859,7 @@ function RequestDrawer({
                         }}
                         onClick={() => setStep("reject")}
                     >
-                        <X size={11} /> Reject
+                        <X size={11} /> Request Correction
                     </button>
                     <button
                         className="cf-drawer-btn"
@@ -861,7 +889,7 @@ function RequestDrawer({
                         }}
                         onClick={() => setStep("reject")}
                     >
-                        <X size={11} /> Reject
+                        <X size={11} /> Request Correction
                     </button>
                     <button
                         className="cf-drawer-btn"
@@ -953,6 +981,21 @@ function RequestDrawer({
                     }}
                 >
                     This request has been rejected. No further action available.
+                </div>
+            );
+
+        if (status === "needs_correction")
+            return (
+                <div
+                    style={{
+                        fontSize: 11.5,
+                        color: "#9a5b00",
+                        textAlign: "center",
+                        width: "100%",
+                        padding: "4px 0",
+                    }}
+                >
+                    Waiting for the resident to edit and resubmit this request.
                 </div>
             );
 
@@ -1359,9 +1402,9 @@ function RequestDrawer({
                     )}
 
                     {/* Rejection reason */}
-                    {status === "rejected" && request.rejection_reason && (
+                    {(status === "rejected" || status === "needs_correction") && request.rejection_reason && (
                         <div className="cf-drawer-section">
-                            <SectionTitle>Rejection Reason</SectionTitle>
+                            <SectionTitle>{status === "needs_correction" ? "Correction Required" : "Rejection Reason"}</SectionTitle>
                             <div
                                 style={{
                                     background: "#f8f6f1",
@@ -1378,13 +1421,78 @@ function RequestDrawer({
                         </div>
                     )}
 
+                    {request.correctionHistory?.length > 0 && (
+                        <div className="cf-drawer-section">
+                            <SectionTitle>
+                                Correction History ({request.revisionCount})
+                            </SectionTitle>
+                            <div style={{ display: "grid", gap: 8 }}>
+                                {request.correctionHistory.map((event) => {
+                                    const resubmitted =
+                                        event.event_type ===
+                                        "resident_resubmitted";
+                                    return (
+                                        <div
+                                            key={event.correction_history_id}
+                                            style={{
+                                                border: "1px solid #e4dfd4",
+                                                borderLeft: `3px solid ${resubmitted ? "#1a7a4a" : "#b86800"}`,
+                                                borderRadius: 5,
+                                                background: "#fff",
+                                                padding: "9px 11px",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: 11.5,
+                                                    fontWeight: 700,
+                                                    color: resubmitted
+                                                        ? "#1a7a4a"
+                                                        : "#9a5b00",
+                                                }}
+                                            >
+                                                {resubmitted
+                                                    ? `Revision ${event.revision_number} resubmitted`
+                                                    : "Staff requested correction"}
+                                            </div>
+                                            {event.message && (
+                                                <div
+                                                    style={{
+                                                        fontSize: 11.5,
+                                                        color: "#4a4a6a",
+                                                        lineHeight: 1.5,
+                                                        marginTop: 3,
+                                                    }}
+                                                >
+                                                    {event.message}
+                                                </div>
+                                            )}
+                                            <div
+                                                style={{
+                                                    fontSize: 10,
+                                                    color: "#9090aa",
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                {event.actor_name || "System"} ·{" "}
+                                                {correctionEventTime(
+                                                    event.created_at,
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Reject textarea */}
                     {step === "reject" && (
                         <div className="cf-drawer-section">
-                            <SectionTitle>Reason for Rejection *</SectionTitle>
+                            <SectionTitle>What must the resident correct? *</SectionTitle>
                             <textarea
                                 className="cf-reject-textarea"
-                                placeholder="Enter reason for rejection — visible to the resident…"
+                                placeholder="Describe what is missing or incorrect. This will be visible to the resident..."
                                 value={rejectReason}
                                 onChange={(e) => {
                                     setRejectReason(e.target.value);
@@ -1753,6 +1861,10 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             attachments: Array.isArray(row.attachments) && row.attachments.length > 0
                 ? row.attachments
                 : fallbackAttachments,
+            correctionHistory: Array.isArray(row.correction_history)
+                ? row.correction_history
+                : [],
+            revisionCount: Number(row.revision_count || 0),
             rejection_reason: row.rejection_reason || "",
             requestedAtIso: row.requested_at || null,
             processedAtIso: row.processed_at || null,

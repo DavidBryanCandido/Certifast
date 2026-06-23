@@ -39,7 +39,7 @@ exports.getOverview = async (req, res) => {
             SELECT
                 COUNT(*) FILTER (WHERE status = 'released' ${periodFilter}) AS "issuedThisPeriod",
                 COUNT(*) FILTER (WHERE status = 'released') AS "totalAllTime",
-                COUNT(*) FILTER (WHERE status IN ('pending', 'approved', 'ready')) AS pending,
+                COUNT(*) FILTER (WHERE status IN ('pending', 'approved', 'ready', 'needs_correction')) AS pending,
                 COUNT(*) FILTER (WHERE status = 'released' AND t.has_fee = true ${periodFilter}) AS "feesThisPeriod"
             FROM requests r
             LEFT JOIN certificate_templates t ON r.template_id = t.template_id
@@ -66,7 +66,7 @@ exports.getOverview = async (req, res) => {
         const statusQuery = await pool.query(`
             SELECT
                 COUNT(*) FILTER (WHERE status = 'released') AS released,
-                COUNT(*) FILTER (WHERE status IN ('pending', 'approved', 'ready')) AS pending,
+                COUNT(*) FILTER (WHERE status IN ('pending', 'approved', 'ready', 'needs_correction')) AS pending,
                 COUNT(*) FILTER (WHERE status = 'rejected') AS rejected
             FROM requests
         `);
@@ -90,7 +90,7 @@ exports.getOverview = async (req, res) => {
                 TO_CHAR(DATE_TRUNC('day', requested_at), 'Mon DD, YYYY') AS date,
                 COUNT(*) AS count,
                 CASE
-                    WHEN COUNT(*) FILTER (WHERE status IN ('pending','approved','ready')) > 0
+                    WHEN COUNT(*) FILTER (WHERE status IN ('pending','approved','ready','needs_correction')) > 0
                     THEN 'pending'
                     ELSE 'released'
                 END AS status

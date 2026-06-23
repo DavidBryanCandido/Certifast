@@ -23,6 +23,24 @@ const requestService = {
         return res.data;
     },
 
+    getRequest: async (requestId) => {
+        const token = authService.getResidentToken();
+        const res = await axios.get(`${API}/resident/requests/${requestId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        return res.data;
+    },
+
+    resubmitRequest: async (requestId, formData) => {
+        const token = authService.getResidentToken();
+        const res = await axios.put(
+            `${API}/resident/requests/${requestId}/resubmit`,
+            formData,
+            { headers: { Authorization: `Bearer ${token}` } },
+        );
+        return res.data;
+    },
+
     getCertificateTemplates: async () => {
         const res = await axios.get(`${API}/certificates/templates`);
         return res.data;

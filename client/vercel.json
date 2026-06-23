@@ -1,6 +1,3 @@
 {
-    "redirects": [
-        { "source": "/", "destination": "/resident/login", "permanent": false }
-    ],
     "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

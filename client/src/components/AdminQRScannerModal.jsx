@@ -50,6 +50,7 @@ function StatusBadge({ status }) {
         ready:      { bg: "#e8f5ee", color: "#1a7a4a", border: "#a8d8bc", label: "Ready" },
         released:   { bg: "#e8f5ee", color: "#1a7a4a", border: "#a8d8bc", label: "Released" },
         rejected:   { bg: "#fdecea", color: "#b02020", border: "#f5c6c6", label: "Rejected" },
+        needs_correction: { bg: "#fff7e6", color: "#9a5b00", border: "#f5d78e", label: "Needs Correction" },
     };
     const s = map[status] || map.pending;
     return (
@@ -66,6 +67,7 @@ const REQUEST_FILTERS = [
     { key: "ready", label: "Ready" },
     { key: "released", label: "Released" },
     { key: "rejected", label: "Rejected" },
+    { key: "needs_correction", label: "Needs Correction" },
 ];
 
 function requestRawId(request) {

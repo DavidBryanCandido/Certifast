@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import {
     Eye,
     EyeOff,
-    User,
+    Mail,
     Lock,
     Shield,
     X,
@@ -236,9 +236,9 @@ function ForgotPasswordModal({ onClose, passwordResetEmail }) {
                             </span>
                         </p>
                         <p style={m.formatRow}>
-                            <span style={m.formatKey}>Username: </span>
+                            <span style={m.formatKey}>Account email: </span>
                             <span style={m.formatValHighlight}>
-                                [your username]
+                                [your registered email]
                             </span>
                         </p>
                         <p style={m.formatRow}>
@@ -270,10 +270,11 @@ function ForgotPasswordModal({ onClose, passwordResetEmail }) {
                     </div>
 
                     <p style={m.bodyText}>
-                        Once verified, you will receive an email with your new
-                        temporary credentials. Only emails sent from registered
-                        barangay accounts will be processed. Otherwise, proceed
-                        to the{" "}
+                        Once verified, authorized personnel will contact you
+                        through a separate secure channel. Passwords are not
+                        included in email messages. Only requests sent from
+                        registered barangay accounts will be processed.
+                        Otherwise, proceed to the{" "}
                         <strong style={{ color: "var(--color-primary)" }}>
                             Barangay Office
                         </strong>{" "}
@@ -316,7 +317,7 @@ export default function AdminLogin() {
     const isMobile = width < 520;
     const { login } = useAdminAuth();
 
-    const [formData, setFormData] = useState({ username: "", password: "" });
+    const [formData, setFormData] = useState({ email: "", password: "" });
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
@@ -373,8 +374,15 @@ export default function AdminLogin() {
                 return;
             }
             handled = true;
+            const verifiedEmail = String(session.user.email || "").trim();
+            if (verifiedEmail) {
+                setFormData((previous) => ({
+                    ...previous,
+                    email: verifiedEmail,
+                }));
+            }
             setVerificationNotice(
-                "Email verified successfully. You may now sign in with your username and password.",
+                "Email verified successfully. Enter your password, then press Sign In.",
             );
             window.history.replaceState({}, "", "/admin/login");
             window.setTimeout(() => {
@@ -408,7 +416,7 @@ export default function AdminLogin() {
         e.preventDefault();
         setError("");
 
-        if (!formData.username || !formData.password) {
+        if (!formData.email || !formData.password) {
             setError("Please fill in all fields.");
             return;
         }
@@ -416,7 +424,7 @@ export default function AdminLogin() {
         setIsLoading(true);
         try {
             const response = await authService.adminLogin({
-                username: formData.username,
+                email: formData.email.trim(),
                 password: formData.password,
             });
 
@@ -530,27 +538,27 @@ export default function AdminLogin() {
                     )}
 
                     <form onSubmit={handleSubmit}>
-                        {/* Username */}
+                        {/* Email */}
                         <div style={s.field}>
-                            <label style={s.fieldLabel} htmlFor="username">
-                                Username
+                            <label style={s.fieldLabel} htmlFor="email">
+                                Email Address
                             </label>
                             <div style={s.inputWrap}>
                                 <span style={s.inputIcon}>
-                                    <User
+                                    <Mail
                                         size={15}
                                         color="var(--color-primary)"
                                         strokeWidth={2}
                                     />
                                 </span>
                                 <input
-                                    id="username"
-                                    name="username"
-                                    type="text"
-                                    autoComplete="off"
-                                    value={formData.username}
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    value={formData.email}
                                     onChange={handleChange}
-                                    placeholder="e.g. etapinac.staff01"
+                                    placeholder="name@easttapinac.gov.ph"
                                     className="cf-input"
                                 />
                             </div>
@@ -573,7 +581,7 @@ export default function AdminLogin() {
                                     id="password"
                                     name="password"
                                     type={showPassword ? "text" : "password"}
-                                    autoComplete="new-password"
+                                    autoComplete="current-password"
                                     value={formData.password}
                                     onChange={handleChange}
                                     placeholder="Enter your password"

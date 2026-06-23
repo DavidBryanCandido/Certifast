@@ -2,8 +2,8 @@
 // FILE: client/src/pages/resident/SubmitRequest.jsx
 // =============================================================
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     FileText,
     Home,
@@ -817,7 +817,7 @@ function isBasicIndigencyTemplate(cert) {
     );
 }
 
-function shouldHideExtraField(field, cert, requestSubject) {
+function shouldHideExtraField(field, cert, _requestSubject) {
     if (!field?.key) return false;
 
     if (field.key === "assistanceType") {
@@ -966,7 +966,24 @@ function countProofFiles(proofFiles = {}) {
 }
 
 function proofFileNames(files = []) {
-    return files.map((file) => file.name).join(", ");
+    return files.map((file) => file.name || file.fileName).join(", ");
+}
+
+function existingAttachmentFile(attachment) {
+    return {
+        isExisting: true,
+        name: attachment.file_name || attachment.fileName || "uploaded-file",
+        size: Number(attachment.file_size || attachment.fileSize || 0),
+        type: attachment.mime_type || attachment.mimeType || "",
+        proofKey: attachment.proof_key || attachment.proofKey || "proof",
+        label: attachment.label || "Supporting proof",
+        fileName:
+            attachment.file_name || attachment.fileName || "uploaded-file",
+        filePath: attachment.file_path || attachment.filePath || "",
+        fileUrl: attachment.file_url || attachment.fileUrl || "",
+        mimeType: attachment.mime_type || attachment.mimeType || "",
+        fileSize: Number(attachment.file_size || attachment.fileSize || 0),
+    };
 }
 
 function FieldGroup({ label, children, required }) {
@@ -1059,6 +1076,11 @@ function fmtDate(str) {
 // ─── Main Component ───────────────────────────────────────────
 export default function SubmitRequest({ resident, onLogout }) {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const editRequestId = Number.parseInt(searchParams.get("edit"), 10);
+    const isEditing = Number.isFinite(editRequestId) && editRequestId > 0;
+    const hydratedEditId = useRef(null);
+    const hydratingEdit = useRef(false);
     const [width, setWidth] = useState(window.innerWidth);
     // Profile (pre-filled from resident profile API)
     const [profile, setProfile] = useState(null);
@@ -1081,6 +1103,8 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [minorDetails, setMinorDetails] = useState(EMPTY_MINOR_DETAILS);
     const [proofFiles, setProofFiles] = useState({});
     const [notes, setNotes] = useState("");
+    const [editingRequest, setEditingRequest] = useState(null);
+    const [editingLoading, setEditingLoading] = useState(isEditing);
 
     // Submission
     const [submitting, setSubmitting] = useState(false);
@@ -1181,6 +1205,41 @@ export default function SubmitRequest({ resident, onLogout }) {
             mounted = false;
         };
     }, [onLogout]);
+
+    useEffect(() => {
+        if (!isEditing) return undefined;
+        let mounted = true;
+        setEditingLoading(true);
+        requestService
+            .getRequest(editRequestId)
+            .then((result) => {
+                const request = result?.request || result?.data || result;
+                if (!mounted) return;
+                if (
+                    String(request?.status || "").toLowerCase() !==
+                    "needs_correction"
+                ) {
+                    setError(
+                        "This request is no longer available for correction.",
+                    );
+                    return;
+                }
+                setEditingRequest(request);
+            })
+            .catch((err) => {
+                if (!mounted) return;
+                setError(
+                    err?.response?.data?.message ||
+                        "Unable to load this request for correction.",
+                );
+            })
+            .finally(() => {
+                if (mounted) setEditingLoading(false);
+            });
+        return () => {
+            mounted = false;
+        };
+    }, [editRequestId, isEditing]);
 
     const isMobile = width < 768;
     const finalPurpose = purpose === "Others" ? customPurpose : purpose;
@@ -1284,6 +1343,10 @@ export default function SubmitRequest({ resident, onLogout }) {
 
     // Reset extra fields when cert changes
     useEffect(() => {
+        if (hydratingEdit.current) {
+            hydratingEdit.current = false;
+            return;
+        }
         const visibleDefaults = visibleExtraFieldsFor(
             certExtra,
             selectedCert,
@@ -1296,13 +1359,86 @@ export default function SubmitRequest({ resident, onLogout }) {
         setRequestSubject(REQUEST_SUBJECT_SELF);
         setMinorDetails(EMPTY_MINOR_DETAILS);
         setProofFiles({});
+        // This reset must run only when the selected certificate changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedCert]);
+
+    useEffect(() => {
+        if (
+            !editingRequest ||
+            certsLoading ||
+            hydratedEditId.current === editingRequest.request_id
+        ) {
+            return;
+        }
+        const requestExtra = editingRequest.extra_fields || {};
+        const matchingCert = certs.find(
+            (cert) =>
+                Number(cert.templateId) === Number(editingRequest.template_id) ||
+                cert.templateKey ===
+                    (editingRequest.template_key ||
+                        requestExtra.templateKey ||
+                        requestExtra.template_key) ||
+                cert.name === editingRequest.cert_type,
+        );
+        if (!matchingCert) {
+            setError(
+                "The certificate template for this request is no longer available.",
+            );
+            return;
+        }
+
+        hydratedEditId.current = editingRequest.request_id;
+        hydratingEdit.current = true;
+        setSelectedCert(matchingCert);
+        if (COMMON_PURPOSES.includes(editingRequest.purpose)) {
+            setPurpose(editingRequest.purpose);
+            setCustomPurpose("");
+        } else {
+            setPurpose("Others");
+            setCustomPurpose(editingRequest.purpose || "");
+        }
+        setExtraFields(requestExtra);
+        const subject =
+            requestExtra.requestSubject === REQUEST_SUBJECT_MINOR ||
+            requestExtra.certificateFor === "minor"
+                ? REQUEST_SUBJECT_MINOR
+                : REQUEST_SUBJECT_SELF;
+        setRequestSubject(subject);
+        setMinorDetails(
+            subject === REQUEST_SUBJECT_MINOR
+                ? {
+                      fullName: requestExtra.minorName || "",
+                      dateOfBirth: requestExtra.minorDateOfBirth || "",
+                      relationship: requestExtra.minorRelationship || "",
+                  }
+                : EMPTY_MINOR_DETAILS,
+        );
+        const groupedProofs = {};
+        const savedAttachments =
+            Array.isArray(editingRequest.attachments) &&
+            editingRequest.attachments.length > 0
+                ? editingRequest.attachments
+                : Array.isArray(requestExtra.proofAttachments)
+                  ? requestExtra.proofAttachments
+                  : [];
+        savedAttachments.forEach((attachment) => {
+            const file = existingAttachmentFile(attachment);
+            if (!groupedProofs[file.proofKey]) groupedProofs[file.proofKey] = [];
+            groupedProofs[file.proofKey].push(file);
+        });
+        setProofFiles(groupedProofs);
+        setNotes(editingRequest.notes || "");
+        setStep(2);
+    }, [editingRequest, certs, certsLoading]);
 
     useEffect(() => {
         if (!selectedCert || !profile) return;
         const profileDefaults = profileExtraFieldValues(visibleCertExtra, profile);
         if (Object.keys(profileDefaults).length === 0) return;
         setExtraFields((prev) => fillBlankExtraFields(prev, profileDefaults));
+        // Profile hydration intentionally runs only when the profile arrives.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [profile]);
 
     async function uploadProofFiles() {
@@ -1323,6 +1459,18 @@ export default function SubmitRequest({ resident, onLogout }) {
             if (files.length === 0) continue;
 
             for (const file of files) {
+                if (file.isExisting) {
+                    uploaded.push({
+                        proofKey: requirement.key,
+                        label: file.label || requirement.label,
+                        fileName: file.fileName || file.name,
+                        filePath: file.filePath,
+                        fileUrl: file.fileUrl,
+                        mimeType: file.mimeType || file.type || "",
+                        fileSize: file.fileSize || file.size || 0,
+                    });
+                    continue;
+                }
                 const unique =
                     typeof crypto !== "undefined" && crypto.randomUUID
                         ? crypto.randomUUID()
@@ -1443,6 +1591,10 @@ export default function SubmitRequest({ resident, onLogout }) {
 
     function handleBack() {
         setError("");
+        if (isEditing && step === 2) {
+            navigate("/resident/my-requests");
+            return;
+        }
         setStep((s) => s - 1);
     }
 
@@ -1478,7 +1630,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                     finalPurpose,
                 }),
             };
-            const data = await requestService.createRequest({
+            const payload = {
                 certType: selectedCert.name,
                 templateId: selectedCert.templateId || null,
                 purpose: finalPurpose,
@@ -1491,10 +1643,16 @@ export default function SubmitRequest({ resident, onLogout }) {
                 attachments,
                 notes,
                 source: "resident",
-            });
+            };
+            const data = isEditing
+                ? await requestService.resubmitRequest(editRequestId, payload)
+                : await requestService.createRequest(payload);
 
             const created = data?.request || data;
-            setSuccess({ request_id: created?.request_id || "—" });
+            setSuccess({
+                request_id: created?.request_id || "—",
+                resubmitted: isEditing,
+            });
         } catch (err) {
             if (
                 err?.response?.status === 401 ||
@@ -1614,7 +1772,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     marginBottom: 8,
                                 }}
                             >
-                                Request Submitted!
+                                {success.resubmitted
+                                    ? "Request Resubmitted!"
+                                    : "Request Submitted!"}
                             </div>
                             <p
                                 style={{
@@ -1628,7 +1788,11 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 <strong style={{ color: "#1a1a2e" }}>
                                     {selectedCert?.name}
                                 </strong>{" "}
-                                has been submitted.{" "}
+                                has been{" "}
+                                {success.resubmitted
+                                    ? "corrected and resubmitted"
+                                    : "submitted"}
+                                .{" "}
                                 {charterGuidance?.waiting || DEFAULT_ONLINE_WAIT}
                             </p>
                             <div
@@ -1714,12 +1878,14 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 >
                                     <FileText size={13} /> View My Requests
                                 </button>
-                                <button
-                                    className="sr-btn-primary"
-                                    onClick={handleReset}
-                                >
-                                    <Plus size={13} /> Submit Another
-                                </button>
+                                {!success.resubmitted && (
+                                    <button
+                                        className="sr-btn-primary"
+                                        onClick={handleReset}
+                                    >
+                                        <Plus size={13} /> Submit Another
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -2071,6 +2237,24 @@ export default function SubmitRequest({ resident, onLogout }) {
     // ─── STEP 2 — Request Details ─────────────────────────────
     const Step2 = (
         <div className="sr-fadein">
+            {isEditing && editingRequest && (
+                <div
+                    style={{
+                        background: "#fff7e6",
+                        border: "1px solid #f5d78e",
+                        borderRadius: 8,
+                        padding: "12px 14px",
+                        marginBottom: 16,
+                        color: "#7a4a00",
+                        fontSize: 12.5,
+                        lineHeight: 1.55,
+                    }}
+                >
+                    <strong>Staff requested a correction:</strong>{" "}
+                    {editingRequest.rejection_reason ||
+                        "Please review the request details and correct the missing information."}
+                </div>
+            )}
             {/* Selected cert banner */}
             <div
                 style={{
@@ -2102,7 +2286,8 @@ export default function SubmitRequest({ resident, onLogout }) {
                         {selectedCert?.desc}
                     </div>
                 </div>
-                <button
+                {!isEditing && (
+                    <button
                     onClick={() => setStep(1)}
                     style={{
                         background: "none",
@@ -2116,9 +2301,10 @@ export default function SubmitRequest({ resident, onLogout }) {
                         fontWeight: 600,
                         flexShrink: 0,
                     }}
-                >
-                    Change
-                </button>
+                    >
+                        Change
+                    </button>
+                )}
             </div>
 
             {/* ── Pre-filled profile info ── */}
@@ -3064,7 +3250,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 margin: "0 0 4px",
                             }}
                         >
-                            Submit a Request
+                            {isEditing
+                                ? "Correct Certificate Request"
+                                : "Submit a Request"}
                         </h1>
                         <p
                             style={{
@@ -3073,8 +3261,9 @@ export default function SubmitRequest({ resident, onLogout }) {
                                 margin: 0,
                             }}
                         >
-                            Request a barangay certificate online. Pickup is
-                            done in person at the barangay office.
+                            {isEditing
+                                ? "Update the information identified by staff, then resubmit the same request for review."
+                                : "Request a barangay certificate online. Pickup is done in person at the barangay office."}
                         </p>
                     </div>
 
@@ -3100,7 +3289,20 @@ export default function SubmitRequest({ resident, onLogout }) {
                                     marginBottom: 16,
                                 }}
                             >
-                                {stepContent}
+                                {editingLoading ? (
+                                    <div
+                                        style={{
+                                            padding: "32px 12px",
+                                            textAlign: "center",
+                                            color: "#9090aa",
+                                            fontSize: 13,
+                                        }}
+                                    >
+                                        Loading your request for correction...
+                                    </div>
+                                ) : (
+                                    stepContent
+                                )}
                             </div>
                             {error && (
                                 <div
@@ -3159,11 +3361,15 @@ export default function SubmitRequest({ resident, onLogout }) {
                                         disabled={submitting}
                                     >
                                         {submitting ? (
-                                            "Submitting…"
+                                            isEditing
+                                                ? "Resubmitting..."
+                                                : "Submitting..."
                                         ) : (
                                             <>
-                                                <Check size={14} /> Submit
-                                                Request
+                                                <Check size={14} />{" "}
+                                                {isEditing
+                                                    ? "Resubmit Request"
+                                                    : "Submit Request"}
                                             </>
                                         )}
                                     </button>

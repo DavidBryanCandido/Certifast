@@ -185,6 +185,7 @@ if (!document.head.querySelector("[data-cf-rr]")) {
 const HIST_BADGE = {
     released: { bg: "#e8f5ee", color: "#1a7a4a", label: "Released" },
     rejected: { bg: "#fdecea", color: "#b02020", label: "Rejected" },
+    needs_correction: { bg: "#fff7e6", color: "#9a5b00", label: "Needs Correction" },
     pending: { bg: "#fff3e0", color: "#b86800", label: "Pending" },
     approved: { bg: "#e8eef8", color: "#1a4a8a", label: "Approved" },
     ready: { bg: "#e8eef8", color: "#1a4a8a", label: "Ready" },

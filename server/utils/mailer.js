@@ -4,6 +4,7 @@ const STATUS_EMAILS = {
     approved: "Your Certificate Request Has Been Approved",
     ready: "Your Certificate is Ready for Pickup",
     rejected: "Your Certificate Request Was Not Approved",
+    needs_correction: "Action Required: Correct Your Certificate Request",
 };
 
 const ACCOUNT_EMAILS = {
@@ -55,12 +56,14 @@ async function sendStatusEmail(
     const statusLabel =
         normalizedStatus === "ready"
             ? "Ready for Pickup"
+            : normalizedStatus === "needs_correction"
+              ? "Needs Correction"
             : normalizedStatus.charAt(0).toUpperCase() +
               normalizedStatus.slice(1);
 
     const rejectionBlock =
-        normalizedStatus === "rejected"
-            ? `<p><strong>Reason:</strong> ${escapeHtml(rejectionReason || "No reason was provided.")}</p>`
+        normalizedStatus === "rejected" || normalizedStatus === "needs_correction"
+            ? `<p><strong>${normalizedStatus === "needs_correction" ? "What to correct" : "Reason"}:</strong> ${escapeHtml(rejectionReason || "No reason was provided.")}</p>`
             : "";
 
     const html = `
@@ -75,7 +78,11 @@ async function sendStatusEmail(
                 <p><strong>Certificate:</strong> ${escapeHtml(certType || "Certificate Request")}</p>
                 <p><strong>Status:</strong> ${escapeHtml(statusLabel)}</p>
                 ${rejectionBlock}
-                <p>Please visit the barangay office during office hours if action or pickup is required.</p>
+                <p>${
+                    normalizedStatus === "needs_correction"
+                        ? "Sign in to CertiFast, open My Requests, edit this request, and resubmit it for review."
+                        : "Please visit the barangay office during office hours if action or pickup is required."
+                }</p>
                 <p><strong>Office hours:</strong> Mon-Fri 8AM-5PM, Saturday 8AM-12PM.</p>
                 <p style="color:#6b7280;font-size:12px;margin-top:24px;">This is an automated CertiFast notification.</p>
             </div>

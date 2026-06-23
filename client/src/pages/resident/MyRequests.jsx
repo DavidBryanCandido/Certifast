@@ -3,6 +3,7 @@
 // =============================================================
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     FileText,
     Clock,
@@ -10,6 +11,7 @@ import {
     XCircle,
     AlertCircle,
     FileCheck,
+    Pencil,
 } from "lucide-react";
 
 import requestService from "../../services/requestService";
@@ -37,6 +39,7 @@ if (!document.head.querySelector("[data-resident-home]")) {
     .rh-badge-ready      { font-size:10px; background:#e8f5ee; color:#1a7a4a; border:1px solid #a8d8bc; border-radius:20px; padding:2px 10px; font-weight:700; white-space:nowrap; }
     .rh-badge-released   { font-size:10px; background:#e8f5ee; color:#1a7a4a; border:1px solid #a8d8bc; border-radius:20px; padding:2px 10px; font-weight:700; white-space:nowrap; }
     .rh-badge-rejected   { font-size:10px; background:#fdecea; color:#b02020; border:1px solid #f5c6c6; border-radius:20px; padding:2px 10px; font-weight:700; white-space:nowrap; }
+    .rh-badge-correction { font-size:10px; background:#fff7e6; color:#9a5b00; border:1px solid #f5d78e; border-radius:20px; padding:2px 10px; font-weight:700; white-space:nowrap; }
     @keyframes rhFadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     .rh-fadein { animation:rhFadeUp 0.35s ease both; }
     `;
@@ -49,6 +52,18 @@ function formatRequestId(raw) {
     return `REQ-${String(num).padStart(4, "0")}`;
 }
 
+function correctionEventTime(value) {
+    const date = new Date(value || 0);
+    if (Number.isNaN(date.getTime())) return "Time unavailable";
+    return date.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
 function StatusBadge({ status }) {
     const normalized = String(status || "").toLowerCase();
     const map = {
@@ -58,6 +73,10 @@ function StatusBadge({ status }) {
         ready: { cls: "rh-badge-ready", label: "Ready for Pickup" },
         released: { cls: "rh-badge-released", label: "Released" },
         rejected: { cls: "rh-badge-rejected", label: "Denied" },
+        needs_correction: {
+            cls: "rh-badge-correction",
+            label: "Needs Correction",
+        },
     };
     const { cls, label } = map[normalized] || {
         cls: "rh-badge-pending",
@@ -77,10 +96,13 @@ function StatusIcon({ status }) {
         return <FileCheck {...props} color="#3730a3" />;
     if (normalized === "rejected")
         return <XCircle {...props} color="#b02020" />;
+    if (normalized === "needs_correction")
+        return <AlertCircle {...props} color="#b86800" />;
     return <Clock {...props} color="#b86800" />;
 }
 
 export default function MyRequests({ resident, onLogout }) {
+    const navigate = useNavigate();
     const [width, setWidth] = useState(window.innerWidth);
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -274,12 +296,15 @@ export default function MyRequests({ resident, onLogout }) {
                         {/* Rows */}
                         {!loading &&
                             rows.map((row) => {
+                                const needsCorrection =
+                                    String(row.status || "").toLowerCase() ===
+                                    "needs_correction";
                                 const isDenied =
                                     String(row.status || "").toLowerCase() ===
                                     "rejected";
                                 const denialReason =
                                     row.rejection_reason ||
-                                    "No denial reason was provided by the admin.";
+                                    "No correction note was provided by staff.";
 
                                 return (
                                     <div key={row.request_id}>
@@ -346,17 +371,24 @@ export default function MyRequests({ resident, onLogout }) {
                                                 <StatusBadge
                                                     status={row.status}
                                                 />
-                                                {isDenied && (
+                                                {(isDenied ||
+                                                    needsCorrection) && (
                                                     <div
                                                         style={{
                                                             background:
-                                                                "#fdecea",
-                                                            border: "1px solid #f5c6c6",
+                                                                needsCorrection
+                                                                    ? "#fff7e6"
+                                                                    : "#fdecea",
+                                                            border: needsCorrection
+                                                                ? "1px solid #f5d78e"
+                                                                : "1px solid #f5c6c6",
                                                             borderRadius: 6,
                                                             padding: "5px 9px",
                                                             marginTop: 4,
                                                             fontSize: 10.5,
-                                                            color: "#7a1f1f",
+                                                            color: needsCorrection
+                                                                ? "#7a4a00"
+                                                                : "#7a1f1f",
                                                             lineHeight: 1.4,
                                                             textAlign: "right",
                                                             maxWidth: 240,
@@ -365,8 +397,135 @@ export default function MyRequests({ resident, onLogout }) {
                                                         {denialReason}
                                                     </div>
                                                 )}
+                                                {needsCorrection && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            navigate(
+                                                                `/resident/submit-request?edit=${row.request_id}`,
+                                                            )
+                                                        }
+                                                        style={{
+                                                            display:
+                                                                "inline-flex",
+                                                            alignItems:
+                                                                "center",
+                                                            gap: 5,
+                                                            border:
+                                                                "1px solid #d7a545",
+                                                            borderRadius: 4,
+                                                            background:
+                                                                "#fff",
+                                                            color: "#8a5300",
+                                                            padding: "5px 9px",
+                                                            fontSize: 10.5,
+                                                            fontWeight: 700,
+                                                            cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        <Pencil size={11} /> Edit
+                                                        &amp; Resubmit
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
+                                        {row.correction_history?.length > 0 && (
+                                            <div
+                                                style={{
+                                                    margin: "0 20px 14px 70px",
+                                                    padding: "10px 12px",
+                                                    border: "1px solid #eadfc9",
+                                                    borderRadius: 6,
+                                                    background: "#fffdf8",
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        fontSize: 10.5,
+                                                        fontWeight: 700,
+                                                        color: "#7a6530",
+                                                        textTransform:
+                                                            "uppercase",
+                                                        letterSpacing: 0.7,
+                                                        marginBottom: 7,
+                                                    }}
+                                                >
+                                                    Correction History ·{" "}
+                                                    {row.revision_count || 0}{" "}
+                                                    revision
+                                                    {Number(
+                                                        row.revision_count || 0,
+                                                    ) === 1
+                                                        ? ""
+                                                        : "s"}
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        display: "grid",
+                                                        gap: 7,
+                                                    }}
+                                                >
+                                                    {row.correction_history.map(
+                                                        (event) => {
+                                                            const resubmitted =
+                                                                event.event_type ===
+                                                                "resident_resubmitted";
+                                                            return (
+                                                                <div
+                                                                    key={
+                                                                        event.correction_history_id
+                                                                    }
+                                                                    style={{
+                                                                        borderLeft: `3px solid ${resubmitted ? "#1a7a4a" : "#b86800"}`,
+                                                                        paddingLeft:
+                                                                            9,
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: 11.5,
+                                                                            fontWeight: 700,
+                                                                            color: resubmitted
+                                                                                ? "#1a7a4a"
+                                                                                : "#9a5b00",
+                                                                        }}
+                                                                    >
+                                                                        {resubmitted
+                                                                            ? `Revision ${event.revision_number} resubmitted`
+                                                                            : "Staff requested correction"}
+                                                                    </div>
+                                                                    {event.message && (
+                                                                        <div
+                                                                            style={{
+                                                                                fontSize: 11.5,
+                                                                                color: "#4a4a6a",
+                                                                                lineHeight: 1.45,
+                                                                                marginTop: 2,
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                event.message
+                                                                            }
+                                                                        </div>
+                                                                    )}
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: 10,
+                                                                            color: "#9090aa",
+                                                                            marginTop: 2,
+                                                                        }}
+                                                                    >
+                                                                        {correctionEventTime(
+                                                                            event.created_at,
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        },
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

@@ -582,7 +582,7 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                 <>
                                     <div className="ma-field">
                                         <label>
-                                            Password{" "}
+                                            Initial Password{" "}
                                             <span className="req">*</span>
                                         </label>
                                         <div className="ma-input-wrap">
@@ -656,6 +656,18 @@ function AccountModal({ mode, account, onClose, onSave }) {
                                                 )}
                                             </button>
                                         </div>
+                                    </div>
+                                    <div
+                                        style={{
+                                            marginTop: 10,
+                                            fontSize: 11,
+                                            color: "#7a7890",
+                                            lineHeight: 1.5,
+                                        }}
+                                    >
+                                        The verification email does not include
+                                        this password. Give it to the account
+                                        owner through a separate secure channel.
                                     </div>
                                 </>
                             )}
@@ -1678,7 +1690,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                     password: form.password,
                 });
                 showToast(
-                    `Account for ${form.full_name} created. Verification email sent.`,
+                    `Account for ${form.full_name} created. Verification email sent; provide the initial password separately.`,
                 );
             } else if (modal.mode === "edit") {
                 await accountService.updateAccount(modal.account.admin_id, {
