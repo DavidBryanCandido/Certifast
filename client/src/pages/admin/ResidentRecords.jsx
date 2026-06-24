@@ -43,6 +43,15 @@ function useWindowSize() {
     return width;
 }
 
+function useDebouncedValue(value, delay = 300) {
+    const [debounced, setDebounced] = useState(value);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebounced(value), delay);
+        return () => window.clearTimeout(timer);
+    }, [value, delay]);
+    return debounced;
+}
+
 // =============================================================
 // Inject styles once
 // =============================================================
@@ -665,6 +674,7 @@ export default function ResidentRecords({
     const [sortFilter, setSortFilter] = useState("name");
     const [rowsPerPage, setRowsPerPage] = useState(5);
     const [currentPage, setCurrentPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(search, 300);
     const [residents, setResidents] = useState([]);
     const [listLoading, setListLoading] = useState(true);
     const [listError, setListError] = useState("");
@@ -760,7 +770,7 @@ export default function ResidentRecords({
 
         try {
             const result = await residentRecordsService.getResidents({
-                search,
+                search: debouncedSearch,
                 status: statusFilter ? statusFilter.toLowerCase() : "",
                 sort: sortFilter,
                 page: currentPage,
@@ -791,10 +801,10 @@ export default function ResidentRecords({
         }
     }, [
         currentPage,
+        debouncedSearch,
         mapResidentRow,
         onLogout,
         rowsPerPage,
-        search,
         sortFilter,
         statusFilter,
     ]);

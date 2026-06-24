@@ -6,10 +6,11 @@ const API = getApiBase();
 
 const requestService = {
     // GET all requests for logged-in resident
-    getAllRequests: async () => {
+    getAllRequests: async (params = {}) => {
         const token = authService.getResidentToken();
         const res = await axios.get(`${API}/resident/requests`, {
             headers: { Authorization: `Bearer ${token}` },
+            params,
         });
         return res.data;
     },

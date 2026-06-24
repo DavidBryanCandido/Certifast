@@ -2073,7 +2073,10 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         async (request) => {
             setSelectedRequest(request);
             try {
-                const result = await adminRequestService.getRequests();
+                const result = await adminRequestService.getRequests({
+                    requestId: request.rawId,
+                    limit: 1,
+                });
                 const rows = Array.isArray(result?.data)
                     ? result.data
                     : Array.isArray(result)

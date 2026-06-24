@@ -213,6 +213,12 @@ export default function ResidentHome({ resident, onLogout }) {
     const navigate = useNavigate();
     const [width, setWidth] = useState(window.innerWidth);
     const [requests, setRequests] = useState([]);
+    const [requestStats, setRequestStats] = useState({
+        total: 0,
+        pending: 0,
+        released: 0,
+        rejected: 0,
+    });
     const [loadingRequests, setLoadingRequests] = useState(true);
     const [requestsError, setRequestsError] = useState("");
     const [branding, setBranding] = useState(DEFAULT_PUBLIC_BRANDING);
@@ -231,7 +237,10 @@ export default function ResidentHome({ resident, onLogout }) {
 
         async function loadRequests() {
             try {
-                const result = await requestService.getAllRequests();
+                const result = await requestService.getAllRequests({
+                    scope: "home",
+                    limit: 5,
+                });
                 const rawRows = Array.isArray(result?.data)
                     ? result.data
                     : Array.isArray(result)
@@ -253,11 +262,46 @@ export default function ResidentHome({ resident, onLogout }) {
 
                 if (mounted) {
                     setRequests(normalized);
+                    const s = result?.stats || {};
+                    const fallbackStats = {
+                        total: normalized.length,
+                        pending: normalized.filter((r) =>
+                            [
+                                "pending",
+                                "processing",
+                                "approved",
+                                "ready",
+                                "needs_correction",
+                            ].includes(String(r.status || "").toLowerCase()),
+                        ).length,
+                        released: normalized.filter(
+                            (r) =>
+                                String(r.status || "").toLowerCase() ===
+                                "released",
+                        ).length,
+                        rejected: normalized.filter(
+                            (r) =>
+                                String(r.status || "").toLowerCase() ===
+                                "rejected",
+                        ).length,
+                    };
+                    setRequestStats({
+                        total: Number(s.total ?? fallbackStats.total),
+                        pending: Number(s.pending ?? fallbackStats.pending),
+                        released: Number(s.released ?? fallbackStats.released),
+                        rejected: Number(s.rejected ?? fallbackStats.rejected),
+                    });
                     setRequestsError("");
                 }
             } catch (err) {
                 if (mounted) {
                     setRequests([]);
+                    setRequestStats({
+                        total: 0,
+                        pending: 0,
+                        released: 0,
+                        rejected: 0,
+                    });
                     setRequestsError(
                         err?.response?.data?.message ||
                             "Unable to load your requests right now.",
@@ -327,31 +371,13 @@ export default function ResidentHome({ resident, onLogout }) {
 
     // Stats
     const stats = {
-        total: requests.length,
-        pending: requests.filter((r) => {
-            const s = String(r.status || "").toLowerCase();
-            return [
-                "pending",
-                "processing",
-                "approved",
-                "ready",
-                "needs_correction",
-            ].includes(s);
-        }).length,
-        released: requests.filter(
-            (r) => String(r.status || "").toLowerCase() === "released",
-        ).length,
-        rejected: requests.filter(
-            (r) => String(r.status || "").toLowerCase() === "rejected",
-        ).length,
+        total: requestStats.total,
+        pending: requestStats.pending,
+        released: requestStats.released,
+        rejected: requestStats.rejected,
     };
 
-    const recentRequests = [...requests]
-        .sort(
-            (a, b) =>
-                new Date(b.requested_at || 0) - new Date(a.requested_at || 0),
-        )
-        .slice(0, 5);
+    const recentRequests = requests;
     const visibleCertificateTemplates = certificateTemplates.slice(
         0,
         HOME_CERTIFICATE_LIMIT,

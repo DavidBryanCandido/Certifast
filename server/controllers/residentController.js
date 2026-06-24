@@ -14,6 +14,22 @@ function cleanInteger(value) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parsePositiveInteger(value, fallback, max = 100) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.min(parsed, max);
+}
+
+function makePagination(query, defaultLimit = 25, maxLimit = 100) {
+    const page = parsePositiveInteger(query.page, 1, 1000000);
+    const limit = parsePositiveInteger(query.limit, defaultLimit, maxLimit);
+    return {
+        page,
+        limit,
+        offset: (page - 1) * limit,
+    };
+}
+
 function cleanObject(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -464,7 +480,41 @@ async function createRequest(req, res) {
 // GET /api/resident/requests
 async function getMyRequests(req, res) {
     const resident_id = req.resident.id;
+    const scope = String(req.query.scope || "").trim().toLowerCase();
+    const summaryMode =
+        scope === "home" ||
+        scope === "summary" ||
+        String(req.query.summary || "") === "1";
+    const wantsPaged =
+        summaryMode ||
+        req.query.page !== undefined ||
+        req.query.limit !== undefined;
+    const { page, limit, offset } = makePagination(
+        req.query,
+        summaryMode ? 5 : 25,
+        100,
+    );
+
     try {
+        const queryArgs = wantsPaged
+            ? [resident_id, limit, offset]
+            : [resident_id];
+        const pagingSql = wantsPaged ? "LIMIT $2 OFFSET $3" : "";
+        const countPromise = wantsPaged
+            ? pool.query(
+                  `SELECT
+                    COUNT(*)::int AS total,
+                    COUNT(*) FILTER (
+                        WHERE status IN ('pending', 'processing', 'approved', 'ready', 'needs_correction')
+                    )::int AS pending,
+                    COUNT(*) FILTER (WHERE status = 'released')::int AS released,
+                    COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected
+                 FROM requests
+                 WHERE resident_id = $1`,
+                  [resident_id],
+              )
+            : null;
+
         const result = await pool.query(
             `SELECT r.request_id, r.template_id, r.cert_type, r.purpose,
                     r.extra_fields, r.notes, r.source, r.status,
@@ -476,13 +526,37 @@ async function getMyRequests(req, res) {
              FROM requests r
              LEFT JOIN certificate_templates ct ON ct.template_id = r.template_id
              WHERE r.resident_id = $1
-             ORDER BY r.requested_at DESC`,
-            [resident_id],
+             ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC
+             ${pagingSql}`,
+            queryArgs,
         );
-        const rowsWithAttachments =
-            await appendResidentRequestAttachments(result.rows);
-        const rows = await appendCorrectionHistory(rowsWithAttachments);
-        return res.json({ data: rows });
+
+        const rows = summaryMode
+            ? result.rows
+            : await appendCorrectionHistory(
+                  await appendResidentRequestAttachments(result.rows),
+              );
+
+        if (!wantsPaged) {
+            return res.json({ data: rows });
+        }
+
+        const countResult = await countPromise;
+        const counts = countResult.rows[0] || {};
+        const total = Number(counts.total || 0);
+        return res.json({
+            data: rows,
+            total,
+            page,
+            limit,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+            stats: {
+                total,
+                pending: Number(counts.pending || 0),
+                released: Number(counts.released || 0),
+                rejected: Number(counts.rejected || 0),
+            },
+        });
     } catch (err) {
         console.error("getMyRequests error:", err);
         return res.status(500).json({ message: "Server error" });

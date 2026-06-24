@@ -14,8 +14,11 @@ function getAdminHeaders() {
 }
 
 const adminRequestService = {
-    getRequests: async () => {
-        const res = await axios.get(`${API}/admin/requests`, getAdminHeaders());
+    getRequests: async (params = {}) => {
+        const res = await axios.get(`${API}/admin/requests`, {
+            ...getAdminHeaders(),
+            params,
+        });
         return res.data;
     },
 

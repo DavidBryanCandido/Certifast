@@ -54,6 +54,15 @@ function useWindowSize() {
     return width;
 }
 
+function useDebouncedValue(value, delay = 300) {
+    const [debounced, setDebounced] = useState(value);
+    useEffect(() => {
+        const timer = window.setTimeout(() => setDebounced(value), delay);
+        return () => window.clearTimeout(timer);
+    }, [value, delay]);
+    return debounced;
+}
+
 // =============================================================
 // Inject styles once
 // =============================================================
@@ -1076,11 +1085,16 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     const [dateFilter, setDateFilter] = useState("all");
     const [sortFilter, setSortFilter] = useState("newest");
     const [currentPage, setCurrentPage] = useState(1);
+    const debouncedSearch = useDebouncedValue(search, 300);
 
     // Data
     const [requests, setRequests]   = useState([]);
     const [loading, setLoading]     = useState(true);
     const [error, setError]         = useState("");
+    const [totalRequests, setTotalRequests] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [statusCounts, setStatusCounts] = useState({ all: 0 });
+    const [certTypes, setCertTypes] = useState([]);
     const [certificateSettings, setCertificateSettings] = useState({});
     const [personnelSignatories, setPersonnelSignatories] = useState({
         captain: null,
@@ -1105,31 +1119,6 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             setActiveTab(requestedStatus);
         }
     }, [requestedStatus]);
-
-    useEffect(() => {
-        if (!Number.isFinite(requestedRequestId) || requestedRequestId <= 0) {
-            return;
-        }
-        const matched = requests.find((req) => req.rawId === requestedRequestId);
-        if (!matched) return;
-
-        setSearch("");
-        setCertFilter("all");
-        setDateFilter("all");
-        setSortFilter("newest");
-        setActiveTab(matched.status || "all");
-        setSelectedRequest(matched);
-
-        const sameStatus = requests.filter(
-            (req) => req.status === matched.status,
-        );
-        const requestIndex = sameStatus.findIndex(
-            (req) => req.rawId === requestedRequestId,
-        );
-        if (requestIndex >= 0) {
-            setCurrentPage(Math.floor(requestIndex / ITEMS_PER_PAGE) + 1);
-        }
-    }, [requestedRequestId, requests]);
 
     const mapRequestRow = useCallback((row) => {
         const requestedAt = row.requested_at ? new Date(row.requested_at) : null;
@@ -1189,13 +1178,25 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
         setLoading(true);
         setError("");
         try {
-            const result = await adminRequestService.getRequests();
+            const result = await adminRequestService.getRequests({
+                status: activeTab === "all" ? undefined : activeTab,
+                search: debouncedSearch || undefined,
+                certType: certFilter === "all" ? undefined : certFilter,
+                date: dateFilter === "all" ? undefined : dateFilter,
+                sort: sortFilter,
+                page: currentPage,
+                limit: ITEMS_PER_PAGE,
+            });
             const rows = Array.isArray(result?.data)
                 ? result.data
                 : Array.isArray(result)
                     ? result
                     : [];
             setRequests(rows.map(mapRequestRow));
+            setTotalRequests(Number(result?.total || rows.length || 0));
+            setTotalPages(Number(result?.totalPages || 1));
+            setStatusCounts(result?.statusCounts || { all: rows.length || 0 });
+            setCertTypes(Array.isArray(result?.certTypes) ? result.certTypes : []);
         } catch (err) {
             if (err?.response?.status === 401 || err?.response?.status === 403) {
                 onLogout?.();
@@ -1203,12 +1204,62 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             }
             setError(err?.response?.data?.message || "Failed to load requests.");
             setRequests([]);
+            setTotalRequests(0);
+            setTotalPages(1);
+            setStatusCounts({ all: 0 });
         } finally {
             setLoading(false);
         }
-    }, [mapRequestRow, onLogout]);
+    }, [
+        activeTab,
+        certFilter,
+        currentPage,
+        dateFilter,
+        debouncedSearch,
+        mapRequestRow,
+        onLogout,
+        sortFilter,
+    ]);
 
     useEffect(() => { loadRequests(); }, [loadRequests]);
+
+    useEffect(() => {
+        if (!Number.isFinite(requestedRequestId) || requestedRequestId <= 0) {
+            return undefined;
+        }
+
+        let mounted = true;
+        async function openLinkedRequest() {
+            try {
+                const result = await adminRequestService.getRequests({
+                    requestId: requestedRequestId,
+                    limit: 1,
+                });
+                const row = Array.isArray(result?.data) ? result.data[0] : null;
+                if (!mounted || !row) return;
+                const request = mapRequestRow(row);
+                setSearch("");
+                setCertFilter("all");
+                setDateFilter("all");
+                setSortFilter("newest");
+                setActiveTab(request.status || "all");
+                setCurrentPage(1);
+                setSelectedRequest(request);
+            } catch (err) {
+                if (
+                    mounted &&
+                    (err?.response?.status === 401 || err?.response?.status === 403)
+                ) {
+                    onLogout?.();
+                }
+            }
+        }
+
+        openLinkedRequest();
+        return () => {
+            mounted = false;
+        };
+    }, [mapRequestRow, onLogout, requestedRequestId]);
 
     useEffect(() => {
         let mounted = true;
@@ -1272,38 +1323,13 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
         }
     };
 
-    // Filter logic
-    const filtered = requests
-        .filter((r) => {
-            if (activeTab !== "all" && r.status !== activeTab) return false;
-            if (certFilter !== "all" && r.certType !== certFilter) return false;
-            if (dateFilter !== "all") {
-                const now = new Date();
-                const reqDate = new Date(r.requestedAtMs || 0);
-                if (dateFilter === "today" && reqDate.toDateString() !== now.toDateString()) return false;
-                if (dateFilter === "week") { const s = new Date(now); s.setDate(now.getDate() - 7); if (reqDate < s) return false; }
-                if (dateFilter === "month") { const s = new Date(now.getFullYear(), now.getMonth(), 1); if (reqDate < s) return false; }
-            }
-            if (search) {
-                const q = search.toLowerCase();
-                if (![r.id, r.name, r.certType, r.purpose].join(" ").toLowerCase().includes(q)) return false;
-            }
-            return true;
-        })
-        .sort((a, b) => {
-            if (sortFilter === "newest") return b.requestedAtMs - a.requestedAtMs;
-            if (sortFilter === "oldest") return a.requestedAtMs - b.requestedAtMs;
-            if (sortFilter === "name")   return a.name.localeCompare(b.name);
-            return 0;
-        });
-
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-    const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
     useEffect(() => { setCurrentPage(1); }, [activeTab, search, certFilter, dateFilter, sortFilter]);
 
-    const countByStatus = (status) => requests.filter((r) => status === "all" || r.status === status).length;
-    const certTypes = [...new Set(requests.map((r) => r.certType))];
+    const paginated = requests;
+    const displayStart =
+        totalRequests === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
+    const displayEnd = Math.min(currentPage * ITEMS_PER_PAGE, totalRequests);
+    const countByStatus = (status) => Number(statusCounts?.[status] || 0);
 
     return (
         <div className="mr-root">
@@ -1386,7 +1412,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
                         <div>
                             <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: isMobile ? 18 : 20, color: "var(--color-primary, #0e2554)", margin: 0 }}>All Requests</h2>
-                            <p style={{ fontSize: 12, color: "#9090aa", marginTop: 3 }}>{requests.length} total requests on record</p>
+                            <p style={{ fontSize: 12, color: "#9090aa", marginTop: 3 }}>{countByStatus("all")} total requests on record</p>
                         </div>
                     </div>
 
@@ -1433,7 +1459,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                                 {activeTab === "all" ? "All Requests" : STATUS_TABS.find((t) => t.key === activeTab)?.label}
                             </div>
                             <div style={{ fontSize: 11, color: "#9090aa" }}>
-                                Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filtered.length)}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+                                Showing {displayStart}–{displayEnd} of {totalRequests}
                             </div>
                         </div>
 
@@ -1552,7 +1578,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
                         {/* Pagination */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderTop: "1px solid #e4dfd4", flexWrap: "wrap", gap: 8 }}>
                             <div style={{ fontSize: 11.5, color: "#9090aa" }}>
-                                Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filtered.length)}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} requests
+                                Showing {displayStart}–{displayEnd} of {totalRequests} requests
                             </div>
                             <div style={{ display: "flex", gap: 4 }}>
                                 <button className="mr-pag-btn" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>

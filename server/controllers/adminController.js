@@ -39,6 +39,26 @@ function getAdminEmailRedirectUrl() {
     return `${clientUrl || "http://localhost:5173"}/admin/login`;
 }
 
+function parsePositiveInteger(value, fallback, max = 100) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+    return Math.min(parsed, max);
+}
+
+function escapeLikePattern(value) {
+    return String(value || "").replace(/[\\%_]/g, "\\$&");
+}
+
+function makePagination(query, defaultLimit = 25, maxLimit = 100) {
+    const page = parsePositiveInteger(query.page, 1, 1000000);
+    const limit = parsePositiveInteger(query.limit, defaultLimit, maxLimit);
+    return {
+        page,
+        limit,
+        offset: (page - 1) * limit,
+    };
+}
+
 function makeWalkInDocId(certificateId) {
     const now = new Date();
     const y = now.getFullYear();
@@ -1148,27 +1168,20 @@ async function getResidents(req, res) {
     const sortRaw = String(req.query.sort || "date")
         .trim()
         .toLowerCase();
-    const pageRaw = Number.parseInt(req.query.page, 10);
-    const limitRaw = Number.parseInt(req.query.limit, 10);
-
-    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
-    const limit =
-        Number.isFinite(limitRaw) && limitRaw > 0
-            ? Math.min(limitRaw, 100)
-            : 10;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = makePagination(req.query, 10, 100);
 
     const where = [];
     const args = [];
 
     if (search) {
-        args.push(`%${search}%`);
+        args.push(`%${escapeLikePattern(search)}%`);
         const idx = args.length;
         where.push(`(
-            res.full_name ILIKE $${idx}
-            OR COALESCE(res.address_house, '') ILIKE $${idx}
-            OR COALESCE(res.address_street, '') ILIKE $${idx}
-            OR ('#RES-' || LPAD(res.resident_id::text, 4, '0')) ILIKE $${idx}
+            res.full_name ILIKE $${idx} ESCAPE '\\'
+            OR COALESCE(res.address_house, '') ILIKE $${idx} ESCAPE '\\'
+            OR COALESCE(res.address_street, '') ILIKE $${idx} ESCAPE '\\'
+            OR ('#RES-' || LPAD(res.resident_id::text, 4, '0')) ILIKE $${idx} ESCAPE '\\'
+            OR ('RES-' || LPAD(res.resident_id::text, 4, '0')) ILIKE $${idx} ESCAPE '\\'
         )`);
     }
 
@@ -1182,12 +1195,32 @@ async function getResidents(req, res) {
     }
 
     const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const sortsByRequestCount = sortRaw === "requests";
     const orderBy =
         sortRaw === "date"
             ? "res.created_at DESC, res.resident_id DESC"
-            : sortRaw === "requests"
-              ? "request_count DESC, res.full_name ASC"
-              : "res.full_name ASC";
+            : sortsByRequestCount
+              ? "request_count DESC, res.full_name ASC, res.resident_id DESC"
+              : "res.full_name ASC, res.resident_id ASC";
+
+    const residentColumns = `
+        res.resident_id,
+        res.full_name,
+        res.email,
+        res.contact_number,
+        to_jsonb(res)->>'id_type' AS id_type,
+        to_jsonb(res)->>'id_image_url' AS id_image_url,
+        to_jsonb(res)->>'rejection_comment' AS rejection_comment,
+        COALESCE((to_jsonb(res)->>'is_renter')::boolean, false) AS is_renter,
+        res.address_house,
+        res.address_street,
+        to_jsonb(res)->>'address_city' AS address_city,
+        to_jsonb(res)->>'address_province' AS address_province,
+        res.date_of_birth,
+        res.civil_status,
+        to_jsonb(res)->>'verified_at' AS verified_at,
+        res.status,
+        res.created_at`;
 
     try {
         const countResult = await pool.query(
@@ -1201,27 +1234,10 @@ async function getResidents(req, res) {
         const totalPages = Math.max(1, Math.ceil(total / limit));
 
         const pageArgs = [...args, limit, offset];
-        let result;
-        try {
-            result = await pool.query(
-                `SELECT
-                    res.resident_id,
-                    res.full_name,
-                    res.email,
-                    res.contact_number,
-                    res.id_type,
-                    res.id_image_url,
-                    res.rejection_comment,
-                    res.is_renter,
-                    res.address_house,
-                    res.address_street,
-                    to_jsonb(res)->>'address_city' AS address_city,
-                    to_jsonb(res)->>'address_province' AS address_province,
-                    res.date_of_birth,
-                    res.civil_status,
-                    res.verified_at,
-                    res.status,
-                    res.created_at,
+        const result = sortsByRequestCount
+            ? await pool.query(
+                  `SELECT
+                    ${residentColumns},
                     COALESCE(req.request_count, 0)::int AS request_count
                  FROM residents res
                  LEFT JOIN (
@@ -1234,45 +1250,29 @@ async function getResidents(req, res) {
                  ORDER BY ${orderBy}
                  LIMIT $${args.length + 1}
                  OFFSET $${args.length + 2}`,
-                pageArgs,
-            );
-        } catch (queryErr) {
-            // Backward-compatible fallback for older schemas missing ID verification columns
-            if (queryErr?.code !== "42703") throw queryErr;
-            result = await pool.query(
-                `SELECT
-                    res.resident_id,
-                    res.full_name,
-                    res.email,
-                    res.contact_number,
-                    NULL::text AS id_type,
-                    NULL::text AS id_image_url,
-                    NULL::text AS rejection_comment,
-                    false AS is_renter,
-                    res.address_house,
-                    res.address_street,
-                    to_jsonb(res)->>'address_city' AS address_city,
-                    to_jsonb(res)->>'address_province' AS address_province,
-                    res.date_of_birth,
-                    res.civil_status,
-                    NULL::timestamp AS verified_at,
-                    res.status,
-                    res.created_at,
+                  pageArgs,
+              )
+            : await pool.query(
+                  `WITH page_residents AS (
+                    SELECT res.*
+                    FROM residents res
+                    ${whereSql}
+                    ORDER BY ${orderBy}
+                    LIMIT $${args.length + 1}
+                    OFFSET $${args.length + 2}
+                 )
+                 SELECT
+                    ${residentColumns},
                     COALESCE(req.request_count, 0)::int AS request_count
-                 FROM residents res
-                 LEFT JOIN (
-                    SELECT resident_id, COUNT(*)::int AS request_count
-                    FROM requests
-                    GROUP BY resident_id
-                 ) req
-                   ON req.resident_id = res.resident_id
-                 ${whereSql}
-                 ORDER BY ${orderBy}
-                 LIMIT $${args.length + 1}
-                 OFFSET $${args.length + 2}`,
-                pageArgs,
-            );
-        }
+                 FROM page_residents res
+                 LEFT JOIN LATERAL (
+                    SELECT COUNT(*)::int AS request_count
+                    FROM requests req
+                    WHERE req.resident_id = res.resident_id
+                 ) req ON TRUE
+                 ORDER BY ${orderBy}`,
+                  pageArgs,
+              );
 
         return res.json({
             data: result.rows,
@@ -1293,63 +1293,33 @@ async function getResidentById(req, res) {
     }
 
     try {
-        let result;
-        try {
-            result = await pool.query(
-                `SELECT
-                    res.resident_id,
-                    res.full_name,
-                    res.email,
-                    res.contact_number,
-                    res.address_house,
-                    res.address_street,
-                    res.date_of_birth,
-                    res.civil_status,
-                    res.rejection_comment,
-                    res.is_renter,
-                    res.status,
-                    res.created_at,
-                    COALESCE(req.request_count, 0)::int AS request_count
-                 FROM residents res
-                 LEFT JOIN (
-                    SELECT resident_id, COUNT(*)::int AS request_count
-                    FROM requests
-                    GROUP BY resident_id
-                 ) req
-                   ON req.resident_id = res.resident_id
-                 WHERE res.resident_id = $1
-                 LIMIT 1`,
-                [residentId],
-            );
-        } catch (queryErr) {
-            if (queryErr?.code !== "42703") throw queryErr;
-            result = await pool.query(
-                `SELECT
-                    res.resident_id,
-                    res.full_name,
-                    res.email,
-                    res.contact_number,
-                    res.address_house,
-                    res.address_street,
-                    res.date_of_birth,
-                    res.civil_status,
-                    NULL::text AS rejection_comment,
-                    false AS is_renter,
-                    res.status,
-                    res.created_at,
-                    COALESCE(req.request_count, 0)::int AS request_count
-                 FROM residents res
-                 LEFT JOIN (
-                    SELECT resident_id, COUNT(*)::int AS request_count
-                    FROM requests
-                    GROUP BY resident_id
-                 ) req
-                   ON req.resident_id = res.resident_id
-                 WHERE res.resident_id = $1
-                 LIMIT 1`,
-                [residentId],
-            );
-        }
+        const result = await pool.query(
+            `SELECT
+                res.resident_id,
+                res.full_name,
+                res.email,
+                res.contact_number,
+                res.address_house,
+                res.address_street,
+                to_jsonb(res)->>'address_city' AS address_city,
+                to_jsonb(res)->>'address_province' AS address_province,
+                res.date_of_birth,
+                res.civil_status,
+                to_jsonb(res)->>'rejection_comment' AS rejection_comment,
+                COALESCE((to_jsonb(res)->>'is_renter')::boolean, false) AS is_renter,
+                res.status,
+                res.created_at,
+                COALESCE(req.request_count, 0)::int AS request_count
+             FROM residents res
+             LEFT JOIN LATERAL (
+                SELECT COUNT(*)::int AS request_count
+                FROM requests req
+                WHERE req.resident_id = res.resident_id
+             ) req ON TRUE
+             WHERE res.resident_id = $1
+             LIMIT 1`,
+            [residentId],
+        );
 
         if (result.rows.length === 0) {
             return res.status(404).json({ message: "Resident not found" });
@@ -1891,9 +1861,94 @@ async function getReportsOverview(req, res) {
 }
 
 async function getManageRequests(req, res) {
+    const requestIdRaw = Number.parseInt(req.query.requestId || req.query.id, 10);
+    const hasRequestId =
+        Number.isFinite(requestIdRaw) && requestIdRaw > 0;
+    const search = String(req.query.search || "").trim();
+    const statusRaw = String(req.query.status || "")
+        .trim()
+        .toLowerCase();
+    const certType = String(req.query.certType || req.query.cert_type || "").trim();
+    const dateRaw = String(req.query.date || "")
+        .trim()
+        .toLowerCase();
+    const sortRaw = String(req.query.sort || "newest")
+        .trim()
+        .toLowerCase();
+
+    const allowedStatuses = new Set([
+        "pending",
+        "approved",
+        "ready",
+        "released",
+        "needs_correction",
+        "rejected",
+    ]);
+    const { page, limit, offset } = hasRequestId
+        ? { page: 1, limit: 1, offset: 0 }
+        : makePagination(req.query, 25, 100);
+
+    const where = [];
+    const args = [];
+
+    if (hasRequestId) {
+        args.push(requestIdRaw);
+        where.push(`r.request_id = $${args.length}`);
+    } else {
+        if (allowedStatuses.has(statusRaw)) {
+            args.push(statusRaw);
+            where.push(`LOWER(COALESCE(r.status, 'pending')) = $${args.length}`);
+        }
+
+        if (certType && certType.toLowerCase() !== "all") {
+            args.push(certType);
+            where.push(`r.cert_type = $${args.length}`);
+        }
+
+        if (dateRaw === "today") {
+            where.push(`r.requested_at >= date_trunc('day', CURRENT_TIMESTAMP)`);
+        } else if (dateRaw === "week") {
+            where.push(`r.requested_at >= CURRENT_TIMESTAMP - INTERVAL '7 days'`);
+        } else if (dateRaw === "month") {
+            where.push(`r.requested_at >= date_trunc('month', CURRENT_TIMESTAMP)`);
+        }
+
+        if (search) {
+            args.push(`%${escapeLikePattern(search)}%`);
+            const idx = args.length;
+            where.push(`(
+                r.cert_type ILIKE $${idx} ESCAPE '\\'
+                OR COALESCE(r.purpose, '') ILIKE $${idx} ESCAPE '\\'
+                OR COALESCE(res.full_name, '') ILIKE $${idx} ESCAPE '\\'
+                OR COALESCE(res.email, '') ILIKE $${idx} ESCAPE '\\'
+                OR ('#REQ-' || LPAD(r.request_id::text, 4, '0')) ILIKE $${idx} ESCAPE '\\'
+                OR ('REQ-' || LPAD(r.request_id::text, 4, '0')) ILIKE $${idx} ESCAPE '\\'
+            )`);
+        }
+    }
+
+    const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+    const orderBy =
+        sortRaw === "oldest"
+            ? "r.requested_at ASC NULLS LAST, r.request_id ASC"
+            : sortRaw === "name"
+              ? "COALESCE(res.full_name, '') ASC, r.requested_at DESC NULLS LAST, r.request_id DESC"
+              : "r.requested_at DESC NULLS LAST, r.request_id DESC";
+
     try {
-        const result = await pool.query(
-            `SELECT
+        const dataArgs = [...args, limit, offset];
+        const [countResult, dataResult, statusCountsResult, certTypesResult] =
+            await Promise.all([
+                pool.query(
+                    `SELECT COUNT(*)::int AS total
+                     FROM requests r
+                     LEFT JOIN residents res
+                       ON res.resident_id = r.resident_id
+                     ${whereSql}`,
+                    args,
+                ),
+                pool.query(
+                    `SELECT
                 r.request_id,
                 r.cert_type,
                 r.purpose,
@@ -1934,13 +1989,57 @@ async function getManageRequests(req, res) {
                          COALESCE(ct.display_order, 0),
                          ct.template_id
                 LIMIT 1
-             ) ct ON TRUE
-             ORDER BY r.requested_at DESC NULLS LAST, r.request_id DESC`,
-        );
+              ) ct ON TRUE
+             ${whereSql}
+             ORDER BY ${orderBy}
+             LIMIT $${args.length + 1}
+             OFFSET $${args.length + 2}`,
+                    dataArgs,
+                ),
+                pool.query(
+                    `SELECT LOWER(COALESCE(status, 'pending')) AS status,
+                            COUNT(*)::int AS count
+                     FROM requests
+                     GROUP BY LOWER(COALESCE(status, 'pending'))`,
+                ),
+                pool.query(
+                    `SELECT cert_type
+                     FROM requests
+                     WHERE cert_type IS NOT NULL AND BTRIM(cert_type) <> ''
+                     GROUP BY cert_type
+                     ORDER BY cert_type ASC`,
+                ),
+            ]);
 
-        const rowsWithAttachments = await appendRequestAttachments(result.rows);
+        const total = countResult.rows[0]?.total || 0;
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        const statusCounts = { all: 0 };
+        statusCountsResult.rows.forEach((row) => {
+            const status = String(row.status || "pending").toLowerCase();
+            const count = Number(row.count || 0);
+            statusCounts[status] = count;
+            statusCounts.all += count;
+        });
+        allowedStatuses.forEach((status) => {
+            if (!Object.prototype.hasOwnProperty.call(statusCounts, status)) {
+                statusCounts[status] = 0;
+            }
+        });
+
+        const certTypes = certTypesResult.rows.map((row) => row.cert_type);
+        const rowsWithAttachments = await appendRequestAttachments(
+            dataResult.rows,
+        );
         const rows = await appendCorrectionHistory(rowsWithAttachments);
-        return res.json({ data: rows });
+        return res.json({
+            data: rows,
+            total,
+            page,
+            limit,
+            totalPages,
+            statusCounts,
+            certTypes,
+        });
     } catch (err) {
         console.error("getManageRequests error:", err);
         return res.status(500).json({ message: "Server error" });
