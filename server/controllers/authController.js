@@ -422,10 +422,14 @@ async function residentChangePassword(req, res) {
 // POST /api/auth/admin/login
 // body: { email, password }
 async function adminLogin(req, res) {
-    const email = String(req.body?.email || "").trim().toLowerCase();
+    const loginIdentifier = String(
+        req.body?.email || req.body?.username || "",
+    )
+        .trim()
+        .toLowerCase();
     const password = String(req.body?.password || "");
 
-    if (!email || !password) {
+    if (!loginIdentifier || !password) {
         return res
             .status(400)
             .json({ message: "Email and password are required" });
@@ -433,8 +437,13 @@ async function adminLogin(req, res) {
 
     try {
         const result = await pool.query(
-            "SELECT * FROM admin_accounts WHERE LOWER(email) = $1 AND status = $2",
-            [email, "active"],
+            `SELECT *
+             FROM admin_accounts
+             WHERE status = $2
+               AND (LOWER(email) = $1 OR LOWER(username) = $1)
+             ORDER BY CASE WHEN LOWER(email) = $1 THEN 0 ELSE 1 END
+             LIMIT 1`,
+            [loginIdentifier, "active"],
         );
 
         if (result.rows.length === 0) {

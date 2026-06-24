@@ -423,8 +423,10 @@ export default function AdminLogin() {
 
         setIsLoading(true);
         try {
+            const email = formData.email.trim();
             const response = await authService.adminLogin({
-                email: formData.email.trim(),
+                email,
+                username: email,
                 password: formData.password,
             });
 
