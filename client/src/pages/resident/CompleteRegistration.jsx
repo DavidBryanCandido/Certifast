@@ -4,7 +4,9 @@ import axios from "axios";
 import { getApiBase } from "../../apiBase";
 import {
     deletePendingResidentIdUpload,
+    deletePendingResidencyProofUpload,
     getPendingResidentIdUpload,
+    getPendingResidencyProofUpload,
 } from "../../residentIdUploadStore";
 
 const API = getApiBase();
@@ -39,6 +41,7 @@ export default function CompleteRegistration() {
                     ? String(v).trim()
                     : null;
             const bool = (v) => v === true || String(v).toLowerCase() === "true";
+            const isRenter = bool(meta.is_renter);
 
             if (!str(meta.first_name) || !str(meta.last_name)) {
                 throw new Error(
@@ -76,6 +79,53 @@ export default function CompleteRegistration() {
                 }
             }
 
+            let residencyProofPath = null;
+            let residencyProofFileName = null;
+            let residencyProofMimeType = null;
+            let residencyProofFileSize = null;
+            const pendingResidencyProofUpload =
+                await getPendingResidencyProofUpload(user.id);
+            if (isRenter && pendingResidencyProofUpload?.file) {
+                const proofFile = pendingResidencyProofUpload.file;
+                const ext =
+                    proofFile.type === "application/pdf"
+                        ? "pdf"
+                        : proofFile.type === "image/png"
+                          ? "png"
+                          : proofFile.type === "image/webp"
+                            ? "webp"
+                            : "jpg";
+                const path = `resident-proofs/${user.id}.${ext}`;
+                const { error: uploadError } = await supabase.storage
+                    .from("certifast-uploads")
+                    .upload(path, proofFile, {
+                        contentType: proofFile.type,
+                        upsert: false,
+                    });
+
+                if (!uploadError) {
+                    residencyProofPath = path;
+                    residencyProofFileName =
+                        pendingResidencyProofUpload.name || proofFile.name || null;
+                    residencyProofMimeType =
+                        pendingResidencyProofUpload.type || proofFile.type || null;
+                    residencyProofFileSize = proofFile.size || null;
+                    await deletePendingResidencyProofUpload(user.id);
+                } else if (/already exists|duplicate/i.test(uploadError.message || "")) {
+                    residencyProofPath = path;
+                    residencyProofFileName =
+                        pendingResidencyProofUpload.name || proofFile.name || null;
+                    residencyProofMimeType =
+                        pendingResidencyProofUpload.type || proofFile.type || null;
+                    residencyProofFileSize = proofFile.size || null;
+                    await deletePendingResidencyProofUpload(user.id);
+                } else {
+                    throw new Error(
+                        "Your proof of residence could not be uploaded. Please contact the barangay office so they can check the Supabase Storage policy for resident proof uploads.",
+                    );
+                }
+            }
+
             await axios.post(
                 `${API}/auth/resident/complete-registration`,
                 {
@@ -88,13 +138,16 @@ export default function CompleteRegistration() {
                     house_no: str(meta.house_no),
                     purok_id: meta.purok_id ?? null,
                     street_id: meta.street_id ?? null,
-                    street_other: str(meta.street_other),
                     date_of_birth: meta.date_of_birth || null,
                     civil_status: str(meta.civil_status),
                     nationality: str(meta.nationality) || "Filipino",
                     id_type: str(meta.id_type),
                     id_image_path: idImagePath,
-                    is_renter: bool(meta.is_renter),
+                    is_renter: isRenter,
+                    residency_proof_path: residencyProofPath,
+                    residency_proof_file_name: residencyProofFileName,
+                    residency_proof_mime_type: residencyProofMimeType,
+                    residency_proof_file_size: residencyProofFileSize,
                     agreed_to_terms: bool(meta.agreed_to_terms),
                     terms_agreed_at: str(meta.terms_agreed_at),
                 },

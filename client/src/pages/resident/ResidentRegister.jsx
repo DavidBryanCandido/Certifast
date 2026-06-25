@@ -25,49 +25,25 @@ import {
 } from "lucide-react";
 import { supabase } from "../../supabaseClient";
 import { getApiBase } from "../../apiBase";
-import { savePendingResidentIdUpload } from "../../residentIdUploadStore";
+import {
+    savePendingResidentIdUpload,
+    savePendingResidencyProofUpload,
+} from "../../residentIdUploadStore";
+import {
+    buildStreetOptions,
+    findSingleMappedPurok,
+    isMappedPurokStreet,
+    isStreetAllowedForPurok,
+    normalizeAddressOptions,
+    PUROKS_FALLBACK,
+    STREET_MAPPINGS_FALLBACK,
+    STREETS_FALLBACK,
+} from "../../utils/addressOptions";
 
 const API = getApiBase();
 
 // ─── Address data ─────────────────────────────────────────────
 // Fallback lists — used while API loads or on fetch failure.
-const PUROKS_FALLBACK = [
-    { purok_id: 1, name: "Purok 1" },
-    { purok_id: 2, name: "Purok 2" },
-    { purok_id: 3, name: "Purok 3" },
-    { purok_id: 4, name: "Purok 4" },
-    { purok_id: 5, name: "Purok 5" },
-    { purok_id: 6, name: "Purok 6" },
-    { purok_id: 7, name: "Purok 7" },
-    { purok_id: 8, name: "Purok 8" },
-    { purok_id: 9, name: "Purok 9" },
-    { purok_id: 10, name: "Purok 10" },
-    { purok_id: 11, name: "Purok 11" },
-];
-const STREETS_FALLBACK = [
-    { street_id: 1, name: "Acayan Street" },
-    { street_id: 2, name: "Apelado Street" },
-    { street_id: 3, name: "Bacon Street" },
-    { street_id: 4, name: "Cruz Dela Drive" },
-    { street_id: 5, name: "Coll Street" },
-    { street_id: 6, name: "Donor Street" },
-    { street_id: 7, name: "Espiritu Street" },
-    { street_id: 8, name: "Fendler Street" },
-    { street_id: 9, name: "Fendler Extension Street" },
-    { street_id: 10, name: "Fontain Extension Street" },
-    { street_id: 11, name: "Gallagher Street" },
-    { street_id: 12, name: "Hansen Street" },
-    { street_id: 13, name: "Irving Street" },
-    { street_id: 14, name: "5th Street" },
-    { street_id: 15, name: "6th Street" },
-    { street_id: 16, name: "8th Street" },
-    { street_id: 17, name: "9th Street" },
-    { street_id: 18, name: "10th Street" },
-    { street_id: 19, name: "12th Street" },
-    { street_id: 20, name: "13th Street" },
-    { street_id: 21, name: "14th Street" },
-    { street_id: 22, name: "16th Street" },
-];
 const ID_TYPES = [
     "Barangay ID",
     "Voter's ID",
@@ -79,6 +55,7 @@ const ID_TYPES = [
     "Other valid ID",
 ];
 const MAX_ID_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_RESIDENCY_PROOF_BYTES = 6 * 1024 * 1024;
 const MIN_REGISTRATION_AGE = 18;
 
 function calculateAge(dateString) {
@@ -396,6 +373,7 @@ function StepIndicator({ step }) {
 export default function ResidentRegister({ onSuccess }) {
     const navigate = useNavigate();
     const fileInputRef = useRef(null);
+    const proofInputRef = useRef(null);
 
     const [width, setWidth] = useState(window.innerWidth);
     useEffect(() => {
@@ -415,6 +393,9 @@ export default function ResidentRegister({ onSuccess }) {
     // Address options — loaded from DB via API, fallback to hardcoded
     const [puroks, setPuroks] = useState(PUROKS_FALLBACK);
     const [streets, setStreets] = useState(STREETS_FALLBACK);
+    const [streetMappings, setStreetMappings] = useState(
+        STREET_MAPPINGS_FALLBACK,
+    );
 
     useEffect(() => {
         async function loadAddressOptions() {
@@ -422,10 +403,10 @@ export default function ResidentRegister({ onSuccess }) {
                 const res = await fetch(`${API}/auth/address-options`);
                 if (!res.ok) return;
                 const data = await res.json();
-                if (Array.isArray(data.puroks) && data.puroks.length)
-                    setPuroks(data.puroks);
-                if (Array.isArray(data.streets) && data.streets.length)
-                    setStreets(data.streets);
+                const options = normalizeAddressOptions(data);
+                setPuroks(options.puroks);
+                setStreets(options.streets);
+                setStreetMappings(options.streetMappings);
             } catch {
                 // silently keep fallback data
             }
@@ -442,7 +423,6 @@ export default function ResidentRegister({ onSuccess }) {
         house_no: "",
         purok_id: "",
         street_id: "",
-        street_other: "",
         date_of_birth: "",
         civil_status: "",
         nationality: "Filipino",
@@ -452,6 +432,7 @@ export default function ResidentRegister({ onSuccess }) {
     const [idFile, setIdFile] = useState(null);
     const [idPreview, setIdPreview] = useState(null);
     const [isRenter, setIsRenter] = useState(false);
+    const [residencyProofFile, setResidencyProofFile] = useState(null);
     // Step 3 — password
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
@@ -475,16 +456,45 @@ export default function ResidentRegister({ onSuccess }) {
     const selectedStreet = streets.find(
         (s) => String(s.street_id) === String(form.street_id),
     );
-    const resolvedStreet =
-        form.street_id === "other"
-            ? form.street_other.trim()
-            : (selectedStreet?.name ?? "");
+    const streetOptions = buildStreetOptions(
+        streets,
+        streetMappings,
+        form.purok_id,
+    );
+    const resolvedStreet = selectedStreet?.name ?? "";
     const selectedPurok = puroks.find(
         (p) => String(p.purok_id) === String(form.purok_id),
     );
     const applicantAge = calculateAge(form.date_of_birth);
     const isApplicantUnderage =
         applicantAge !== null && applicantAge < MIN_REGISTRATION_AGE;
+
+    const handlePurokChange = (value) => {
+        setError("");
+        setForm((prev) => ({
+            ...prev,
+            purok_id: value,
+            street_id:
+                !value ||
+                isStreetAllowedForPurok(streetMappings, value, prev.street_id)
+                    ? prev.street_id
+                    : "",
+        }));
+    };
+
+    const handleStreetChange = (value) => {
+        const inferredPurokId = findSingleMappedPurok(streetMappings, value);
+        setError("");
+        setForm((prev) => ({
+            ...prev,
+            street_id: value,
+            purok_id:
+                prev.purok_id &&
+                isStreetAllowedForPurok(streetMappings, prev.purok_id, value)
+                    ? prev.purok_id
+                    : inferredPurokId || "",
+        }));
+    };
 
     const handleDateOfBirthChange = (value) => {
         set("date_of_birth", value);
@@ -529,6 +539,34 @@ export default function ResidentRegister({ onSuccess }) {
         if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
+    const removeResidencyProof = () => {
+        setResidencyProofFile(null);
+        if (proofInputRef.current) proofInputRef.current.value = "";
+    };
+
+    const handleRenterChange = (checked) => {
+        setIsRenter(checked);
+        setError("");
+        if (!checked) removeResidencyProof();
+    };
+
+    const handleResidencyProofPick = (e) => {
+        const file = e.target.files?.[0] || null;
+        if (!file) return;
+        const isAllowed =
+            file.type.startsWith("image/") || file.type === "application/pdf";
+        if (!isAllowed) {
+            setError("Please upload a JPG, PNG, WEBP, or PDF proof of residence.");
+            return;
+        }
+        if (file.size > MAX_RESIDENCY_PROOF_BYTES) {
+            setError("Proof of residence must be 6 MB or smaller.");
+            return;
+        }
+        setError("");
+        setResidencyProofFile(file);
+    };
+
     const validateStep = () => {
         if (step === 1) {
             if (!form.first_name.trim()) return "First name is required.";
@@ -548,12 +586,22 @@ export default function ResidentRegister({ onSuccess }) {
                 return "House / Unit number is required.";
 
             if (!form.street_id) return "Please select your street.";
-            if (form.street_id === "other" && !form.street_other.trim())
-                return "Please specify your street name.";
+            if (
+                form.purok_id &&
+                !isMappedPurokStreet(
+                    streetMappings,
+                    form.purok_id,
+                    form.street_id,
+                )
+            )
+                return "Selected street is not assigned to the selected purok.";
         }
         if (step === 2) {
             if (!idType) return "Please select your ID type.";
             if (!idFile) return "Please upload a photo of your valid ID.";
+            if (isRenter && !residencyProofFile) {
+                return "Please upload proof of your current East Tapinac residence.";
+            }
         }
         if (step === 3) {
             if (!password) return "Password is required.";
@@ -609,14 +657,7 @@ export default function ResidentRegister({ onSuccess }) {
                             contact_number: form.contact_number.trim(),
                             house_no: form.house_no.trim(),
                             purok_id: form.purok_id || null,
-                            street_id:
-                                form.street_id && form.street_id !== "other"
-                                    ? form.street_id
-                                    : null,
-                            street_other:
-                                form.street_id === "other"
-                                    ? form.street_other.trim() || null
-                                    : null,
+                            street_id: form.street_id || null,
                             date_of_birth: form.date_of_birth || null,
                             civil_status: form.civil_status || null,
                             nationality: form.nationality || "Filipino",
@@ -680,6 +721,19 @@ export default function ResidentRegister({ onSuccess }) {
                 } catch {
                     setIdUploadWarning(
                         "Your ID photo could not be saved for upload after email verification. You can still verify your email, but staff may request your ID during review.",
+                    );
+                }
+            }
+
+            if (isRenter && residencyProofFile && authData?.user) {
+                try {
+                    await savePendingResidencyProofUpload(
+                        authData.user.id,
+                        residencyProofFile,
+                    );
+                } catch {
+                    setIdUploadWarning(
+                        "Your proof file could not be saved for upload after email verification. If account completion fails after clicking the email link, please contact the barangay office.",
                     );
                 }
             }
@@ -764,7 +818,8 @@ export default function ResidentRegister({ onSuccess }) {
                             We sent a verification link to{" "}
                             <strong>{form.email}</strong>. Click it to confirm
                             your email, then come back in 1-3 business days
-                            once the barangay has reviewed your ID.
+                            once the barangay has reviewed your ID
+                            {isRenter ? " and proof of residence" : ""}.
                         </p>
                         {idUploadWarning ? (
                             <div
@@ -1045,7 +1100,7 @@ export default function ResidentRegister({ onSuccess }) {
                         <select
                             className="reg-select"
                             value={form.purok_id}
-                            onChange={(e) => set("purok_id", e.target.value)}
+                            onChange={(e) => handlePurokChange(e.target.value)}
                         >
                             <option value="">Select…</option>
                             {puroks.map((p) => (
@@ -1059,37 +1114,22 @@ export default function ResidentRegister({ onSuccess }) {
                         <select
                             className="reg-select"
                             value={form.street_id}
-                            onChange={(e) => set("street_id", e.target.value)}
+                            onChange={(e) => handleStreetChange(e.target.value)}
                         >
                             <option value="">Select street…</option>
-                            {streets.map((s) => (
-                                <option key={s.street_id} value={s.street_id}>
-                                    {s.name}
+                            {streetOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
                                 </option>
                             ))}
-                            <option value="other">Other / Not listed</option>
+                            {!streetOptions.length && (
+                                <option value="" disabled>
+                                    No streets mapped
+                                </option>
+                            )}
                         </select>
                     </FieldGroup>
                 </div>
-
-                {form.street_id === "other" && (
-                    <FieldGroup
-                        label="Specify Street"
-                        required
-                        mb={0}
-                        style={{ marginBottom: 10 }}
-                    >
-                        <input
-                            className="reg-input-bare"
-                            type="text"
-                            value={form.street_other}
-                            onChange={(e) =>
-                                set("street_other", e.target.value)
-                            }
-                            placeholder="Enter your street name"
-                        />
-                    </FieldGroup>
-                )}
 
                 {/* Row 2 — Barangay / City (locked, shown below for context) */}
                 <div
@@ -1097,7 +1137,7 @@ export default function ResidentRegister({ onSuccess }) {
                         display: "grid",
                         gridTemplateColumns: "1fr 1fr",
                         gap: 10,
-                        marginTop: form.street_id === "other" ? 0 : 10,
+                        marginTop: 10,
                     }}
                 >
                     <div>
@@ -1329,7 +1369,7 @@ export default function ResidentRegister({ onSuccess }) {
                         <input
                             type="checkbox"
                             checked={isRenter}
-                            onChange={(e) => setIsRenter(e.target.checked)}
+                            onChange={(e) => handleRenterChange(e.target.checked)}
                             style={{ marginTop: 3, accentColor: "var(--color-primary)" }}
                         />
                         <span
@@ -1339,28 +1379,145 @@ export default function ResidentRegister({ onSuccess }) {
                                 lineHeight: 1.55,
                             }}
                         >
-                            My ID address does not match my current Barangay
-                            East Tapinac address (e.g., I am a renter/boarder).
+                            My ID address is different from my current Barangay
+                            East Tapinac address.
                         </span>
                     </label>
                     {isRenter && (
-                        <div
-                            style={{
-                                marginTop: 9,
-                                padding: "9px 11px",
-                                borderRadius: 5,
-                                background: "#fff7e6",
-                                border: "1px solid #f5d78e",
-                                color: "#7a4800",
-                                fontSize: 11.8,
-                                lineHeight: 1.55,
-                            }}
-                        >
-                            Please bring a supporting document to the barangay
-                            office, such as a contract of lease or certification
-                            from your landlord. This note does not block your
-                            online registration.
-                        </div>
+                        <>
+                            <div
+                                style={{
+                                    marginTop: 9,
+                                    padding: "9px 11px",
+                                    borderRadius: 5,
+                                    background: "#fff7e6",
+                                    border: "1px solid #f5d78e",
+                                    color: "#7a4800",
+                                    fontSize: 11.8,
+                                    lineHeight: 1.55,
+                                }}
+                            >
+                                Upload proof of your current residence, such as a
+                                lease, boarding certification, landlord
+                                certification, utility bill, or similar document
+                                showing your East Tapinac address.
+                            </div>
+
+                            <FieldGroup
+                                label="Proof of Current Residence"
+                                required
+                                mb={0}
+                                style={{ marginTop: 12 }}
+                            >
+                                <input
+                                    ref={proofInputRef}
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    style={{ display: "none" }}
+                                    onChange={handleResidencyProofPick}
+                                />
+                                {!residencyProofFile ? (
+                                    <div
+                                        className="reg-upload-zone"
+                                        onClick={() =>
+                                            proofInputRef.current?.click()
+                                        }
+                                        style={{
+                                            minHeight: 92,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            flexDirection: "column",
+                                        }}
+                                    >
+                                        <Upload
+                                            size={20}
+                                            color="#1a4a8a"
+                                            strokeWidth={2}
+                                        />
+                                        <div
+                                            style={{
+                                                fontSize: 12.5,
+                                                fontWeight: 600,
+                                                color: "#1a1a2e",
+                                                marginTop: 8,
+                                            }}
+                                        >
+                                            Upload proof
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: 11.5,
+                                                color: "#9090aa",
+                                                marginTop: 2,
+                                            }}
+                                        >
+                                            Image or PDF - Max 6 MB
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div
+                                        className="reg-upload-zone has-file"
+                                        onClick={() =>
+                                            proofInputRef.current?.click()
+                                        }
+                                        style={{
+                                            minHeight: 76,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 12,
+                                            padding: "12px 14px",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <Check
+                                            size={18}
+                                            color="var(--color-primary)"
+                                            strokeWidth={2.5}
+                                        />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div
+                                                style={{
+                                                    fontSize: 12.5,
+                                                    fontWeight: 600,
+                                                    color: "#1a7a4a",
+                                                }}
+                                            >
+                                                Proof uploaded
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: "#4a4a6a",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {residencyProofFile.name}
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeResidencyProof();
+                                            }}
+                                            style={{
+                                                background: "none",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                color: "#b02020",
+                                                padding: 4,
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                )}
+                            </FieldGroup>
+                        </>
                     )}
                 </div>
             </div>
@@ -1409,7 +1566,8 @@ export default function ResidentRegister({ onSuccess }) {
                         }}
                     >
                         Upload a valid ID so barangay staff can confirm your
-                        residency. Review takes{" "}
+                        identity and residency. If your ID address is different,
+                        upload proof now. Review takes{" "}
                         <strong>1–3 business days</strong>.
                     </div>
                     <div
@@ -1460,13 +1618,13 @@ export default function ResidentRegister({ onSuccess }) {
                             marginBottom: 9,
                         }}
                     >
-                        Photo Guidelines
+                        Review Guidelines
                     </div>
                     {[
-                        "ID must be clearly visible and not blurry",
-                        "All four corners must be in frame",
-                        "Your name and photo must be readable",
-                        "Do not cover any part of the ID",
+                        "ID must be clear, complete, and not blurry",
+                        "Name, photo, and birthdate should match your registration",
+                        "ID address should match your current East Tapinac address when available",
+                        "If the ID address differs, upload proof of current residence",
                     ].map((tip, i, arr) => (
                         <div
                             key={i}
@@ -1804,7 +1962,13 @@ export default function ResidentRegister({ onSuccess }) {
                     { label: "Email", value: form.email },
                     {
                         label: "Address",
-                        value: `${form.house_no}, ${selectedPurok?.name ?? ""}, ${resolvedStreet}`,
+                        value: [
+                            form.house_no,
+                            selectedPurok?.name,
+                            resolvedStreet,
+                        ]
+                            .filter(Boolean)
+                            .join(", "),
                     },
                     { label: "Civil Status", value: form.civil_status },
                     { label: "Nationality", value: form.nationality },
@@ -2156,14 +2320,14 @@ export default function ResidentRegister({ onSuccess }) {
                             }}
                         >
                             {step === 1 && "Your Information"}
-                            {step === 2 && "Verify Your Residency"}
+                            {step === 2 && "Verify Identity and Residency"}
                             {step === 3 && "Create Your Password"}
                         </div>
                         <div style={{ fontSize: 12.5, color: "#9090aa" }}>
                             {step === 1 &&
                                 "Personal details and home address within East Tapinac."}
                             {step === 2 &&
-                                "Upload a valid ID so barangay staff can confirm your residency."}
+                                "Upload your ID, and add proof if your ID address is different."}
                             {step === 3 &&
                                 "Almost done — set a secure password for your account."}
                         </div>

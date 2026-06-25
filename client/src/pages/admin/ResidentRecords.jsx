@@ -428,9 +428,25 @@ function ResidentDrawer({
                                     }}
                                 >
                                     <strong>Renter / Non-matching ID:</strong>{" "}
-                                    Request a supporting physical document
-                                    during verification, such as a contract of
-                                    lease or landlord certification.
+                                    {resident.residencyProofUrl
+                                        ? "Online proof of current residence is on file. Compare it with the registered East Tapinac address during review."
+                                        : "No online proof is on file for this older registration. Request proof before approval or release."}
+                                    {resident.residencyProofUrl && (
+                                        <>
+                                            {" "}
+                                            <a
+                                                href={resident.residencyProofUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                style={{
+                                                    color: "#7a4800",
+                                                    fontWeight: 700,
+                                                }}
+                                            >
+                                                Open proof
+                                            </a>
+                                        </>
+                                    )}
                                 </div>
                             )}
                             <div className="rr-pf-grid">
@@ -743,6 +759,9 @@ export default function ResidentRecords({
             nationality: "Filipino",
             email: row.email || "N/A",
             isRenter: row.is_renter === true,
+            residencyProofUrl: row.residency_proof_url || "",
+            residencyProofFileName: row.residency_proof_file_name || "",
+            residencyProofMimeType: row.residency_proof_mime_type || "",
             qr: `QR-ET-${new Date().getFullYear()}-${String(row.resident_id || "").padStart(4, "0")}`,
         };
     }, []);

@@ -14,6 +14,7 @@ import {
     Shield,
     Users,
     CheckCircle,
+    Check,
     XCircle,
     Menu,
     Edit2,
@@ -1102,10 +1103,24 @@ function ConfirmModal({
 function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
     const [comment, setComment] = useState(resident?.rejection_comment || "");
     const [submitting, setSubmitting] = useState("");
+    const [reviewError, setReviewError] = useState("");
     const status = String(resident?.status || "").toLowerCase();
     const isActive = status === "active";
+    const proofUrl = resident?.residency_proof_url || "";
+    const proofName =
+        resident?.residency_proof_file_name || "Proof of current residence";
+    const proofMime = resident?.residency_proof_mime_type || "";
+    const proofIsPdf =
+        proofMime === "application/pdf" || /\.pdf($|\?)/i.test(proofUrl);
+    const missingRequiredProof = Boolean(resident?.is_renter && !proofUrl);
 
     const handleApprove = async () => {
+        if (missingRequiredProof) {
+            setReviewError(
+                "Proof of current residence is required before activating this account.",
+            );
+            return;
+        }
         setSubmitting("approve");
         try {
             await onApprove(resident);
@@ -1119,6 +1134,7 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
 
     const handleReject = async () => {
         if (!comment.trim()) return;
+        setReviewError("");
         setSubmitting("reject");
         try {
             await onReject(resident, comment.trim());
@@ -1170,6 +1186,56 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
                         {resBadgeLabel(status)}
                     </div>
 
+                    <div
+                        style={{
+                            background: "#f8f6f1",
+                            border: "1px solid #e4dfd4",
+                            borderRadius: 6,
+                            padding: "11px 13px",
+                            marginBottom: 14,
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: "#70708a",
+                                textTransform: "uppercase",
+                                letterSpacing: 1,
+                                marginBottom: 8,
+                            }}
+                        >
+                            Staff Review Checklist
+                        </div>
+                        {[
+                            "Confirm the ID name, photo, and birthdate match the registration details.",
+                            "Check that the ID address supports Barangay East Tapinac residency when available.",
+                            "If the ID address differs, compare the uploaded proof with the registered East Tapinac address.",
+                            "Reject with a clear comment if the ID, address, or proof is unreadable or inconsistent.",
+                        ].map((item) => (
+                            <div
+                                key={item}
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "flex-start",
+                                    fontSize: 12,
+                                    color: "#4a4a6a",
+                                    lineHeight: 1.45,
+                                    marginTop: 5,
+                                }}
+                            >
+                                <Check
+                                    size={13}
+                                    color="var(--color-primary)"
+                                    strokeWidth={2.4}
+                                    style={{ marginTop: 2, flexShrink: 0 }}
+                                />
+                                <span>{item}</span>
+                            </div>
+                        ))}
+                    </div>
+
                     <div style={{ display: "flex", justifyContent: "center" }}>
                         {resident?.id_image_url ? (
                             <img
@@ -1203,6 +1269,100 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
                         )}
                     </div>
 
+                    {resident?.is_renter && (
+                        <div style={{ marginTop: 14 }}>
+                            <div
+                                style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: "#70708a",
+                                    textTransform: "uppercase",
+                                    letterSpacing: 1,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                Proof of Current Residence
+                            </div>
+                            {proofUrl ? (
+                                <div
+                                    style={{
+                                        border: "1px solid #e4dfd4",
+                                        borderRadius: 6,
+                                        background: "#fff",
+                                        padding: 10,
+                                    }}
+                                >
+                                    {proofIsPdf ? (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                gap: 12,
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: "#4a4a6a",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    whiteSpace: "nowrap",
+                                                }}
+                                            >
+                                                {proofName}
+                                            </span>
+                                            <a
+                                                href={proofUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="ma-id-btn"
+                                            >
+                                                Open PDF
+                                            </a>
+                                        </div>
+                                    ) : (
+                                        <a
+                                            href={proofUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{ display: "block" }}
+                                        >
+                                            <img
+                                                src={proofUrl}
+                                                alt="Resident proof of current residence"
+                                                style={{
+                                                    width: "100%",
+                                                    maxHeight: "38vh",
+                                                    objectFit: "contain",
+                                                    borderRadius: 4,
+                                                    background: "#f8f6f1",
+                                                }}
+                                            />
+                                        </a>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
+                                    style={{
+                                        border: "1px dashed #e4dfd4",
+                                        borderRadius: 6,
+                                        padding: "12px 14px",
+                                        color: "#8a5800",
+                                        background: "#fff7e6",
+                                        fontSize: 12,
+                                        lineHeight: 1.45,
+                                    }}
+                                >
+                                    This resident marked a different ID address,
+                                    but no online proof is on file. This may be an
+                                    older registration; request proof before
+                                    approval.
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {!isActive && (
                         <div className="ma-field" style={{ marginTop: 16 }}>
                             <label>
@@ -1233,6 +1393,23 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
                             {resident.rejection_comment}
                         </div>
                     )}
+
+                    {reviewError && (
+                        <div
+                            style={{
+                                marginTop: 16,
+                                padding: "10px 14px",
+                                border: "1px solid #e8a598",
+                                borderRadius: 4,
+                                fontSize: 12,
+                                color: "#7a2e24",
+                                background: "#fff4f0",
+                                lineHeight: 1.45,
+                            }}
+                        >
+                            {reviewError}
+                        </div>
+                    )}
                 </div>
                 <div className="ma-modal-footer">
                     <button className="ma-btn-secondary" onClick={onClose}>
@@ -1253,7 +1430,12 @@ function ResidentIdReviewModal({ resident, onClose, onApprove, onReject }) {
                         <button
                             className="ma-btn-primary"
                             onClick={handleApprove}
-                            disabled={Boolean(submitting)}
+                            disabled={Boolean(submitting) || missingRequiredProof}
+                            title={
+                                missingRequiredProof
+                                    ? "Proof of current residence is required before activation."
+                                    : undefined
+                            }
                         >
                             <CheckCircle size={13} />
                             {submitting === "approve"

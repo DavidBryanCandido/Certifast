@@ -6,6 +6,11 @@ const { createClient } = require("@supabase/supabase-js");
 const { createAuditLog } = require("../utils/logger");
 const { sendPasswordChangedEmail } = require("../utils/mailer");
 const { isSupabaseConnectivityError } = require("../utils/supabaseAuthError");
+const {
+    ADDRESS_MAPPING_SETUP_MESSAGE,
+    isAddressMappingMissingError,
+    resolvePurokStreetPair,
+} = require("../utils/addressLookup");
 
 // Supabase client — optional at startup so the server can still boot without it.
 const supabaseUrl =
@@ -63,58 +68,22 @@ function calculateAge(dateString) {
 }
 
 /** Legacy columns address_house / address_street — mirror structured fields for older reports/UI. */
-async function legacyAddressFields(pool, {
-    house_no,
-    purok_id,
-    street_id,
-    street_other,
-}) {
+function legacyAddressFields({ house_no, addressPair }) {
     const address_house = (house_no || "").trim() || null;
-    let streetSegment = (street_other || "").trim() || null;
+    const parts = [];
+    if (addressPair?.purok_name) parts.push(addressPair.purok_name);
+    if (addressPair?.street_name) parts.push(addressPair.street_name);
 
-    try {
-        const pid =
-            purok_id && Number(purok_id) > 0 ? Number(purok_id) : null;
-        const sid =
-            street_id && Number(street_id) > 0 ? Number(street_id) : null;
-
-        let purokName = null;
-        let streetName = null;
-        if (pid) {
-            const pr = await pool.query(
-                "SELECT name FROM puroks WHERE purok_id = $1",
-                [pid],
-            );
-            purokName = pr.rows[0]?.name || null;
-        }
-        if (sid) {
-            const sr = await pool.query(
-                "SELECT name FROM streets WHERE street_id = $1",
-                [sid],
-            );
-            streetName = sr.rows[0]?.name || null;
-        }
-
-        if (!streetSegment && streetName) streetSegment = streetName;
-
-        const parts = [];
-        if (purokName) parts.push(purokName);
-        if (streetSegment) parts.push(streetSegment);
-
-        const address_street = parts.length ? parts.join(", ") : null;
-        return { address_house, address_street };
-    } catch {
-        return {
-            address_house,
-            address_street: streetSegment || null,
-        };
-    }
+    return {
+        address_house,
+        address_street: parts.length ? parts.join(", ") : null,
+    };
 }
 
 // POST /api/auth/resident/register
 // body: { first_name, middle_name, last_name, full_name, email, password,
 //         contact_number, date_of_birth, house_number, purok_id, street_id,
-//         street_other, address_house, address_street, id_type }
+//         address_house, address_street, id_type }
 async function residentRegister(req, res) {
     return res.status(410).json({
         message:
@@ -135,13 +104,16 @@ async function completeResidentRegistration(req, res) {
         house_no,
         purok_id,
         street_id,
-        street_other,
         date_of_birth,
         civil_status,
         nationality,
         id_type,
         id_image_path,
         is_renter,
+        residency_proof_path,
+        residency_proof_file_name,
+        residency_proof_mime_type,
+        residency_proof_file_size,
         agreed_to_terms,
     } = req.body;
 
@@ -200,21 +172,54 @@ async function completeResidentRegistration(req, res) {
                   .getPublicUrl(normalizedIdImagePath)
             : { data: null };
         const id_image_url = idUrlData?.publicUrl || null;
+        const renterFlag = parseBoolean(is_renter);
+        const expectedProofPath = new RegExp(
+            `^resident-proofs/${supabase_uid}\\.(jpg|jpeg|png|webp|pdf)$`,
+        );
+        const normalizedResidencyProofPath =
+            typeof residency_proof_path === "string" &&
+            expectedProofPath.test(residency_proof_path)
+                ? residency_proof_path
+                : null;
+
+        if (renterFlag && !normalizedResidencyProofPath) {
+            return res.status(400).json({
+                message:
+                    "Proof of current East Tapinac residence is required when the ID address is different.",
+            });
+        }
+
+        const { data: proofUrlData } = normalizedResidencyProofPath
+            ? supabase.storage
+                  .from("certifast-uploads")
+                  .getPublicUrl(normalizedResidencyProofPath)
+            : { data: null };
+        const residency_proof_url = proofUrlData?.publicUrl || null;
+        const proofFileSizeNumber = Number(residency_proof_file_size);
+        const normalizedProofFileSize =
+            Number.isFinite(proofFileSizeNumber) && proofFileSizeNumber > 0
+                ? Math.round(proofFileSizeNumber)
+                : null;
 
         const middleNorm =
             middle_name != null && String(middle_name).trim() !== ""
                 ? String(middle_name).trim()
                 : null;
 
-        const { address_house, address_street } = await legacyAddressFields(
-            pool,
-            {
-                house_no,
-                purok_id,
-                street_id,
-                street_other,
-            },
-        );
+        const addressPair = await resolvePurokStreetPair(pool, {
+            purokId: purok_id,
+            streetId: street_id,
+        });
+        if (!addressPair.ok) {
+            return res
+                .status(addressPair.status)
+                .json({ message: addressPair.message });
+        }
+
+        const { address_house, address_street } = legacyAddressFields({
+            house_no,
+            addressPair: addressPair.address,
+        });
 
         const result = await pool.query(
             `INSERT INTO residents (
@@ -224,7 +229,9 @@ async function completeResidentRegistration(req, res) {
                 date_of_birth, house_number,
                 purok_id, street_id, street_other,
                 id_type, id_image_url, civil_status, nationality, status,
-                is_renter, agreed_to_terms, terms_agreed_at
+                is_renter, residency_proof_url, residency_proof_file_name,
+                residency_proof_mime_type, residency_proof_file_size,
+                agreed_to_terms, terms_agreed_at
             ) VALUES (
                 $1, $2, $3, $4,
                 $5, $6,
@@ -232,7 +239,7 @@ async function completeResidentRegistration(req, res) {
                 $10, $11,
                 $12, $13, $14,
                 $15, $16, $17, $18, 'pending_verification',
-                $19, TRUE, NOW()
+                $19, $20, $21, $22, $23, TRUE, NOW()
             ) RETURNING resident_id, full_name, email, status`,
             [
                 full_name,
@@ -246,14 +253,18 @@ async function completeResidentRegistration(req, res) {
                 address_street,
                 date_of_birth || null,
                 house_no || null,
-                purok_id && Number(purok_id) > 0 ? Number(purok_id) : null,
-                street_id && Number(street_id) > 0 ? Number(street_id) : null,
-                street_other || null,
+                addressPair.address.purok_id,
+                addressPair.address.street_id,
+                null,
                 id_type || null,
                 id_image_url,
                 civil_status || null,
                 nationality || "Filipino",
-                parseBoolean(is_renter),
+                renterFlag,
+                residency_proof_url,
+                residency_proof_file_name || null,
+                residency_proof_mime_type || null,
+                normalizedProofFileSize,
             ],
         );
 
@@ -263,6 +274,17 @@ async function completeResidentRegistration(req, res) {
         });
     } catch (err) {
         console.error("completeResidentRegistration error:", err);
+        if (isAddressMappingMissingError(err)) {
+            return res.status(503).json({
+                message: ADDRESS_MAPPING_SETUP_MESSAGE,
+            });
+        }
+        if (err.code === "42703") {
+            return res.status(503).json({
+                message:
+                    "Resident proof columns are missing. Run database/resident_registration_residency_proofs.sql in Supabase, then try again.",
+            });
+        }
         return res.status(500).json({ message: "Server error" });
     }
 }
@@ -544,19 +566,40 @@ async function adminLogin(req, res) {
 // → { puroks: [{purok_id, name},...], streets: [{street_id, name},...] }
 async function getAddressOptions(req, res) {
     try {
-        const puroks = await pool.query(
-            "SELECT purok_id, name FROM puroks WHERE is_active = true ORDER BY sort_order",
-        );
-        const streets = await pool.query(
-            "SELECT street_id, name FROM streets WHERE is_active = true ORDER BY sort_order",
-        );
+        const [puroks, streets, streetMappings] = await Promise.all([
+            pool.query(
+                "SELECT purok_id, name FROM puroks WHERE is_active = true ORDER BY sort_order",
+            ),
+            pool.query(
+                "SELECT street_id, name FROM streets WHERE is_active = true ORDER BY sort_order",
+            ),
+            pool.query(
+                `SELECT ps.purok_id,
+                        p.name AS purok_name,
+                        ps.street_id,
+                        s.name AS street_name
+                 FROM purok_streets ps
+                 JOIN puroks p ON p.purok_id = ps.purok_id
+                 JOIN streets s ON s.street_id = ps.street_id
+                 WHERE ps.is_active = TRUE
+                   AND p.is_active = TRUE
+                   AND s.is_active = TRUE
+                 ORDER BY p.sort_order, ps.sort_order, s.sort_order, s.name`,
+            ),
+        ]);
 
         return res.json({
             puroks: puroks.rows,
             streets: streets.rows,
+            streetMappings: streetMappings.rows,
         });
     } catch (err) {
         console.error("getAddressOptions error:", err);
+        if (isAddressMappingMissingError(err)) {
+            return res.status(503).json({
+                message: ADDRESS_MAPPING_SETUP_MESSAGE,
+            });
+        }
         return res.status(500).json({ message: "Server error" });
     }
 }

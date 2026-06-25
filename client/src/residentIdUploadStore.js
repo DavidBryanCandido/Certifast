@@ -43,7 +43,11 @@ function withStore(mode, run) {
     );
 }
 
-export function savePendingResidentIdUpload(userId, file) {
+function uploadKey(userId, kind) {
+    return `${kind}:${userId}`;
+}
+
+function savePendingUpload(userId, file, kind) {
     if (!userId || !file) return Promise.resolve();
     return withStore("readwrite", (store) =>
         store.put(
@@ -53,17 +57,52 @@ export function savePendingResidentIdUpload(userId, file) {
                 type: file.type,
                 savedAt: Date.now(),
             },
-            userId,
+            uploadKey(userId, kind),
         ),
     );
 }
 
+function getPendingUpload(userId, kind) {
+    if (!userId) return Promise.resolve(null);
+    return withStore("readonly", (store) => store.get(uploadKey(userId, kind))).catch(
+        () => null,
+    );
+}
+
+function deletePendingUpload(userId, kind) {
+    if (!userId) return Promise.resolve();
+    return withStore("readwrite", (store) =>
+        store.delete(uploadKey(userId, kind)),
+    ).catch(() => {});
+}
+
+export function savePendingResidentIdUpload(userId, file) {
+    return savePendingUpload(userId, file, "resident-id");
+}
+
 export function getPendingResidentIdUpload(userId) {
     if (!userId) return Promise.resolve(null);
-    return withStore("readonly", (store) => store.get(userId)).catch(() => null);
+    return getPendingUpload(userId, "resident-id").then((upload) => {
+        if (upload) return upload;
+        return withStore("readonly", (store) => store.get(userId)).catch(() => null);
+    });
 }
 
 export function deletePendingResidentIdUpload(userId) {
     if (!userId) return Promise.resolve();
-    return withStore("readwrite", (store) => store.delete(userId)).catch(() => {});
+    return deletePendingUpload(userId, "resident-id").then(() =>
+        withStore("readwrite", (store) => store.delete(userId)).catch(() => {}),
+    );
+}
+
+export function savePendingResidencyProofUpload(userId, file) {
+    return savePendingUpload(userId, file, "residency-proof");
+}
+
+export function getPendingResidencyProofUpload(userId) {
+    return getPendingUpload(userId, "residency-proof");
+}
+
+export function deletePendingResidencyProofUpload(userId) {
+    return deletePendingUpload(userId, "residency-proof");
 }

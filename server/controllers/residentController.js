@@ -1,6 +1,11 @@
 // certifast/controllers/residentController.js
 const pool = require("../db/pool");
 const { createAuditLog } = require("../utils/logger");
+const {
+    ADDRESS_MAPPING_SETUP_MESSAGE,
+    isAddressMappingMissingError,
+    resolvePurokStreetPair,
+} = require("../utils/addressLookup");
 
 function cleanText(value) {
     if (value === null || value === undefined) return null;
@@ -269,7 +274,7 @@ async function getProfile(req, res) {
 }
 
 // PUT /api/resident/profile
-// body: { date_of_birth, civil_status, contact_number, house_number, purok_id, street_id, street_other, gender, place_of_birth, occupation, years_of_residency, profile_details }
+// body: { date_of_birth, civil_status, contact_number, house_number, purok_id, street_id, gender, place_of_birth, occupation, years_of_residency, profile_details }
 async function updateProfile(req, res) {
     const resident_id = req.resident.id;
     const {
@@ -279,7 +284,6 @@ async function updateProfile(req, res) {
         house_number,
         purok_id,
         street_id,
-        street_other,
         gender,
         place_of_birth,
         occupation,
@@ -288,44 +292,22 @@ async function updateProfile(req, res) {
     } = req.body;
 
     try {
-        // Resolve purok name for address_house rebuild
-        let purokName = "";
-        if (purok_id && Number(purok_id) > 0) {
-            const purokRes = await pool.query(
-                "SELECT name FROM puroks WHERE purok_id = $1",
-                [Number(purok_id)],
-            );
-            purokName = purokRes.rows[0]?.name || "";
-        }
-
-        // Resolve street name for address_street rebuild
-        let streetName = "";
-        if (street_id && street_id !== "other" && Number(street_id) > 0) {
-            const streetRes = await pool.query(
-                "SELECT name FROM streets WHERE street_id = $1",
-                [Number(street_id)],
-            );
-            streetName = streetRes.rows[0]?.name || "";
-        } else if (street_id === "other" && street_other) {
-            streetName = street_other.trim();
+        const addressPair = await resolvePurokStreetPair(pool, {
+            purokId: purok_id,
+            streetId: street_id,
+        });
+        if (!addressPair.ok) {
+            return res
+                .status(addressPair.status)
+                .json({ message: addressPair.message });
         }
 
         // Rebuild combined address columns
-        const address_house = [house_number, purokName]
+        const address_house = [house_number, addressPair.address.purok_name]
             .filter(Boolean)
             .join(", ");
 
-        const address_street = streetName
-            ? `${streetName}, Barangay East Tapinac, Olongapo City`
-            : "Barangay East Tapinac, Olongapo City";
-
-        const resolvedStreetId =
-            street_id && street_id !== "other" && Number(street_id) > 0
-                ? Number(street_id)
-                : null;
-
-        const resolvedPurokId =
-            purok_id && Number(purok_id) > 0 ? Number(purok_id) : null;
+        const address_street = `${addressPair.address.street_name}, Barangay East Tapinac, Olongapo City`;
 
         const sanitizedProfileDetails = cleanProfileDetails(profile_details);
 
@@ -351,9 +333,9 @@ async function updateProfile(req, res) {
                 civil_status || null,
                 contact_number,
                 house_number || null,
-                resolvedPurokId,
-                resolvedStreetId,
-                street_id === "other" ? street_other || null : null,
+                addressPair.address.purok_id,
+                addressPair.address.street_id,
+                null,
                 address_house,
                 address_street,
                 cleanText(gender),
@@ -387,6 +369,11 @@ async function updateProfile(req, res) {
         });
     } catch (err) {
         console.error("updateProfile error:", err);
+        if (isAddressMappingMissingError(err)) {
+            return res.status(503).json({
+                message: ADDRESS_MAPPING_SETUP_MESSAGE,
+            });
+        }
         return res.status(500).json({ message: "Server error" });
     }
 }

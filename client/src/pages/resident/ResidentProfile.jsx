@@ -21,6 +21,16 @@ import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
 import { formatAddressParts } from "../../utils/address";
+import {
+    buildStreetOptions,
+    findSingleMappedPurok,
+    isMappedPurokStreet,
+    isStreetAllowedForPurok,
+    normalizeAddressOptions,
+    PUROKS_FALLBACK,
+    STREET_MAPPINGS_FALLBACK,
+    STREETS_FALLBACK,
+} from "../../utils/addressOptions";
 
 if (!document.head.querySelector("[data-resident-home]")) {
     const s = document.createElement("style");
@@ -42,45 +52,6 @@ const PROFILE_UPLOAD_POLICY_HINT =
     "Please run database/resident_profile_certificate_details.sql in Supabase, then try saving again.";
 const PROFILE_UPLOAD_MIME_HINT =
     "The certifast-uploads bucket must allow image/jpeg, image/png, image/webp, and application/pdf.";
-
-const PUROKS_FALLBACK = [
-    { purok_id: 1, name: "Purok 1" },
-    { purok_id: 2, name: "Purok 2" },
-    { purok_id: 3, name: "Purok 3" },
-    { purok_id: 4, name: "Purok 4" },
-    { purok_id: 5, name: "Purok 5" },
-    { purok_id: 6, name: "Purok 6" },
-    { purok_id: 7, name: "Purok 7" },
-    { purok_id: 8, name: "Purok 8" },
-    { purok_id: 9, name: "Purok 9" },
-    { purok_id: 10, name: "Purok 10" },
-    { purok_id: 11, name: "Purok 11" },
-];
-
-const STREETS_FALLBACK = [
-    { street_id: 1, name: "Acayan Street" },
-    { street_id: 2, name: "Apelado Street" },
-    { street_id: 3, name: "Bacon Street" },
-    { street_id: 4, name: "Cruz Dela Drive" },
-    { street_id: 5, name: "Coll Street" },
-    { street_id: 6, name: "Donor Street" },
-    { street_id: 7, name: "Espiritu Street" },
-    { street_id: 8, name: "Fendler Street" },
-    { street_id: 9, name: "Fendler Extension Street" },
-    { street_id: 10, name: "Fontain Extension Street" },
-    { street_id: 11, name: "Gallagher Street" },
-    { street_id: 12, name: "Hansen Street" },
-    { street_id: 13, name: "Irving Street" },
-    { street_id: 14, name: "5th Street" },
-    { street_id: 15, name: "6th Street" },
-    { street_id: 16, name: "8th Street" },
-    { street_id: 17, name: "9th Street" },
-    { street_id: 18, name: "10th Street" },
-    { street_id: 19, name: "12th Street" },
-    { street_id: 20, name: "13th Street" },
-    { street_id: 21, name: "14th Street" },
-    { street_id: 22, name: "16th Street" },
-];
 
 const EMPTY_PROFILE_DETAILS = Object.freeze({
     fatherName: "",
@@ -268,12 +239,7 @@ function formFromProfile(profile) {
         contact_number: profile?.contact_number || "",
         house_number: profile?.house_number || "",
         purok_id: profile?.purok_id ? String(profile.purok_id) : "",
-        street_id: profile?.street_other
-            ? "other"
-            : profile?.street_id
-              ? String(profile.street_id)
-              : "",
-        street_other: profile?.street_other || "",
+        street_id: profile?.street_id ? String(profile.street_id) : "",
         gender: profile?.gender || "",
         place_of_birth: profile?.place_of_birth || "",
         occupation: profile?.occupation || "",
@@ -309,9 +275,15 @@ function hasBusinessInfo(details) {
             trimText(details.businessOwnerName) ||
             trimText(details.businessOwnerAddress) ||
             trimText(details.businessPermitNo) ||
-            trimText(details.monthlyIncome) ||
-            trimText(details.incomeStartYear) ||
             details.businessProof,
+    );
+}
+
+function hasWorkInfo(profile, details) {
+    return Boolean(
+        trimText(profile?.occupation) ||
+            trimText(details.monthlyIncome) ||
+            trimText(details.incomeStartYear),
     );
 }
 
@@ -324,6 +296,9 @@ export default function ResidentProfile({ resident, onLogout }) {
     const [error, setError] = useState("");
     const [puroks, setPuroks] = useState(PUROKS_FALLBACK);
     const [streets, setStreets] = useState(STREETS_FALLBACK);
+    const [streetMappings, setStreetMappings] = useState(
+        STREET_MAPPINGS_FALLBACK,
+    );
     const [businessProofFile, setBusinessProofFile] = useState(null);
     const [form, setForm] = useState(formFromProfile(null));
 
@@ -337,8 +312,10 @@ export default function ResidentProfile({ resident, onLogout }) {
         fetch("/api/address-options")
             .then((response) => (response.ok ? response.json() : null))
             .then((data) => {
-                if (data?.puroks?.length) setPuroks(data.puroks);
-                if (data?.streets?.length) setStreets(data.streets);
+                const options = normalizeAddressOptions(data);
+                setPuroks(options.puroks);
+                setStreets(options.streets);
+                setStreetMappings(options.streetMappings);
             })
             .catch(() => {});
     }, []);
@@ -462,6 +439,12 @@ export default function ResidentProfile({ resident, onLogout }) {
         };
     }
 
+    const streetOptions = buildStreetOptions(
+        streets,
+        streetMappings,
+        form.purok_id,
+    );
+
     async function handleSave() {
         if (!trimText(form.contact_number)) {
             setError("Contact number is required.");
@@ -475,8 +458,11 @@ export default function ResidentProfile({ resident, onLogout }) {
             setError("Please select your street.");
             return;
         }
-        if (form.street_id === "other" && !trimText(form.street_other)) {
-            setError("Please specify your street name.");
+        if (
+            form.purok_id &&
+            !isMappedPurokStreet(streetMappings, form.purok_id, form.street_id)
+        ) {
+            setError("Selected street is not assigned to the selected purok.");
             return;
         }
         if (
@@ -502,12 +488,8 @@ export default function ResidentProfile({ resident, onLogout }) {
                 contact_number: trimText(form.contact_number),
                 house_number: trimText(form.house_number) || null,
                 purok_id: form.purok_id || null,
-                street_id:
-                    form.street_id !== "other" ? form.street_id || null : null,
-                street_other:
-                    form.street_id === "other"
-                        ? trimText(form.street_other) || null
-                        : null,
+                street_id: form.street_id || null,
+                street_other: null,
                 gender: trimText(form.gender) || null,
                 place_of_birth: trimText(form.place_of_birth) || null,
                 occupation: trimText(form.occupation) || null,
@@ -543,6 +525,33 @@ export default function ResidentProfile({ resident, onLogout }) {
 
     function updateField(key, value) {
         setForm((current) => ({ ...current, [key]: value }));
+    }
+
+    function handlePurokChange(value) {
+        setError("");
+        setForm((current) => ({
+            ...current,
+            purok_id: value,
+            street_id:
+                !value ||
+                isStreetAllowedForPurok(streetMappings, value, current.street_id)
+                    ? current.street_id
+                    : "",
+        }));
+    }
+
+    function handleStreetChange(value) {
+        const inferredPurokId = findSingleMappedPurok(streetMappings, value);
+        setError("");
+        setForm((current) => ({
+            ...current,
+            street_id: value,
+            purok_id:
+                current.purok_id &&
+                isStreetAllowedForPurok(streetMappings, current.purok_id, value)
+                    ? current.purok_id
+                    : inferredPurokId || "",
+        }));
     }
 
     function updateChild(index, value) {
@@ -602,6 +611,11 @@ export default function ResidentProfile({ resident, onLogout }) {
     const age = calcAge(editing ? form.date_of_birth : profile?.date_of_birth);
     const displayChildren = profileDetails.childrenNames;
     const displayBusinessProof = profileDetails.businessProof;
+    const displayHasWorkInfo = hasWorkInfo(profile, profileDetails);
+    const displayHasBusinessInfo = hasBusinessInfo(profileDetails);
+    const showWorkSection =
+        editing || displayHasWorkInfo || !displayHasBusinessInfo;
+    const showBusinessSection = editing || displayHasBusinessInfo;
     const displayAddress = profile
         ? (() => {
               const parts = [];
@@ -638,6 +652,50 @@ export default function ResidentProfile({ resident, onLogout }) {
         : "-";
 
     const inputProps = { className: "rp-input" };
+    const twoColumnGrid = {
+        gridTemplateColumns: isMobile || isTablet ? "1fr" : "1fr 1fr",
+        padding: 0,
+    };
+
+    const fullRow = {
+        gridColumn: isMobile ? "1" : "1 / -1",
+    };
+
+    const renderProfileField = ({
+        label,
+        field,
+        displayValue,
+        placeholder = "",
+        multiline = false,
+        full = false,
+    }) => (
+        <div style={full ? fullRow : undefined}>
+            <label className="rp-field-label">{label}</label>
+            {editing ? (
+                multiline ? (
+                    <textarea
+                        className="rp-textarea"
+                        placeholder={placeholder}
+                        value={form[field] || ""}
+                        onChange={(event) =>
+                            updateField(field, event.target.value)
+                        }
+                    />
+                ) : (
+                    <input
+                        {...inputProps}
+                        placeholder={placeholder}
+                        value={form[field] || ""}
+                        onChange={(event) =>
+                            updateField(field, event.target.value)
+                        }
+                    />
+                )
+            ) : (
+                <div className="rp-field-value">{displayValue || "-"}</div>
+            )}
+        </div>
+    );
 
     return (
         <div
@@ -1331,8 +1389,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                                                             className="rp-select"
                                                             value={form.purok_id}
                                                             onChange={(event) =>
-                                                                updateField(
-                                                                    "purok_id",
+                                                                handlePurokChange(
                                                                     event.target
                                                                         .value,
                                                                 )
@@ -1375,8 +1432,7 @@ export default function ResidentProfile({ resident, onLogout }) {
                                                             className="rp-select"
                                                             value={form.street_id}
                                                             onChange={(event) =>
-                                                                updateField(
-                                                                    "street_id",
+                                                                handleStreetChange(
                                                                     event.target
                                                                         .value,
                                                                 )
@@ -1386,62 +1442,34 @@ export default function ResidentProfile({ resident, onLogout }) {
                                                                 Select
                                                                 street...
                                                             </option>
-                                                            {streets.map(
-                                                                (item) => (
+                                                            {streetOptions.map(
+                                                                (option) => (
                                                                     <option
                                                                         key={
-                                                                            item.street_id
+                                                                            option.value
                                                                         }
                                                                         value={
-                                                                            item.street_id
+                                                                            option.value
                                                                         }
                                                                     >
                                                                         {
-                                                                            item.name
+                                                                            option.label
                                                                         }
                                                                     </option>
                                                                 ),
                                                             )}
-                                                            <option value="other">
-                                                                Other / Not
-                                                                listed
-                                                            </option>
+                                                            {!streetOptions.length && (
+                                                                <option
+                                                                    value=""
+                                                                    disabled
+                                                                >
+                                                                    No streets
+                                                                    mapped
+                                                                </option>
+                                                            )}
                                                         </select>
                                                     </div>
                                                 </div>
-
-                                                {form.street_id === "other" && (
-                                                    <div
-                                                        style={{
-                                                            marginBottom: 10,
-                                                        }}
-                                                    >
-                                                        <label className="rp-field-label">
-                                                            Specify Street{" "}
-                                                            <span
-                                                                style={{
-                                                                    color: "#b02020",
-                                                                }}
-                                                            >
-                                                                *
-                                                            </span>
-                                                        </label>
-                                                        <input
-                                                            {...inputProps}
-                                                            placeholder="Enter your street name"
-                                                            value={
-                                                                form.street_other
-                                                            }
-                                                            onChange={(event) =>
-                                                                updateField(
-                                                                    "street_other",
-                                                                    event.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                )}
 
                                                 <div
                                                     style={{
@@ -1825,372 +1853,318 @@ export default function ResidentProfile({ resident, onLogout }) {
                                 </div>
 
                                 <div
-                                    className="rp-card-grid"
                                     style={{
-                                        gridTemplateColumns: isMobile
-                                            ? "1fr"
-                                            : isTablet
-                                              ? "1fr"
-                                              : "1fr 1fr",
+                                        padding: "20px 24px",
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 22,
                                     }}
                                 >
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Occupation / Role
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                value={form.occupation}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "occupation",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profile.occupation || "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Monthly Income
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                placeholder="e.g. PHP 12,000"
-                                                value={form.monthlyIncome}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "monthlyIncome",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.monthlyIncome ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Income Start Year
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                placeholder="e.g. 2021"
-                                                value={form.incomeStartYear}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "incomeStartYear",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.incomeStartYear ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Business / Trade Name
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                value={form.businessName}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessName",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.businessName ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Type of Business
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                value={form.businessType}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessType",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.businessType ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Coverage / Area
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                value={form.businessArea}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessArea",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.businessArea ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Business Owner Name
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                placeholder="Leave blank if same as your name"
-                                                value={form.businessOwnerName}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessOwnerName",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {hasBusinessInfo(profileDetails)
-                                                    ? profileDetails.businessOwnerName ||
-                                                      "-"
-                                                    : "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="rp-field-label">
-                                            Barangay Permit No.
-                                        </label>
-                                        {editing ? (
-                                            <input
-                                                {...inputProps}
-                                                value={form.businessPermitNo}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessPermitNo",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.businessPermitNo ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            gridColumn: isMobile
-                                                ? "1"
-                                                : "1 / -1",
-                                        }}
-                                    >
-                                        <label className="rp-field-label">
-                                            Business Address
-                                        </label>
-                                        {editing ? (
-                                            <textarea
-                                                className="rp-textarea"
-                                                value={form.businessAddress}
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessAddress",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.businessAddress ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            gridColumn: isMobile
-                                                ? "1"
-                                                : "1 / -1",
-                                        }}
-                                    >
-                                        <label className="rp-field-label">
-                                            Operator Address
-                                        </label>
-                                        {editing ? (
-                                            <textarea
-                                                className="rp-textarea"
-                                                value={
-                                                    form.businessOwnerAddress
-                                                }
-                                                onChange={(event) =>
-                                                    updateField(
-                                                        "businessOwnerAddress",
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                {profileDetails.businessOwnerAddress ||
-                                                    "-"}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            gridColumn: isMobile
-                                                ? "1"
-                                                : "1 / -1",
-                                        }}
-                                    >
-                                        <label className="rp-field-label">
-                                            Proof of Business
-                                        </label>
-
-                                        {editing ? (
+                                    {showWorkSection && (
+                                        <div>
                                             <div
                                                 style={{
                                                     display: "flex",
-                                                    flexDirection: "column",
-                                                    gap: 10,
-                                                    alignItems: "flex-start",
+                                                    alignItems: "center",
+                                                    gap: 8,
+                                                    marginBottom: 14,
                                                 }}
                                             >
-                                                {form.businessProof?.fileUrl ? (
-                                                    <a
-                                                        className="rp-link"
-                                                        href={
-                                                            form.businessProof
-                                                                .fileUrl
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                    >
-                                                        View current file:{" "}
-                                                        {form.businessProof
-                                                            .fileName ||
-                                                            "Business document"}
-                                                    </a>
-                                                ) : (
-                                                    <div className="rp-muted">
-                                                        No proof file uploaded
-                                                        yet.
-                                                    </div>
-                                                )}
-
-                                                <label className="rp-upload-btn">
-                                                    <FileUp size={14} />
-                                                    {businessProofFile
-                                                        ? "Replace selected file"
-                                                        : "Upload proof file"}
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*,.pdf"
-                                                        style={{
-                                                            display: "none",
-                                                        }}
-                                                        onChange={
-                                                            handleBusinessProofSelect
-                                                        }
-                                                    />
-                                                </label>
-
-                                                {businessProofFile && (
-                                                    <div className="rp-muted">
-                                                        Selected:{" "}
-                                                        {businessProofFile.name}{" "}
-                                                        (
-                                                        {formatFileSize(
-                                                            businessProofFile.size,
-                                                        )}
-                                                        )
-                                                    </div>
-                                                )}
-
-                                                <div className="rp-muted">
-                                                    Accepts image or PDF files
-                                                    up to 6 MB.
-                                                </div>
-                                            </div>
-                                        ) : displayBusinessProof?.fileUrl ? (
-                                            <div
-                                                style={{
-                                                    display: "flex",
-                                                    flexDirection: "column",
-                                                    gap: 4,
-                                                }}
-                                            >
-                                                <a
-                                                    className="rp-link"
-                                                    href={
-                                                        displayBusinessProof.fileUrl
-                                                    }
-                                                    target="_blank"
-                                                    rel="noreferrer"
+                                                <span
+                                                    style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 700,
+                                                        color: "#9090aa",
+                                                        letterSpacing: 1,
+                                                        textTransform:
+                                                            "uppercase",
+                                                    }}
                                                 >
-                                                    {displayBusinessProof.fileName ||
-                                                        "Business document"}
-                                                </a>
+                                                    Employment / Income
+                                                </span>
+                                            </div>
+
+                                            {editing || displayHasWorkInfo ? (
+                                                <div
+                                                    className="rp-card-grid"
+                                                    style={twoColumnGrid}
+                                                >
+                                                    {renderProfileField({
+                                                        label:
+                                                            "Occupation / Role",
+                                                        field: "occupation",
+                                                        displayValue:
+                                                            profile?.occupation,
+                                                    })}
+                                                    {renderProfileField({
+                                                        label:
+                                                            "Monthly Income",
+                                                        field: "monthlyIncome",
+                                                        placeholder:
+                                                            "e.g. PHP 12,000",
+                                                        displayValue:
+                                                            profileDetails.monthlyIncome,
+                                                    })}
+                                                    {renderProfileField({
+                                                        label:
+                                                            "Income Start Year",
+                                                        field:
+                                                            "incomeStartYear",
+                                                        placeholder:
+                                                            "e.g. 2021",
+                                                        displayValue:
+                                                            profileDetails.incomeStartYear,
+                                                    })}
+                                                </div>
+                                            ) : (
                                                 <div className="rp-muted">
-                                                    {displayBusinessProof.fileSize
-                                                        ? formatFileSize(
-                                                              displayBusinessProof.fileSize,
-                                                          )
-                                                        : ""}
+                                                    No work details on file.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {showBusinessSection && (
+                                        <div
+                                            style={{
+                                                borderTop: showWorkSection
+                                                    ? "1px solid #f0ece4"
+                                                    : "none",
+                                                paddingTop: showWorkSection
+                                                    ? 20
+                                                    : 0,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 8,
+                                                    marginBottom: 14,
+                                                    flexWrap: "wrap",
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        fontSize: 10,
+                                                        fontWeight: 700,
+                                                        color: "#9090aa",
+                                                        letterSpacing: 1,
+                                                        textTransform:
+                                                            "uppercase",
+                                                    }}
+                                                >
+                                                    Business Details
+                                                </span>
+                                                {editing && (
+                                                    <span
+                                                        style={{
+                                                            fontSize: 10,
+                                                            color: "#7a6530",
+                                                            background:
+                                                                "#fff7e6",
+                                                            border:
+                                                                "1px solid #eadfc9",
+                                                            borderRadius: 999,
+                                                            padding: "2px 8px",
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        If applicable
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div
+                                                className="rp-card-grid"
+                                                style={twoColumnGrid}
+                                            >
+                                                {renderProfileField({
+                                                    label:
+                                                        "Business / Trade Name",
+                                                    field: "businessName",
+                                                    displayValue:
+                                                        profileDetails.businessName,
+                                                })}
+                                                {renderProfileField({
+                                                    label: "Type of Business",
+                                                    field: "businessType",
+                                                    displayValue:
+                                                        profileDetails.businessType,
+                                                })}
+                                                {renderProfileField({
+                                                    label: "Coverage / Area",
+                                                    field: "businessArea",
+                                                    displayValue:
+                                                        profileDetails.businessArea,
+                                                })}
+                                                {renderProfileField({
+                                                    label: "Barangay Permit No.",
+                                                    field: "businessPermitNo",
+                                                    displayValue:
+                                                        profileDetails.businessPermitNo,
+                                                })}
+                                                {renderProfileField({
+                                                    label:
+                                                        "Business Owner Name",
+                                                    field: "businessOwnerName",
+                                                    placeholder:
+                                                        "Leave blank if same as your name",
+                                                    displayValue:
+                                                        profileDetails.businessOwnerName ||
+                                                        (displayHasBusinessInfo
+                                                            ? "Same as resident"
+                                                            : ""),
+                                                })}
+                                                {renderProfileField({
+                                                    label: "Business Address",
+                                                    field: "businessAddress",
+                                                    displayValue:
+                                                        profileDetails.businessAddress,
+                                                    multiline: true,
+                                                    full: true,
+                                                })}
+                                                {renderProfileField({
+                                                    label:
+                                                        "Owner / Operator Address",
+                                                    field:
+                                                        "businessOwnerAddress",
+                                                    displayValue:
+                                                        profileDetails.businessOwnerAddress,
+                                                    multiline: true,
+                                                    full: true,
+                                                })}
+
+                                                <div style={fullRow}>
+                                                    <label className="rp-field-label">
+                                                        Proof of Business
+                                                    </label>
+
+                                                    {editing ? (
+                                                        <div
+                                                            style={{
+                                                                display: "flex",
+                                                                flexDirection:
+                                                                    "column",
+                                                                gap: 10,
+                                                                alignItems:
+                                                                    "flex-start",
+                                                            }}
+                                                        >
+                                                            {form.businessProof
+                                                                ?.fileUrl ? (
+                                                                <a
+                                                                    className="rp-link"
+                                                                    href={
+                                                                        form
+                                                                            .businessProof
+                                                                            .fileUrl
+                                                                    }
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                >
+                                                                    View current
+                                                                    file:{" "}
+                                                                    {form
+                                                                        .businessProof
+                                                                        .fileName ||
+                                                                        "Business document"}
+                                                                </a>
+                                                            ) : (
+                                                                <div className="rp-muted">
+                                                                    No proof
+                                                                    file
+                                                                    uploaded
+                                                                    yet.
+                                                                </div>
+                                                            )}
+
+                                                            <label className="rp-upload-btn">
+                                                                <FileUp
+                                                                    size={14}
+                                                                />
+                                                                {businessProofFile
+                                                                    ? "Replace selected file"
+                                                                    : "Upload proof file"}
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*,.pdf"
+                                                                    style={{
+                                                                        display:
+                                                                            "none",
+                                                                    }}
+                                                                    onChange={
+                                                                        handleBusinessProofSelect
+                                                                    }
+                                                                />
+                                                            </label>
+
+                                                            {businessProofFile && (
+                                                                <div className="rp-muted">
+                                                                    Selected:{" "}
+                                                                    {
+                                                                        businessProofFile.name
+                                                                    }{" "}
+                                                                    (
+                                                                    {formatFileSize(
+                                                                        businessProofFile.size,
+                                                                    )}
+                                                                    )
+                                                                </div>
+                                                            )}
+
+                                                            <div className="rp-muted">
+                                                                Accepts image or
+                                                                PDF files up to 6
+                                                                MB.
+                                                            </div>
+                                                        </div>
+                                                    ) : displayBusinessProof?.fileUrl ? (
+                                                        <div
+                                                            style={{
+                                                                display: "flex",
+                                                                flexDirection:
+                                                                    "column",
+                                                                gap: 4,
+                                                            }}
+                                                        >
+                                                            <a
+                                                                className="rp-link"
+                                                                href={
+                                                                    displayBusinessProof.fileUrl
+                                                                }
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                            >
+                                                                {displayBusinessProof.fileName ||
+                                                                    "Business document"}
+                                                            </a>
+                                                            <div className="rp-muted">
+                                                                {displayBusinessProof.fileSize
+                                                                    ? formatFileSize(
+                                                                          displayBusinessProof.fileSize,
+                                                                      )
+                                                                    : ""}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rp-field-value">
+                                                            -
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        ) : (
-                                            <div className="rp-field-value">
-                                                -
+                                        </div>
+                                    )}
+
+                                    {!editing &&
+                                        !displayHasWorkInfo &&
+                                        !displayHasBusinessInfo && (
+                                            <div className="rp-muted">
+                                                No work or business details on
+                                                file.
                                             </div>
                                         )}
-                                    </div>
                                 </div>
                             </div>
 

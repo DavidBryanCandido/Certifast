@@ -3,6 +3,8 @@
 --
 -- Bucket: certifast-uploads
 -- Path pattern: resident-ids/{auth.uid()}.jpg | .png | .webp
+-- For mismatched-ID-address residency proof uploads, also run:
+-- database/resident_registration_residency_proofs.sql
 --
 -- 1) Dashboard → Storage → certifast-uploads → Policies — enable RLS and add policies below.
 -- 2) Ensure the bucket exists. Public bucket still requires INSERT policies for authenticated users.
