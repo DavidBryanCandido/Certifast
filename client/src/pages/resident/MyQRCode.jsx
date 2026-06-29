@@ -997,7 +997,7 @@ export default function MyQRCode({ resident, onLogout }) {
                                             {
                                                 n: "2",
                                                 t: "Wait for Processing",
-                                                s: "Barangay staff will process it in 1–3 business days.",
+                                                s: "Staff may approve online requests immediately when available; otherwise allow 1-3 business days.",
                                             },
                                             {
                                                 n: "3",

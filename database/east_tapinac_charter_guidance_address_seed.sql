@@ -30,7 +30,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Barangay Clearance",
-          "waiting": "Online review: 1-3 business days. Counter release after approval is usually about 12 minutes.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Counter release after approval is usually about 12 minutes.",
           "review": "Barangay staff checks your resident profile, purpose, and clearance details before preparing the clearance.",
           "release": "Claim the clearance in person. Bring the original ID and the listed payment for final verification and release.",
           "bring": [
@@ -51,7 +51,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Barangay Certification",
-          "waiting": "Online review: 1-3 business days. Counter release after approval is usually about 12 minutes.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Counter release after approval is usually about 12 minutes.",
           "review": "Barangay staff checks your resident profile, purpose, and supporting details before preparing the certification.",
           "release": "Claim the certification in person. Bring the original ID, request reference, and listed payment.",
           "bring": [
@@ -73,7 +73,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Certificate of Residency",
-          "waiting": "Online review: 1-3 business days. Counter release after approval is usually about 12 minutes.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Counter release after approval is usually about 12 minutes.",
           "review": "Barangay staff verifies your residence details and the requesting bank, school, agency, or office requirement.",
           "release": "Claim the residency certificate in person. Bring your ID, request reference, and the original agency requirement if available.",
           "bring": [
@@ -95,7 +95,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Certificate of Indigency / Assistance Certification",
-          "waiting": "Online review: 1-3 business days. Counter release after approval is usually about 12 minutes.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Counter release after approval is usually about 12 minutes.",
           "review": "Barangay staff reviews the assistance purpose and checks the uploaded medical, burial, educational, financial, or agency document.",
           "release": "Claim the certification in person. Bring the original supporting document used for the request.",
           "bring": [
@@ -118,7 +118,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Business Endorsement / Business Certification",
-          "waiting": "Online review: 1-3 business days. Requests that need business-site verification or inspection may take up to 7 days under the charter extension rule.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Requests that need business-site verification or inspection may take up to 7 days under the charter extension rule.",
           "review": "Barangay staff reviews the business details, registration or permit document, and business address before preparing the endorsement.",
           "release": "Claim the endorsement in person. Bring the original business document used for the request.",
           "bring": [
@@ -140,7 +140,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Business Closure / Non-Operation Certification",
-          "waiting": "Online review: 1-3 business days. Requests that need business-site verification or inspection may take up to 7 days under the charter extension rule.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Requests that need business-site verification or inspection may take up to 7 days under the charter extension rule.",
           "review": "Barangay staff reviews the business closure details, prior permit or registration, and any proof of non-operation.",
           "release": "Claim the certification in person. Bring the original business closure or non-operation document if available.",
           "bring": [
@@ -161,7 +161,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Property / Lot Certification",
-          "waiting": "Online review: 1-3 business days. Requests that need onsite verification may take up to 7 days under the charter extension rule.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Requests that need onsite verification may take up to 7 days under the charter extension rule.",
           "review": "Barangay staff checks the property details and uploaded ownership, lease, tax declaration, or lot document.",
           "release": "Claim the certification in person. Bring the original property document used for the request.",
           "bring": [
@@ -183,7 +183,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Senior Citizen Certification",
-          "waiting": "Online review: 1-3 business days. Counter release after approval is usually about 28 minutes.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Counter release after approval is usually about 28 minutes.",
           "review": "Barangay staff assesses the senior citizen requirement and prepares the certification for Senior Citizen ID processing.",
           "release": "Claim the certification in person. Bring age, residency, or OSCA-related proof if requested.",
           "bring": [
@@ -205,7 +205,7 @@ WITH guidance(group_key, body) AS (
         $json$
         {
           "title": "Solo Parent Certification",
-          "waiting": "Online review: 1-3 business days. Barangay verification for solo-parent status may take 1 day.",
+          "waiting": "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days. Barangay verification for solo-parent status may take 1 day.",
           "review": "Barangay staff assesses the solo-parent requirement and verifies the resident's solo-parent status when needed.",
           "release": "Claim the certification in person. Bring the original solo-parent proof or agency requirement if available.",
           "bring": [

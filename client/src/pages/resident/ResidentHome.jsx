@@ -967,9 +967,10 @@ export default function ResidentHome({ resident, onLogout }) {
                                 }}
                             >
                                 <AlertCircle size={11} />
-                                Processing time is typically 1–3 business days.
-                                Visit the barangay office to claim released
-                                certificates.
+                                Online review may be approved immediately when
+                                staff is available; otherwise allow 1-3
+                                business days. Visit the barangay office to
+                                claim released certificates.
                             </div>
                         </div>
 

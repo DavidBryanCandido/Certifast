@@ -196,7 +196,8 @@ function feePaymentText(cert) {
     return amount ? `Fee payment: ${amount}` : "Fee payment";
 }
 
-const DEFAULT_ONLINE_WAIT = "Online review: 1-3 business days.";
+const DEFAULT_ONLINE_WAIT =
+    "Online review may be approved immediately when staff is available; otherwise allow 1-3 business days.";
 
 const DEFAULT_RESIDENT_GUIDANCE = {
     title: "Barangay Certificate Request",
