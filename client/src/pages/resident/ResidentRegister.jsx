@@ -440,7 +440,6 @@ export default function ResidentRegister({ onSuccess }) {
     const [showCf, setShowCf] = useState(false);
     const [declared, setDeclared] = useState(false);
     const [agreedToTerms, setAgreedToTerms] = useState(false);
-    const [showTerms, setShowTerms] = useState(false);
     const [ageModalOpen, setAgeModalOpen] = useState(false);
 
     const set = (k, v) => {
@@ -613,7 +612,7 @@ export default function ResidentRegister({ onSuccess }) {
             if (password !== confirm) return "Passwords do not match.";
             if (!declared) return "Please confirm your residency declaration.";
             if (!agreedToTerms)
-                return "Please agree to the Terms and Conditions.";
+                return "Please agree to the Terms of Service and Privacy Notice.";
         }
         return null;
     };
@@ -1899,12 +1898,10 @@ export default function ResidentRegister({ onSuccess }) {
                         }}
                     >
                         I have read and agree to the{" "}
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                setShowTerms(true);
-                            }}
+                        <a
+                            href="/resident/terms-of-service"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             style={{
                                 background: "none",
                                 border: "none",
@@ -1917,8 +1914,8 @@ export default function ResidentRegister({ onSuccess }) {
                                 textDecoration: "underline",
                             }}
                         >
-                            Terms and Conditions
-                        </button>
+                            Terms of Service and Privacy Notice
+                        </a>
                         .
                     </p>
                 </label>
@@ -2072,137 +2069,6 @@ export default function ResidentRegister({ onSuccess }) {
                                 <button
                                     type="button"
                                     onClick={closeAgeModal}
-                                    className="reg-btn-primary"
-                                    style={{
-                                        width: "100%",
-                                        justifyContent: "center",
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>,
-                    document.body,
-                )}
-
-            {showTerms &&
-                createPortal(
-                    <div
-                        onClick={() => setShowTerms(false)}
-                        style={{
-                            position: "fixed",
-                            inset: 0,
-                            zIndex: 600,
-                            background: "rgba(9,26,62,0.62)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: 18,
-                        }}
-                    >
-                        <div
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                                width: "100%",
-                                maxWidth: 560,
-                                maxHeight: "82vh",
-                                background: "#fff",
-                                borderRadius: 8,
-                                overflow: "hidden",
-                                boxShadow:
-                                    "0 24px 60px rgba(0,0,0,0.35)",
-                                display: "flex",
-                                flexDirection: "column",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    padding: "16px 22px",
-                                    background:
-                                        "linear-gradient(135deg,var(--color-primary),var(--color-primary-soft))",
-                                    color: "#fff",
-                                    fontFamily:
-                                        "'Playfair Display',serif",
-                                    fontSize: 16,
-                                    fontWeight: 700,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    gap: 12,
-                                }}
-                            >
-                                <span>Terms and Conditions</span>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowTerms(false)}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        color: "rgba(255,255,255,0.8)",
-                                        cursor: "pointer",
-                                        display: "flex",
-                                        padding: 2,
-                                    }}
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-                            <div
-                                style={{
-                                    padding: "20px 24px",
-                                    overflowY: "auto",
-                                    color: "#1a1a2e",
-                                    fontSize: 13,
-                                    lineHeight: 1.7,
-                                }}
-                            >
-                                <p style={{ margin: "0 0 12px" }}>
-                                    By creating a CertiFast account, you consent
-                                    to Barangay East Tapinac collecting,
-                                    processing, and storing the personal
-                                    information and documents you submit for
-                                    identity verification, account review,
-                                    certificate processing, notifications, audit
-                                    logs, and related barangay services.
-                                </p>
-                                <p style={{ margin: "0 0 12px" }}>
-                                    You certify that the information you provide
-                                    is complete, accurate, and your own. False,
-                                    misleading, or incomplete information may
-                                    result in registration denial, account
-                                    suspension, certificate cancellation, or
-                                    referral to the barangay office for manual
-                                    review.
-                                </p>
-                                <p style={{ margin: "0 0 12px" }}>
-                                    Certificates requested through CertiFast
-                                    must be used only for lawful and legitimate
-                                    purposes. You are responsible for ensuring
-                                    that any certificate issued to you is not
-                                    altered, misrepresented, sold, transferred,
-                                    or used for fraudulent activity.
-                                </p>
-                                <p style={{ margin: 0 }}>
-                                    Barangay East Tapinac may deny, revoke, or
-                                    limit access to CertiFast when required for
-                                    verification, security, data privacy,
-                                    compliance, or lawful barangay operations.
-                                    You may contact the barangay office to ask
-                                    about corrections, account status, or data
-                                    privacy concerns.
-                                </p>
-                            </div>
-                            <div
-                                style={{
-                                    padding: "14px 22px",
-                                    borderTop: "1px solid #e4dfd4",
-                                    background: "#f8f6f1",
-                                }}
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => setShowTerms(false)}
                                     className="reg-btn-primary"
                                     style={{
                                         width: "100%",

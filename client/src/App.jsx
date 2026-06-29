@@ -20,6 +20,9 @@ const Settings = lazy(() => import("./pages/admin/Settings"));
 
 const ResidentLogin = lazy(() => import("./pages/resident/ResidentLogin"));
 const ResidentRegister = lazy(() => import("./pages/resident/ResidentRegister"));
+const ResidentTermsOfService = lazy(
+    () => import("./pages/resident/ResidentTermsOfService"),
+);
 const CompleteRegistration = lazy(
     () => import("./pages/resident/CompleteRegistration"),
 );
@@ -289,6 +292,10 @@ export default function App() {
                 <Route
                     path="/resident/register"
                     element={<ResidentRegisterRoute />}
+                />
+                <Route
+                    path="/resident/terms-of-service"
+                    element={<ResidentTermsOfService />}
                 />
                 <Route
                     path="/resident/complete-registration"
