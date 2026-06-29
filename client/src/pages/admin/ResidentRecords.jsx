@@ -29,6 +29,10 @@ import AdminDateChip from "../../components/AdminDateChip";
 import AdminNotificationsBell from "../../components/AdminNotificationsBell";
 import residentRecordsService from "../../services/residentRecordsService";
 import { formatResidentAddress } from "../../utils/address";
+import {
+    DATA_TABLE_REFRESH_MS,
+    shouldRefreshVisiblePage,
+} from "../../utils/autoRefresh";
 
 // =============================================================
 // useWindowSize
@@ -783,8 +787,8 @@ export default function ResidentRecords({
         };
     }, []);
 
-    const loadResidents = useCallback(async () => {
-        setListLoading(true);
+    const loadResidents = useCallback(async ({ showLoading = true } = {}) => {
+        if (showLoading) setListLoading(true);
         setListError("");
 
         try {
@@ -816,7 +820,7 @@ export default function ResidentRecords({
                 err?.response?.data?.message || "Failed to load residents.",
             );
         } finally {
-            setListLoading(false);
+            if (showLoading) setListLoading(false);
         }
     }, [
         currentPage,
@@ -895,6 +899,16 @@ export default function ResidentRecords({
     useEffect(() => {
         loadResidentStats();
     }, [loadResidentStats]);
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            if (!shouldRefreshVisiblePage()) return;
+            loadResidents({ showLoading: false });
+            loadResidentStats();
+        }, DATA_TABLE_REFRESH_MS);
+
+        return () => window.clearInterval(id);
+    }, [loadResidentStats, loadResidents]);
 
     // Stat strip values
     const stats = [

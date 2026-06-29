@@ -8,6 +8,7 @@ import {
     cacheSystemTheme,
     getCachedSystemTheme,
 } from "./theme";
+import { clearStoredAuth } from "./utils/authSession";
 
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const Dashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -67,8 +68,7 @@ function useSessionData() {
 }
 
 function clearResidentAuth() {
-    localStorage.removeItem("certifast_resident_auth");
-    localStorage.removeItem("certifast_resident_token");
+    clearStoredAuth();
 }
 
 function useResidentPageProps() {
@@ -104,8 +104,7 @@ function AdminPage({
     };
 
     const handleAdminLogout = () => {
-        localStorage.removeItem("certifast_admin_auth");
-        localStorage.removeItem("certifast_admin_token");
+        clearStoredAuth();
         navigate("/admin/login");
     };
 

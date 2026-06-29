@@ -5,6 +5,9 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import App from "./App.jsx";
 import { AdminAuthProvider } from "./context/AdminAuthContext.jsx";
+import { installAuthSessionGuard } from "./utils/authSession.js";
+
+installAuthSessionGuard();
 
 createRoot(document.getElementById("root")).render(
     <StrictMode>

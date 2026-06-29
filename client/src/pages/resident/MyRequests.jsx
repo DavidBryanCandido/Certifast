@@ -2,7 +2,7 @@
 // FILE: client/src/pages/resident/MyRequests.jsx
 // =============================================================
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     FileText,
@@ -19,6 +19,10 @@ import formatDate from "../../utils/formatDate";
 import ResidentBottomNav from "../../components/ResidentBottomNav";
 import ResidentSidebar from "../../components/ResidentSidebar";
 import ResidentTopbar from "../../components/ResidentTopbar";
+import {
+    DATA_TABLE_REFRESH_MS,
+    shouldRefreshVisiblePage,
+} from "../../utils/autoRefresh";
 
 if (!document.head.querySelector("[data-resident-home]")) {
     const s = document.createElement("style");
@@ -107,6 +111,7 @@ export default function MyRequests({ resident, onLogout }) {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const mountedRef = useRef(false);
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
@@ -115,26 +120,46 @@ export default function MyRequests({ resident, onLogout }) {
     }, []);
 
     useEffect(() => {
-        let mounted = true;
-        async function load() {
-            try {
-                const result = await requestService.getAllRequests();
-                if (mounted) setRows(result.data || []);
-            } catch (err) {
-                if (mounted)
-                    setError(
-                        err?.response?.data?.message ||
-                            "Failed to load requests.",
-                    );
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        }
-        load();
+        mountedRef.current = true;
         return () => {
-            mounted = false;
+            mountedRef.current = false;
         };
     }, []);
+
+    const loadRequests = useCallback(async ({ showLoading = true } = {}) => {
+        if (showLoading) setLoading(true);
+        setError("");
+
+        try {
+            const result = await requestService.getAllRequests();
+            if (mountedRef.current) setRows(result.data || []);
+        } catch (err) {
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                onLogout?.();
+                return;
+            }
+            if (mountedRef.current) {
+                setError(
+                    err?.response?.data?.message || "Failed to load requests.",
+                );
+            }
+        } finally {
+            if (mountedRef.current && showLoading) setLoading(false);
+        }
+    }, [onLogout]);
+
+    useEffect(() => {
+        loadRequests();
+    }, [loadRequests]);
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            if (!shouldRefreshVisiblePage()) return;
+            loadRequests({ showLoading: false });
+        }, DATA_TABLE_REFRESH_MS);
+
+        return () => window.clearInterval(id);
+    }, [loadRequests]);
 
     const isMobile = width < 768;
     const isTablet = width >= 640 && width < 1024;

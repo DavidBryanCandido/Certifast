@@ -31,6 +31,10 @@ import adminRequestService from "../../services/adminRequestService";
 import * as settingsService from "../../services/settingsService";
 import * as personnelService from "../../services/personnelService";
 import {
+    DATA_TABLE_REFRESH_MS,
+    shouldRefreshVisiblePage,
+} from "../../utils/autoRefresh";
+import {
     buildCertificatePrintHtml,
     getCertificateSignatoryRequirements,
 } from "../../utils/certificateTemplateEngine";
@@ -1174,8 +1178,8 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
         };
     }, []);
 
-    const loadRequests = useCallback(async () => {
-        setLoading(true);
+    const loadRequests = useCallback(async ({ showLoading = true } = {}) => {
+        if (showLoading) setLoading(true);
         setError("");
         try {
             const result = await adminRequestService.getRequests({
@@ -1208,7 +1212,7 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             setTotalPages(1);
             setStatusCounts({ all: 0 });
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     }, [
         activeTab,
@@ -1222,6 +1226,15 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
     ]);
 
     useEffect(() => { loadRequests(); }, [loadRequests]);
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            if (!shouldRefreshVisiblePage()) return;
+            loadRequests({ showLoading: false });
+        }, DATA_TABLE_REFRESH_MS);
+
+        return () => window.clearInterval(id);
+    }, [loadRequests]);
 
     useEffect(() => {
         if (!Number.isFinite(requestedRequestId) || requestedRequestId <= 0) {

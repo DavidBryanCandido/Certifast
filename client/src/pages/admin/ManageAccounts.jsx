@@ -35,6 +35,10 @@ import axios from "axios";
 import authService from "../../services/authService";
 
 import { getApiBase } from "../../apiBase";
+import {
+    DATA_TABLE_REFRESH_MS,
+    shouldRefreshVisiblePage,
+} from "../../utils/autoRefresh";
 
 const API = getApiBase();
 function adminHeaders() {
@@ -1740,8 +1744,8 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     };
 
     // ── Load staff/admin accounts ──
-    const loadAccounts = useCallback(async () => {
-        setLoading(true);
+    const loadAccounts = useCallback(async ({ showLoading = true } = {}) => {
+        if (showLoading) setLoading(true);
         setError("");
         try {
             const result = await accountService.getAccounts();
@@ -1763,13 +1767,13 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                 err?.response?.data?.message || "Failed to load accounts.",
             );
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
     }, [onLogout]);
 
     // ── Load resident accounts ──
-    const loadResidents = useCallback(async () => {
-        setResLoading(true);
+    const loadResidents = useCallback(async ({ showLoading = true } = {}) => {
+        if (showLoading) setResLoading(true);
         setResError("");
         try {
             const res = await axios.get(
@@ -1801,7 +1805,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                     "Failed to load resident accounts.",
             );
         } finally {
-            setResLoading(false);
+            if (showLoading) setResLoading(false);
         }
     }, [onLogout]);
 
@@ -1812,6 +1816,16 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
     useEffect(() => {
         loadResidents();
     }, [loadResidents]);
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            if (!shouldRefreshVisiblePage()) return;
+            if (isSuperAdmin) loadAccounts({ showLoading: false });
+            loadResidents({ showLoading: false });
+        }, DATA_TABLE_REFRESH_MS);
+
+        return () => window.clearInterval(id);
+    }, [isSuperAdmin, loadAccounts, loadResidents]);
 
     // ── Filtered staff rows ──
     const filtered = rows.filter((r) => {

@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { getApiBase } from "../apiBase";
+import { clearStoredAuth } from "../utils/authSession";
 
 const API = getApiBase();
 
@@ -36,13 +37,11 @@ const authService = {
 
     // Logout helpers
     residentLogout: () => {
-        localStorage.removeItem("certifast_resident_token");
-        localStorage.removeItem("certifast_resident_auth");
+        clearStoredAuth();
     },
 
     adminLogout: () => {
-        localStorage.removeItem("certifast_admin_token");
-        localStorage.removeItem("certifast_admin_auth");
+        clearStoredAuth();
     },
 
     // Get tokens for protected requests

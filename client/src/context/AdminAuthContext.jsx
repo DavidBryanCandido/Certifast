@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState } from 'react';
+import { clearStoredAuth } from '../utils/authSession';
 
 const STORAGE_KEY = 'certifast_admin_auth';
 
@@ -26,7 +27,7 @@ export function AdminAuthProvider({ children }) {
 	const logout = () => {
 		const next = { token: null, admin: null };
 		setAuthState(next);
-		localStorage.removeItem(STORAGE_KEY);
+		clearStoredAuth();
 	};
 
 	const value = useMemo(
