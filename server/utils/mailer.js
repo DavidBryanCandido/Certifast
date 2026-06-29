@@ -22,21 +22,79 @@ function escapeHtml(value) {
 }
 
 function getTransporter() {
-    const host = process.env.EMAIL_HOST;
-    const port = Number(process.env.EMAIL_PORT || 587);
-    const user = process.env.EMAIL_USER;
-    const pass = process.env.EMAIL_PASS;
+    const host = process.env.EMAIL_HOST || process.env.SMTP_HOST;
+    const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587);
+    const user = process.env.EMAIL_USER || process.env.SMTP_USER;
+    const pass = process.env.EMAIL_PASS || process.env.SMTP_PASS;
+    const tlsRejectUnauthorized =
+        process.env.EMAIL_TLS_REJECT_UNAUTHORIZED ??
+        process.env.SMTP_TLS_REJECT_UNAUTHORIZED;
 
     if (!host || !user || !pass) {
         throw new Error("Email SMTP configuration is incomplete.");
     }
 
-    return nodemailer.createTransport({
+    const options = {
         host,
         port,
         secure: port === 465,
         auth: { user, pass },
-    });
+    };
+
+    if (String(tlsRejectUnauthorized).toLowerCase() === "false") {
+        options.tls = { rejectUnauthorized: false };
+    }
+
+    return nodemailer.createTransport(options);
+}
+
+function normalizeEmailList(items) {
+    if (!Array.isArray(items)) return [];
+    return items
+        .map((item) => String(item || "").trim())
+        .filter(Boolean);
+}
+
+function buildPickupDetailsBlock(normalizedStatus, pickupDetails) {
+    if (!["approved", "ready"].includes(normalizedStatus) || !pickupDetails) {
+        return "";
+    }
+
+    const bringItems = normalizeEmailList(pickupDetails.bringItems);
+    const bringBlock = bringItems.length
+        ? `<p style="margin-bottom:8px;"><strong>What to bring:</strong></p>
+           <ul style="margin-top:0;padding-left:22px;">
+               ${bringItems
+                   .map((item) => `<li>${escapeHtml(item)}</li>`)
+                   .join("")}
+           </ul>`
+        : "";
+    const feeBlock = pickupDetails.feeLabel
+        ? `<p><strong>Fee:</strong> ${escapeHtml(pickupDetails.feeLabel)}</p>`
+        : "";
+
+    if (!bringBlock && !feeBlock) return "";
+
+    return `
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:14px 16px;margin:18px 0;">
+            <p style="margin-top:0;"><strong>${normalizedStatus === "ready" ? "Pickup reminder" : "Claiming reminder"}</strong></p>
+            ${bringBlock}
+            ${feeBlock}
+        </div>
+    `;
+}
+
+function statusActionText(normalizedStatus, hasPickupDetails) {
+    if (normalizedStatus === "needs_correction") {
+        return "Sign in to CertiFast, open My Requests, edit this request, and resubmit it for review.";
+    }
+    if (hasPickupDetails && normalizedStatus === "ready") {
+        return "Please visit the barangay office during office hours to claim your certificate.";
+    }
+    if (hasPickupDetails && normalizedStatus === "approved") {
+        return "Please prepare the listed items while barangay staff process your certificate.";
+    }
+    return "Please visit the barangay office during office hours if action or pickup is required.";
 }
 
 async function sendStatusEmail(
@@ -45,6 +103,7 @@ async function sendStatusEmail(
     certType,
     status,
     rejectionReason = "",
+    pickupDetails = null,
 ) {
     const normalizedStatus = String(status || "").toLowerCase();
     const subject = STATUS_EMAILS[normalizedStatus];
@@ -52,7 +111,11 @@ async function sendStatusEmail(
     if (!residentEmail) throw new Error("Resident email is required.");
 
     const transporter = getTransporter();
-    const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const from =
+        process.env.EMAIL_FROM ||
+        process.env.SMTP_FROM ||
+        process.env.EMAIL_USER ||
+        process.env.SMTP_USER;
     const statusLabel =
         normalizedStatus === "ready"
             ? "Ready for Pickup"
@@ -65,6 +128,10 @@ async function sendStatusEmail(
         normalizedStatus === "rejected" || normalizedStatus === "needs_correction"
             ? `<p><strong>${normalizedStatus === "needs_correction" ? "What to correct" : "Reason"}:</strong> ${escapeHtml(rejectionReason || "No reason was provided.")}</p>`
             : "";
+    const pickupDetailsBlock = buildPickupDetailsBlock(
+        normalizedStatus,
+        pickupDetails,
+    );
 
     const html = `
         <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:620px;margin:0 auto;">
@@ -78,11 +145,8 @@ async function sendStatusEmail(
                 <p><strong>Certificate:</strong> ${escapeHtml(certType || "Certificate Request")}</p>
                 <p><strong>Status:</strong> ${escapeHtml(statusLabel)}</p>
                 ${rejectionBlock}
-                <p>${
-                    normalizedStatus === "needs_correction"
-                        ? "Sign in to CertiFast, open My Requests, edit this request, and resubmit it for review."
-                        : "Please visit the barangay office during office hours if action or pickup is required."
-                }</p>
+                ${pickupDetailsBlock}
+                <p>${statusActionText(normalizedStatus, Boolean(pickupDetailsBlock))}</p>
                 <p><strong>Office hours:</strong> Mon-Fri 8AM-5PM, Saturday 8AM-12PM.</p>
                 <p style="color:#6b7280;font-size:12px;margin-top:24px;">This is an automated CertiFast notification.</p>
             </div>
@@ -103,7 +167,11 @@ async function sendAccountActivatedEmail(residentEmail, residentName) {
     if (!residentEmail) throw new Error("Resident email is required.");
 
     const transporter = getTransporter();
-    const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const from =
+        process.env.EMAIL_FROM ||
+        process.env.SMTP_FROM ||
+        process.env.EMAIL_USER ||
+        process.env.SMTP_USER;
     const html = `
         <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:620px;margin:0 auto;">
             <div style="background:#0e2554;color:#fff;padding:18px 22px;border-radius:6px 6px 0 0;">
@@ -137,7 +205,11 @@ async function sendPasswordChangedEmail(
     if (!residentEmail) throw new Error("Resident email is required.");
 
     const transporter = getTransporter();
-    const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const from =
+        process.env.EMAIL_FROM ||
+        process.env.SMTP_FROM ||
+        process.env.EMAIL_USER ||
+        process.env.SMTP_USER;
     const changedByText =
         changedBy === "admin"
             ? "by barangay personnel"

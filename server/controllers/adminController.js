@@ -9,6 +9,10 @@ const {
     sendPasswordChangedEmail,
 } = require("../utils/mailer");
 const { buildSignatorySnapshot } = require("../utils/signatories");
+const {
+    buildStatusNotificationMessage,
+    getRequestNotificationDetails,
+} = require("../utils/requestNotificationDetails");
 
 const supabase = (() => {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -270,8 +274,36 @@ async function createNotification({
     }
 }
 
-async function sendRequestStatusEmailAfterUpdate(requestId, status, rejectionReason = "") {
+async function loadRequestNotificationDetails(requestId) {
     try {
+        return await getRequestNotificationDetails(requestId);
+    } catch (err) {
+        console.error("getRequestNotificationDetails error:", err.message || err);
+        return null;
+    }
+}
+
+async function sendRequestStatusEmailAfterUpdate(
+    requestId,
+    status,
+    rejectionReason = "",
+    requestDetails = null,
+) {
+    try {
+        const details =
+            requestDetails || (await loadRequestNotificationDetails(requestId));
+        if (details?.residentEmail) {
+            await sendStatusEmail(
+                details.residentEmail,
+                details.residentName,
+                details.certType,
+                status,
+                rejectionReason,
+                details,
+            );
+            return;
+        }
+
         const result = await pool.query(
             `SELECT
                 r.cert_type,
@@ -448,13 +480,20 @@ async function approveRequest(req, res) {
 
         // Create notification for resident
         const request = result.rows[0];
-        await sendRequestStatusEmailAfterUpdate(request.request_id, "approved");
+        const requestDetails = await loadRequestNotificationDetails(
+            request.request_id,
+        );
+        await sendRequestStatusEmailAfterUpdate(
+            request.request_id,
+            "approved",
+            "",
+            requestDetails,
+        );
         await createNotification({
             residentId: request.resident_id,
             type: "request_update",
             title: "Request Approved",
-            message:
-                "Your certificate request has been approved and is now being processed.",
+            message: buildStatusNotificationMessage("approved", requestDetails),
             requestId: request.request_id,
         });
 
@@ -2080,13 +2119,20 @@ async function markRequestReady(req, res) {
 
         // Create notification for resident
         const request = result.rows[0];
-        await sendRequestStatusEmailAfterUpdate(request.request_id, "ready");
+        const requestDetails = await loadRequestNotificationDetails(
+            request.request_id,
+        );
+        await sendRequestStatusEmailAfterUpdate(
+            request.request_id,
+            "ready",
+            "",
+            requestDetails,
+        );
         await createNotification({
             residentId: request.resident_id,
             type: "request_update",
             title: "Certificate Ready for Pickup",
-            message:
-                "Your certificate is ready for pickup at the barangay office.",
+            message: buildStatusNotificationMessage("ready", requestDetails),
             requestId: request.request_id,
         });
 
