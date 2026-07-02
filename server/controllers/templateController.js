@@ -1,5 +1,6 @@
 //
 const pool = require("../db/pool");
+const { normalizeProofRequirements } = require("../utils/requestProofRequirements");
 
 function queryActiveTemplates({
     includeFeeAmount = true,
@@ -56,7 +57,14 @@ async function getTemplates(req, res) {
 
         if (!result) result = await queryActiveTemplates(flags);
 
-        return res.json({ data: result.rows });
+        return res.json({
+            data: result.rows.map((row) => ({
+                ...row,
+                proof_requirements: normalizeProofRequirements(
+                    row.proof_requirements,
+                ),
+            })),
+        });
     } catch (err) {
         console.error("getTemplates error:", err);
         return res.status(500).json({ message: "Server error" });

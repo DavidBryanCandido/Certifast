@@ -1,4 +1,5 @@
 // certifast/controllers/residentController.js
+const { createClient } = require("@supabase/supabase-js");
 const pool = require("../db/pool");
 const { createAuditLog } = require("../utils/logger");
 const {
@@ -6,6 +7,17 @@ const {
     isAddressMappingMissingError,
     resolvePurokStreetPair,
 } = require("../utils/addressLookup");
+const {
+    requirementsForRequest,
+    summarizeProofRequirements,
+    validateProofAttachments,
+} = require("../utils/requestProofRequirements");
+
+const supabase = (() => {
+    const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    return url && key ? createClient(url, key) : null;
+})();
 
 function cleanText(value) {
     if (value === null || value === undefined) return null;
@@ -37,6 +49,29 @@ function makePagination(query, defaultLimit = 25, maxLimit = 100) {
 
 function cleanObject(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+async function loadTemplateProofRequirements(client, templateId, certType) {
+    const parsedTemplateId = Number.parseInt(templateId, 10);
+    const resolvedTemplateId =
+        Number.isFinite(parsedTemplateId) && parsedTemplateId > 0
+            ? parsedTemplateId
+            : null;
+    const certificateName = cleanText(certType) || "";
+
+    const result = await client.query(
+        `SELECT COALESCE(to_jsonb(ct)->'proof_requirements', '[]'::jsonb) AS proof_requirements
+         FROM certificate_templates ct
+         WHERE ($1::int IS NOT NULL AND ct.template_id = $1)
+            OR ($2::text <> '' AND ct.name = $2)
+         ORDER BY CASE WHEN ct.template_id = $1 THEN 0 ELSE 1 END,
+                  COALESCE(ct.display_order, 0),
+                  ct.template_id
+         LIMIT 1`,
+        [resolvedTemplateId, certificateName],
+    );
+
+    return result.rows[0]?.proof_requirements || [];
 }
 
 function cleanStringList(value) {
@@ -105,7 +140,6 @@ function normalizeRequestAttachments(value) {
     if (!Array.isArray(value)) return [];
     return value
         .filter(Boolean)
-        .slice(0, 8)
         .map((file) => ({
             proofKey: String(file.proofKey || file.proof_key || "proof").slice(
                 0,
@@ -184,12 +218,35 @@ async function appendResidentRequestAttachments(rows = []) {
             [ids],
         );
         const grouped = new Map();
-        result.rows.forEach((attachment) => {
-            if (!grouped.has(attachment.request_id)) {
-                grouped.set(attachment.request_id, []);
+        for (const row of result.rows) {
+            const item = {
+                id: row.request_attachment_id,
+                proofKey: row.proof_key,
+                label: row.label,
+                fileName: row.file_name,
+                filePath: row.file_path,
+                fileUrl: row.file_url,
+                mimeType: row.mime_type,
+                fileSize: row.file_size,
+                uploadedAt: row.uploaded_at,
+            };
+
+            if (supabase && row.file_path) {
+                const { data, error } = await supabase.storage
+                    .from("certifast-uploads")
+                    .createSignedUrl(row.file_path, 60 * 60);
+                if (!error && data?.signedUrl) {
+                    item.viewUrl = data.signedUrl;
+                }
             }
-            grouped.get(attachment.request_id).push(attachment);
-        });
+
+            if (!item.viewUrl) item.viewUrl = row.file_url;
+
+            if (!grouped.has(row.request_id)) {
+                grouped.set(row.request_id, []);
+            }
+            grouped.get(row.request_id).push(item);
+        }
         return rows.map((row) => ({
             ...row,
             attachments: grouped.get(row.request_id) || [],
@@ -203,6 +260,23 @@ async function appendResidentRequestAttachments(rows = []) {
         }
         throw err;
     }
+}
+
+function appendResidentRequestProofSummaries(rows = []) {
+    return rows.map((row) => {
+        const { proofRequirements, missingProofRequirements } =
+            summarizeProofRequirements({
+                templateRequirements: row.proof_requirements,
+                attachments: row.attachments,
+            });
+
+        return {
+            ...row,
+            proof_requirements: proofRequirements,
+            proofRequirements,
+            missingProofRequirements,
+        };
+    });
 }
 
 async function appendCorrectionHistory(rows = []) {
@@ -408,6 +482,42 @@ async function createRequest(req, res) {
                 ? parsedTemplateId
                 : null;
 
+        const normalizedExtraFields = cleanObject(extraFields);
+        const proofFiles = normalizeRequestAttachments(
+            Array.isArray(attachments)
+                ? attachments
+                : Array.isArray(normalizedExtraFields.proofAttachments)
+                  ? normalizedExtraFields.proofAttachments
+                  : [],
+        );
+        const templateProofRequirements = await loadTemplateProofRequirements(
+            client,
+            resolvedTemplateId,
+            certType,
+        );
+        const proofRequirements = requirementsForRequest(
+            templateProofRequirements,
+            normalizedExtraFields,
+        );
+        const proofErrors = validateProofAttachments({
+            requirements: proofRequirements,
+            attachments: proofFiles,
+            uploadPrefix: `request-proofs/${req.resident.supabase_uid}/`,
+        });
+
+        if (proofErrors.length > 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message: proofErrors[0],
+                errors: proofErrors,
+            });
+        }
+
+        const nextExtraFields = {
+            ...normalizedExtraFields,
+            proofAttachments: proofFiles,
+        };
+
         const result = await client.query(
             `INSERT INTO requests
         (resident_id, template_id, cert_type, purpose, extra_fields, notes, source, status)
@@ -418,20 +528,13 @@ async function createRequest(req, res) {
                 resolvedTemplateId,
                 certType,
                 purpose,
-                JSON.stringify(extraFields || {}),
+                JSON.stringify(nextExtraFields),
                 notes || "",
                 source || "resident",
             ],
         );
 
         const requestId = result.rows[0].request_id;
-        const proofFiles = normalizeRequestAttachments(
-            Array.isArray(attachments)
-                ? attachments
-                : Array.isArray(extraFields?.proofAttachments)
-                  ? extraFields.proofAttachments
-                  : [],
-        );
 
         await insertRequestAttachments(
             client,
@@ -509,7 +612,8 @@ async function getMyRequests(req, res) {
                     r.released_at,
                     COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
                     to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
-                    ct.template_key
+                    ct.template_key,
+                    COALESCE(to_jsonb(ct)->'proof_requirements', '[]'::jsonb) AS proof_requirements
              FROM requests r
              LEFT JOIN certificate_templates ct ON ct.template_id = r.template_id
              WHERE r.resident_id = $1
@@ -521,7 +625,9 @@ async function getMyRequests(req, res) {
         const rows = summaryMode
             ? result.rows
             : await appendCorrectionHistory(
-                  await appendResidentRequestAttachments(result.rows),
+                  appendResidentRequestProofSummaries(
+                      await appendResidentRequestAttachments(result.rows),
+                  ),
               );
 
         if (!wantsPaged) {
@@ -565,7 +671,8 @@ async function getMyRequest(req, res) {
                     r.released_at,
                     COALESCE((to_jsonb(r)->>'revision_count')::int, 0) AS revision_count,
                     to_jsonb(r)->>'last_resubmitted_at' AS last_resubmitted_at,
-                    ct.template_key
+                    ct.template_key,
+                    COALESCE(to_jsonb(ct)->'proof_requirements', '[]'::jsonb) AS proof_requirements
              FROM requests r
              LEFT JOIN certificate_templates ct ON ct.template_id = r.template_id
              WHERE r.request_id = $1 AND r.resident_id = $2
@@ -577,7 +684,9 @@ async function getMyRequest(req, res) {
         }
         const rowsWithAttachments =
             await appendResidentRequestAttachments(result.rows);
-        const [request] = await appendCorrectionHistory(rowsWithAttachments);
+        const [request] = await appendCorrectionHistory(
+            appendResidentRequestProofSummaries(rowsWithAttachments),
+        );
         return res.json({ request });
     } catch (err) {
         console.error("getMyRequest error:", err);
@@ -610,7 +719,7 @@ async function resubmitRequest(req, res) {
     try {
         await client.query("BEGIN");
         const currentResult = await client.query(
-            `SELECT request_id, cert_type, status
+            `SELECT request_id, cert_type, template_id, status
              FROM requests
              WHERE request_id = $1 AND resident_id = $2
              FOR UPDATE`,
@@ -639,14 +748,33 @@ async function resubmitRequest(req, res) {
             allowedExisting.rows.map((row) => String(row.file_path || "")),
         );
         const uploadPrefix = `request-proofs/${req.resident.supabase_uid}/`;
-        const safeAttachments = attachments.filter(
-            (file) =>
-                existingPaths.has(file.filePath) ||
-                file.filePath.startsWith(uploadPrefix),
+        const templateProofRequirements = await loadTemplateProofRequirements(
+            client,
+            current.template_id,
+            current.cert_type,
         );
+        const proofRequirements = requirementsForRequest(
+            templateProofRequirements,
+            extraFields,
+        );
+        const proofErrors = validateProofAttachments({
+            requirements: proofRequirements,
+            attachments,
+            uploadPrefix,
+            allowedExistingPaths: existingPaths,
+        });
+
+        if (proofErrors.length > 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message: proofErrors[0],
+                errors: proofErrors,
+            });
+        }
+
         const nextExtraFields = {
             ...extraFields,
-            proofAttachments: safeAttachments,
+            proofAttachments: attachments,
         };
 
         const result = await client.query(
@@ -681,7 +809,7 @@ async function resubmitRequest(req, res) {
             client,
             requestId,
             residentId,
-            safeAttachments,
+            attachments,
         );
         const updated = result.rows[0];
         await client.query(
@@ -700,7 +828,7 @@ async function resubmitRequest(req, res) {
                     purpose,
                     extraFields: nextExtraFields,
                     notes,
-                    attachments: safeAttachments,
+                    attachments,
                     status: updated.status,
                 }),
             ],

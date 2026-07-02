@@ -32,7 +32,6 @@ import {
     FileDown,
     Loader2,
     Paperclip,
-    ExternalLink,
 } from "lucide-react";
 import {
     BarChart,
@@ -293,6 +292,30 @@ function formatAttachmentSize(size = 0) {
     if (!bytes) return "";
     if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const RECENT_REQUEST_LIMIT = 10;
+
+function attachmentFileName(attachment) {
+    return attachment?.fileName || attachment?.file_name || "Uploaded file";
+}
+
+function attachmentFileUrl(attachment) {
+    return (
+        attachment?.viewUrl ||
+        attachment?.view_url ||
+        attachment?.fileUrl ||
+        attachment?.file_url ||
+        ""
+    );
+}
+
+function attachmentMime(attachment) {
+    return attachment?.mimeType || attachment?.mime_type || "";
+}
+
+function attachmentSize(attachment) {
+    return attachment?.fileSize || attachment?.file_size || 0;
 }
 
 if (!document.head.querySelector("[data-cf-dashboard]")) {
@@ -603,6 +626,7 @@ function RequestDrawer({
     const [adminExtraFields, setAdminExtraFields] = useState({});
     const [signatorySelections, setSignatorySelections] = useState({});
     const [savedSignatorySnapshot, setSavedSignatorySnapshot] = useState({});
+    const [documentPreview, setDocumentPreview] = useState(null);
 
     useEffect(() => {
         if (!request) return;
@@ -612,6 +636,7 @@ function RequestDrawer({
         setRejectReason("");
         setActionError("");
         setAdminExtraFields({});
+        setDocumentPreview(null);
         const snapshot = request.signatorySnapshot || {};
         setSavedSignatorySnapshot(snapshot);
         setSignatorySelections(
@@ -626,14 +651,19 @@ function RequestDrawer({
     useEffect(() => {
         document.body.style.overflow = "hidden";
         const fn = (e) => {
-            if (e.key === "Escape") onClose();
+            if (e.key !== "Escape") return;
+            if (documentPreview) {
+                setDocumentPreview(null);
+                return;
+            }
+            onClose();
         };
         window.addEventListener("keydown", fn);
         return () => {
             document.body.style.overflow = "";
             window.removeEventListener("keydown", fn);
         };
-    }, [onClose]);
+    }, [documentPreview, onClose]);
 
     if (!request) return null;
 
@@ -810,6 +840,93 @@ function RequestDrawer({
 
     const SectionTitle = ({ children }) => (
         <div className="cf-drawer-section-title">{children}</div>
+    );
+
+    const openDocumentPreview = (attachment, label) => {
+        const url = attachmentFileUrl(attachment);
+        setActionError("");
+        setDocumentPreview({
+            url,
+            label: label || attachment.label || "Supporting document",
+            fileName: attachmentFileName(attachment),
+            mimeType: attachmentMime(attachment),
+            unavailableMessage: url
+                ? ""
+                : "This uploaded file is not available for preview yet.",
+        });
+    };
+
+    const closeDocumentPreview = () => setDocumentPreview(null);
+
+    const previewName = documentPreview?.fileName || "";
+    const previewMime = documentPreview?.mimeType || "";
+    const previewUrl = documentPreview?.url || "";
+    const hasPreviewUrl = Boolean(previewUrl);
+    const previewIsImage =
+        hasPreviewUrl &&
+        (previewMime.startsWith("image/") ||
+            /\.(jpe?g|png|webp|gif)$/i.test(previewName));
+    const previewIsPdf =
+        hasPreviewUrl &&
+        (previewMime === "application/pdf" || /\.pdf$/i.test(previewName));
+
+    const documentPreviewModal = documentPreview && (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Supporting document preview"
+            onClick={closeDocumentPreview}
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 650,
+                background: "rgba(12,18,32,.58)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? 14 : 24,
+            }}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                    width: "min(920px, 100%)",
+                    maxHeight: "88vh",
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 18px 50px rgba(0,0,0,.24)",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+            >
+                <div style={{ padding: "12px 14px", borderBottom: "1px solid #e4dfd4", background: "#f8f6f1", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#9090aa", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                            {documentPreview.label}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary, #0e2554)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {documentPreview.fileName}
+                        </div>
+                    </div>
+                    <button type="button" onClick={closeDocumentPreview} title="Close preview" style={{ width: 34, height: 34, border: "1px solid #e4dfd4", borderRadius: 4, background: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#4a4a6a", cursor: "pointer", flexShrink: 0 }}>
+                        <X size={16} />
+                    </button>
+                </div>
+                <div style={{ padding: 14, background: "#f4f2ed", minHeight: 280, overflow: "auto" }}>
+                    {previewIsImage ? (
+                        <img src={previewUrl} alt={documentPreview.fileName} style={{ display: "block", maxWidth: "100%", maxHeight: "70vh", margin: "0 auto", objectFit: "contain", background: "#fff" }} />
+                    ) : previewIsPdf ? (
+                        <iframe src={previewUrl} title={documentPreview.fileName} style={{ width: "100%", height: "70vh", border: "1px solid #e4dfd4", background: "#fff" }} />
+                    ) : (
+                        <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 6, padding: 18, textAlign: "center", color: "#4a4a6a", fontSize: 13 }}>
+                            {documentPreview.unavailableMessage ||
+                                "Preview is not available for this file type."}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 
     const renderFooter = () => {
@@ -1240,23 +1357,30 @@ function RequestDrawer({
                         {request.attachments?.length > 0 ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                                 {request.attachments.map((attachment) => {
-                                    const url = attachment.viewUrl || attachment.fileUrl;
-                                    const isImage = String(attachment.mimeType || "").startsWith("image/");
+                                    const url = attachmentFileUrl(attachment);
+                                    const isImage = String(attachmentMime(attachment)).startsWith("image/");
                                     return (
-                                        <a
-                                            key={attachment.id || `${attachment.proofKey}-${attachment.fileName}`}
-                                            href={url}
-                                            target="_blank"
-                                            rel="noreferrer"
+                                        <button
+                                            type="button"
+                                            key={attachment.id || `${attachment.proofKey || attachment.proof_key}-${attachmentFileName(attachment)}`}
+                                            onClick={() =>
+                                                openDocumentPreview(
+                                                    attachment,
+                                                    attachment.label,
+                                                )
+                                            }
                                             style={{
                                                 display: "flex",
                                                 gap: 10,
                                                 alignItems: "center",
+                                                width: "100%",
                                                 padding: 10,
                                                 border: "1px solid #e4dfd4",
                                                 borderRadius: 6,
                                                 background: "#fffdf8",
-                                                textDecoration: "none",
+                                                textAlign: "left",
+                                                cursor: "pointer",
+                                                fontFamily: "'Source Serif 4',serif",
                                             }}
                                         >
                                             {isImage && url ? (
@@ -1282,14 +1406,17 @@ function RequestDrawer({
                                                     {attachment.label || "Supporting document"}
                                                 </span>
                                                 <span style={{ display: "block", fontSize: 12.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {attachment.fileName || "Uploaded file"}
+                                                    {attachmentFileName(attachment)}
                                                 </span>
                                                 <span style={{ display: "block", fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
-                                                    {formatAttachmentSize(attachment.fileSize)}
+                                                    {formatAttachmentSize(attachmentSize(attachment))}
                                                 </span>
                                             </span>
-                                            <ExternalLink size={13} color="#4a4a6a" />
-                                        </a>
+                                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--color-primary, #0e2554)", fontSize: 11, fontWeight: 700 }}>
+                                                <Eye size={13} />
+                                                Preview
+                                            </span>
+                                        </button>
                                     );
                                 })}
                             </div>
@@ -1571,6 +1698,7 @@ function RequestDrawer({
 
                 <div className="cf-drawer-footer">{renderFooter()}</div>
             </div>
+            {documentPreviewModal}
         </div>
     );
 }
@@ -1882,7 +2010,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                 const [statsRes, recentRes, reportsRes, logsRes] =
                     await Promise.all([
                         adminDashboardService.getStats(),
-                        adminDashboardService.getRecentRequests(5),
+                        adminDashboardService.getRecentRequests(RECENT_REQUEST_LIMIT),
                         reportsService.getOverview("month").catch(() => null),
                         logsService.getLogs({ limit: 5 }).catch(() => null),
                     ]);
@@ -2290,6 +2418,14 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
         },
     ];
 
+    const totalRequestCount = Number(statsData.totalRequests || 0);
+    const shownRecentRequestCount = recentRequests.length;
+    const recentRequestSummary = dashboardLoading
+        ? "Loading recent requests..."
+        : totalRequestCount > 0
+          ? `Showing ${shownRecentRequestCount} of ${totalRequestCount} total request${totalRequestCount === 1 ? "" : "s"}`
+          : "No requests yet";
+
     const handleNavigate = (page) => {
         if (!String(page).startsWith("/")) setActivePage(page);
         if (navProp) navProp(page);
@@ -2496,10 +2632,37 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                                     gridRow: isMobile || isTablet ? 2 : 1,
                                 }}
                             >
-                                <div style={d.panelHeader}>
-                                    <span style={d.panelTitle}>
-                                        Recent Requests
-                                    </span>
+                                <div
+                                    style={{
+                                        ...d.panelHeader,
+                                        alignItems: isMobile
+                                            ? "flex-start"
+                                            : "center",
+                                        gap: 12,
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 4,
+                                            minWidth: 180,
+                                        }}
+                                    >
+                                        <span style={d.panelTitle}>
+                                            Recent Requests
+                                        </span>
+                                        <span
+                                            style={{
+                                                fontSize: 11,
+                                                color: "#77708a",
+                                                lineHeight: 1.35,
+                                            }}
+                                        >
+                                            {recentRequestSummary}
+                                        </span>
+                                    </div>
                                     <button
                                         className="cf-panel-action"
                                         onClick={() =>

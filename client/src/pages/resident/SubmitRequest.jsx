@@ -25,6 +25,10 @@ import {
     FileCheck,
     UserCircle,
     UploadCloud,
+    Eye,
+    X,
+    Trash2,
+    Paperclip,
 } from "lucide-react";
 import residentProfileService from "../../services/residentProfileService";
 import requestService from "../../services/requestService";
@@ -148,6 +152,35 @@ function normalizeTemplateField(field, templateKey, name) {
 }
 
 const OBSOLETE_PROOF_KEYS = new Set(["valid_id", "address_proof"]);
+const DEFAULT_PROOF_MAX_FILES = 8;
+
+function normalizeProofKey(raw, fallback = "") {
+    const key = String(raw || fallback)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_ -]+/g, "")
+        .replace(/[\s-]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 80);
+    return key || fallback;
+}
+
+function normalizeMaxFiles(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0
+        ? parsed
+        : DEFAULT_PROOF_MAX_FILES;
+}
+
+function normalizeMinFiles(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function normalizeProofKeyList(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => normalizeProofKey(item)).filter(Boolean);
+}
 
 function normalizeProofRequirements(raw) {
     let list = raw;
@@ -163,12 +196,100 @@ function normalizeProofRequirements(raw) {
 
     return list
         .filter(Boolean)
-        .filter((proof) => !OBSOLETE_PROOF_KEYS.has(String(proof.key || "")))
-        .map((proof) => ({
-            ...proof,
-            required: proof.required !== false,
-            accept: proof.accept || "image/*,.pdf",
-        }));
+        .map((proof, index) => {
+            const key = normalizeProofKey(
+                proof.key || proof.proofKey,
+                `proof_${index + 1}`,
+            );
+            if (OBSOLETE_PROOF_KEYS.has(key)) return null;
+
+            const groupKey = normalizeProofKey(
+                proof.groupKey || proof.group_key,
+            );
+            const inGroup = Boolean(groupKey);
+            const label =
+                String(proof.label || proof.name || proof.title || "").trim() ||
+                `Supporting document ${index + 1}`;
+
+            return {
+                ...proof,
+                key,
+                label,
+                required: inGroup ? proof.required === true : proof.required !== false,
+                accept: proof.accept || "image/*,.pdf",
+                maxFiles: normalizeMaxFiles(proof.maxFiles || proof.max_files),
+                legacyKeys: normalizeProofKeyList(
+                    proof.legacyKeys || proof.legacy_keys,
+                ),
+                ...(inGroup
+                    ? {
+                          groupKey,
+                          groupLabel:
+                              String(
+                                  proof.groupLabel || proof.group_label || "",
+                              ).trim() || label,
+                          groupRequired:
+                              proof.groupRequired !== false &&
+                              proof.group_required !== false,
+                          groupMinFiles: normalizeMinFiles(
+                              proof.groupMinFiles || proof.group_min_files,
+                          ),
+                      }
+                    : {}),
+            };
+        })
+        .filter(Boolean);
+}
+
+function proofKeys(proof = {}) {
+    return [
+        normalizeProofKey(proof.key || proof.proofKey),
+        ...normalizeProofKeyList(proof.legacyKeys || proof.legacy_keys),
+    ].filter(Boolean);
+}
+
+function proofGroupKey(proof = {}) {
+    return normalizeProofKey(proof.groupKey || proof.group_key || proof.key);
+}
+
+function proofGroupLabel(proof = {}) {
+    return (
+        String(proof.groupLabel || proof.group_label || proof.label || "").trim() ||
+        "Supporting documents"
+    );
+}
+
+function groupProofRequirements(requirements = []) {
+    const groups = new Map();
+
+    requirements.forEach((proof) => {
+        const groupKey = proofGroupKey(proof);
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, {
+                key: groupKey,
+                label: proofGroupLabel(proof),
+                required: proof.groupKey
+                    ? proof.groupRequired !== false
+                    : proof.required !== false,
+                minFiles: proof.groupKey ? proof.groupMinFiles || 1 : 1,
+                items: [],
+            });
+        }
+
+        const group = groups.get(groupKey);
+        group.items.push(proof);
+        group.required =
+            group.required ||
+            (proof.groupKey
+                ? proof.groupRequired !== false
+                : proof.required !== false);
+        group.minFiles = Math.max(
+            group.minFiles || 1,
+            proof.groupKey ? proof.groupMinFiles || 1 : 1,
+        );
+    });
+
+    return [...groups.values()];
 }
 
 function normalizeFeeAmount(value) {
@@ -216,12 +337,6 @@ const EMPTY_MINOR_DETAILS = {
     dateOfBirth: "",
     relationship: "",
 };
-const MINOR_PROOF_REQUIREMENT = {
-    key: "minor_guardianship_document",
-    label: "Minor birth record, guardianship proof, or authorization document",
-    required: true,
-    accept: "image/*,.pdf",
-};
 
 function calculateAge(dateString) {
     if (!dateString) return null;
@@ -237,16 +352,6 @@ function calculateAge(dateString) {
         age -= 1;
     }
     return age;
-}
-
-function mergeProofRequirements(base = [], additional = []) {
-    const seen = new Set();
-    return [...base, ...additional].filter((proof) => {
-        const key = String(proof?.key || proof?.label || "").toLowerCase();
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
 }
 
 function getCharterGuidance(cert) {
@@ -332,8 +437,8 @@ function normalizeResidentGuidance(raw, cert) {
 
 function getWhatToBringItems(cert, proofRequirements = []) {
     const guidance = getCharterGuidance(cert);
-    const uploadedDocumentItems = proofRequirements.map(
-        (proof) => `Original/copy of uploaded ${proof.label}`,
+    const uploadedDocumentItems = groupProofRequirements(proofRequirements).map(
+        (group) => `Original/copy of uploaded ${group.label}`,
     );
     return uniqueList([
         "Your CertiFast QR card (printed or on your phone)",
@@ -940,7 +1045,6 @@ function formatFileSize(size = 0) {
 }
 
 const MAX_SUPPORTING_FILE_SIZE = 6 * 1024 * 1024;
-const MAX_SUPPORTING_FILES = 8;
 
 function validateProofFile(file) {
     if (!file) return "";
@@ -959,15 +1063,47 @@ function fileListForProof(proofFiles, key) {
     return files ? [files] : [];
 }
 
-function countProofFiles(proofFiles = {}) {
-    return Object.values(proofFiles).reduce(
-        (total, files) => total + (Array.isArray(files) ? files.length : files ? 1 : 0),
-        0,
-    );
+function fileListForRequirement(proofFiles, proof) {
+    const seen = new Set();
+    return proofKeys(proof).flatMap((key) => {
+        if (seen.has(key)) return [];
+        seen.add(key);
+        return fileListForProof(proofFiles, key);
+    });
 }
 
-function proofFileNames(files = []) {
-    return files.map((file) => file.name || file.fileName).join(", ");
+function fileCountForGroup(proofFiles, group) {
+    const seen = new Set();
+    return group.items.reduce((count, proof) => {
+        return (
+            count +
+            proofKeys(proof).reduce((proofCount, key) => {
+                if (seen.has(key)) return proofCount;
+                seen.add(key);
+                return proofCount + fileListForProof(proofFiles, key).length;
+            }, 0)
+        );
+    }, 0);
+}
+
+function proofFileName(file) {
+    return file?.name || file?.fileName || "Uploaded file";
+}
+
+function proofFileMime(file) {
+    return file?.type || file?.mimeType || "";
+}
+
+function proofFileUrl(file) {
+    return file?.viewUrl || file?.fileUrl || "";
+}
+
+function canPreviewProofFile(file) {
+    return Boolean(proofFileUrl(file)) || (typeof File !== "undefined" && file instanceof File);
+}
+
+function proofMaxFiles(proof) {
+    return normalizeMaxFiles(proof?.maxFiles || proof?.max_files);
 }
 
 function existingAttachmentFile(attachment) {
@@ -982,6 +1118,7 @@ function existingAttachmentFile(attachment) {
             attachment.file_name || attachment.fileName || "uploaded-file",
         filePath: attachment.file_path || attachment.filePath || "",
         fileUrl: attachment.file_url || attachment.fileUrl || "",
+        viewUrl: attachment.view_url || attachment.viewUrl || "",
         mimeType: attachment.mime_type || attachment.mimeType || "",
         fileSize: Number(attachment.file_size || attachment.fileSize || 0),
     };
@@ -1111,12 +1248,22 @@ export default function SubmitRequest({ resident, onLogout }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(null);
+    const [proofPreview, setProofPreview] = useState(null);
 
     useEffect(() => {
         const fn = () => setWidth(window.innerWidth);
         window.addEventListener("resize", fn);
         return () => window.removeEventListener("resize", fn);
     }, []);
+
+    useEffect(
+        () => () => {
+            if (proofPreview?.revokeUrl && proofPreview.url) {
+                URL.revokeObjectURL(proofPreview.url);
+            }
+        },
+        [proofPreview],
+    );
 
     useEffect(() => {
         let mounted = true;
@@ -1255,11 +1402,8 @@ export default function SubmitRequest({ resident, onLogout }) {
     const certificateProofRequirements = selectedCert
         ? getProofRequirements(selectedCert)
         : [];
-    const proofRequirements = isMinorRequest
-        ? mergeProofRequirements(certificateProofRequirements, [
-              MINOR_PROOF_REQUIREMENT,
-          ])
-        : certificateProofRequirements;
+    const proofRequirements = certificateProofRequirements;
+    const proofRequirementGroups = groupProofRequirements(proofRequirements);
     const charterGuidance = getCharterGuidance(selectedCert);
     const processSteps = getProcessSteps(charterGuidance);
     const whatToBringItems = getWhatToBringItems(
@@ -1310,17 +1454,73 @@ export default function SubmitRequest({ resident, onLogout }) {
     function handleRequestSubjectChange(nextSubject) {
         setRequestSubject(nextSubject);
         setError("");
-        if (nextSubject === REQUEST_SUBJECT_SELF) {
-            setProofFiles((prev) => {
-                const { [MINOR_PROOF_REQUIREMENT.key]: _minorProof, ...rest } =
-                    prev;
-                return rest;
-            });
-        }
     }
 
-    function setProofFilesForKey(key, selectedFiles) {
+    function openProofPreview(file, label = "Supporting document") {
+        if (!file) return;
+        const existingUrl = proofFileUrl(file);
+        const isLocalFile = typeof File !== "undefined" && file instanceof File;
+        const url = existingUrl || (isLocalFile ? URL.createObjectURL(file) : "");
+
+        if (!url) {
+            setError("This uploaded file is not available for preview yet.");
+            return;
+        }
+
+        setProofPreview({
+            url,
+            fileName: proofFileName(file),
+            label,
+            mimeType: proofFileMime(file),
+            revokeUrl: !existingUrl && isLocalFile,
+        });
+    }
+
+    function closeProofPreview() {
+        setProofPreview(null);
+    }
+
+    function removeProofFile(proofOrKey, fileToRemove = null) {
+        const keys =
+            typeof proofOrKey === "object" && proofOrKey
+                ? proofKeys(proofOrKey)
+                : [normalizeProofKey(proofOrKey)];
+        setProofFiles((prev) => {
+            const next = { ...prev };
+            if (!fileToRemove) {
+                keys.forEach((key) => delete next[key]);
+                return next;
+            }
+
+            keys.forEach((key) => {
+                const files = fileListForProof(prev, key).filter(
+                    (file) => file !== fileToRemove,
+                );
+                if (files.length > 0) {
+                    next[key] = files;
+                } else {
+                    delete next[key];
+                }
+            });
+            return next;
+        });
+        setError("");
+    }
+
+    function setProofFilesForKey(
+        key,
+        selectedFiles,
+        label = "Supporting document",
+        maxFiles = DEFAULT_PROOF_MAX_FILES,
+    ) {
         const files = Array.from(selectedFiles || []).filter(Boolean);
+        if (files.length === 0) return;
+
+        const currentFiles = fileListForProof(proofFiles, key);
+        if (currentFiles.length + files.length > maxFiles) {
+            setError(`${label} accepts up to ${maxFiles} files.`);
+            return;
+        }
         for (const file of files) {
             const validationError = validateProofFile(file);
             if (validationError) {
@@ -1328,17 +1528,10 @@ export default function SubmitRequest({ resident, onLogout }) {
                 return;
             }
         }
-        const otherFileCount = countProofFiles({
-            ...proofFiles,
-            [key]: [],
-        });
-        if (otherFileCount + files.length > MAX_SUPPORTING_FILES) {
-            setError(
-                `Please upload up to ${MAX_SUPPORTING_FILES} supporting files total.`,
-            );
-            return;
-        }
-        setProofFiles((prev) => ({ ...prev, [key]: files }));
+        setProofFiles((prev) => ({
+            ...prev,
+            [key]: [...fileListForProof(prev, key), ...files],
+        }));
         setError("");
     }
 
@@ -1456,14 +1649,14 @@ export default function SubmitRequest({ resident, onLogout }) {
 
         const uploaded = [];
         for (const requirement of proofRequirements) {
-            const files = fileListForProof(proofFiles, requirement.key);
+            const files = fileListForRequirement(proofFiles, requirement);
             if (files.length === 0) continue;
 
             for (const file of files) {
                 if (file.isExisting) {
                     uploaded.push({
                         proofKey: requirement.key,
-                        label: file.label || requirement.label,
+                        label: requirement.label,
                         fileName: file.fileName || file.name,
                         filePath: file.filePath,
                         fileUrl: file.fileUrl,
@@ -1570,20 +1763,27 @@ export default function SubmitRequest({ resident, onLogout }) {
                     return;
                 }
             }
-            for (const proof of proofRequirements) {
+            for (const group of proofRequirementGroups) {
                 if (
-                    proof.required &&
-                    fileListForProof(proofFiles, proof.key).length === 0
+                    group.required &&
+                    fileCountForGroup(proofFiles, group) < (group.minFiles || 1)
                 ) {
-                    setError(`Please upload: ${proof.label}`);
+                    setError(`Please upload at least one file for: ${group.label}`);
                     return;
                 }
             }
-            if (countProofFiles(proofFiles) > MAX_SUPPORTING_FILES) {
-                setError(
-                    `Please upload up to ${MAX_SUPPORTING_FILES} supporting files total.`,
-                );
-                return;
+
+            for (const proof of proofRequirements) {
+                const proofFilesForSlot = fileListForRequirement(proofFiles, proof);
+                if (!proof.groupKey && proof.required && proofFilesForSlot.length === 0) {
+                    setError(`Please upload: ${proof.label}`);
+                    return;
+                }
+                const maxFiles = proofMaxFiles(proof);
+                if (proofFilesForSlot.length > maxFiles) {
+                    setError(`${proof.label} accepts up to ${maxFiles} files.`);
+                    return;
+                }
             }
             setError("");
         }
@@ -1683,6 +1883,7 @@ export default function SubmitRequest({ resident, onLogout }) {
         setNotes("");
         setError("");
         setSuccess(null);
+        setProofPreview(null);
     }
 
     function formatRequestId(raw) {
@@ -2807,98 +3008,358 @@ export default function SubmitRequest({ resident, onLogout }) {
                             marginBottom: 14,
                         }}
                     >
-                        Upload only the document needed for this certificate,
-                        such as a letter, medical paper, business paper, school
-                        paper, or other requirement. Staff will review it before
-                        approving or rejecting the request.
+                        Upload the specific document requested for this
+                        certificate. Staff will review it before approving or
+                        rejecting the request.
                     </div>
-                    {proofRequirements.map((proof) => {
-                        const files = fileListForProof(proofFiles, proof.key);
-                        const hasFiles = files.length > 0;
+                    {proofRequirementGroups.map((group) => {
+                        const groupFileCount = fileCountForGroup(proofFiles, group);
                         return (
-                            <FieldGroup
-                                key={proof.key}
-                                label={proof.label}
-                                required={proof.required}
+                            <div
+                                key={group.key}
+                                style={{
+                                    border: "1px solid #e4dfd4",
+                                    borderRadius: 6,
+                                    background: "#fffdf8",
+                                    padding: 12,
+                                    marginBottom: 12,
+                                }}
                             >
-                                <label
+                                <div
                                     style={{
                                         display: "flex",
-                                        alignItems: "center",
                                         justifyContent: "space-between",
                                         gap: 12,
-                                        padding: "11px 12px",
-                                        border: "1.5px dashed #cfc7bb",
-                                        borderRadius: 6,
-                                        background: hasFiles
-                                            ? "#f0faf4"
-                                            : "#fffdf8",
-                                        cursor: "pointer",
+                                        marginBottom: 10,
                                     }}
                                 >
-                                    <span
-                                        style={{
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: 2,
-                                            minWidth: 0,
-                                        }}
-                                    >
-                                        <strong
+                                    <div style={{ minWidth: 0 }}>
+                                        <div
                                             style={{
-                                                fontSize: 12.5,
-                                                color: hasFiles
-                                                    ? "#1a7a4a"
-                                                    : "#4a4a6a",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                color: "var(--color-primary, #0e2554)",
+                                                textTransform: "uppercase",
+                                                letterSpacing: 0.7,
                                             }}
                                         >
-                                            {hasFiles
-                                                ? `${files.length} file${files.length > 1 ? "s" : ""} selected`
-                                                : "Choose files"}
-                                        </strong>
-                                        <span
+                                            {group.label}
+                                            {group.required && (
+                                                <span style={{ color: "#b02020" }}> *</span>
+                                            )}
+                                        </div>
+                                        <div
                                             style={{
                                                 fontSize: 10.5,
                                                 color: "#9090aa",
+                                                marginTop: 2,
                                             }}
                                         >
-                                            {hasFiles
-                                                ? files
-                                                      .map(
-                                                          (file) =>
-                                                              `${file.name} (${formatFileSize(file.size)})`,
-                                                      )
-                                                      .join(", ")
-                                                : `Images or PDFs, max 6 MB each. Up to ${MAX_SUPPORTING_FILES} files total.`}
-                                        </span>
-                                    </span>
+                                            Upload at least one applicable document type.
+                                        </div>
+                                    </div>
                                     <span
                                         style={{
-                                            fontSize: 11,
+                                            fontSize: 10.5,
                                             fontWeight: 700,
-                                            color: "var(--color-primary, #0e2554)",
-                                            flexShrink: 0,
+                                            color: groupFileCount
+                                                ? "#1a7a4a"
+                                                : "#7a7890",
+                                            whiteSpace: "nowrap",
                                         }}
                                     >
-                                        Browse
+                                        {groupFileCount} file
+                                        {groupFileCount === 1 ? "" : "s"}
                                     </span>
-                                    <input
-                                        type="file"
-                                        multiple
-                                        accept={proof.accept || "image/*,.pdf"}
-                                        onChange={(e) =>
-                                            setProofFilesForKey(
-                                                proof.key,
-                                                e.target.files,
-                                            )
-                                        }
-                                        style={{ display: "none" }}
-                                    />
-                                </label>
-                            </FieldGroup>
+                                </div>
+                                <div style={{ display: "grid", gap: 10 }}>
+                                    {group.items.map((proof) => {
+                                        const files = fileListForRequirement(
+                                            proofFiles,
+                                            proof,
+                                        );
+                                        const hasFiles = files.length > 0;
+                                        const maxFiles = proofMaxFiles(proof);
+                                        return (
+                                            <FieldGroup
+                                                key={proof.key}
+                                                label={proof.label}
+                                                required={false}
+                                            >
+                                                <div
+                                                    style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns:
+                                                            "minmax(0,1fr) auto",
+                                                        gap: 10,
+                                                        alignItems: "center",
+                                                        padding: "10px 12px",
+                                                        border: "1.5px dashed #cfc7bb",
+                                                        borderRadius: 6,
+                                                        background: hasFiles
+                                                            ? "#f0faf4"
+                                                            : "#fff",
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            display: "flex",
+                                                            gap: 10,
+                                                            alignItems: "center",
+                                                            minWidth: 0,
+                                                        }}
+                                                    >
+                                                        <span
+                                                            style={{
+                                                                width: 34,
+                                                                height: 34,
+                                                                borderRadius: 4,
+                                                                border: "1px solid #e4dfd4",
+                                                                background: "#fff",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                color: hasFiles
+                                                                    ? "#1a7a4a"
+                                                                    : "var(--color-primary, #0e2554)",
+                                                                flexShrink: 0,
+                                                            }}
+                                                        >
+                                                            <Paperclip size={14} />
+                                                        </span>
+                                                        <span style={{ minWidth: 0 }}>
+                                                            <strong
+                                                                style={{
+                                                                    display: "block",
+                                                                    fontSize: 12,
+                                                                    color: hasFiles
+                                                                        ? "#1a7a4a"
+                                                                        : "#4a4a6a",
+                                                                    overflow: "hidden",
+                                                                    textOverflow: "ellipsis",
+                                                                    whiteSpace: "nowrap",
+                                                                }}
+                                                            >
+                                                                {hasFiles
+                                                                    ? `${files.length} of ${maxFiles} files selected`
+                                                                    : "No file selected"}
+                                                            </strong>
+                                                            <span
+                                                                style={{
+                                                                    display: "block",
+                                                                    fontSize: 10.5,
+                                                                    color: "#9090aa",
+                                                                    marginTop: 2,
+                                                                }}
+                                                            >
+                                                                {hasFiles
+                                                                    ? "Images or PDFs up to 6 MB each."
+                                                                    : `Upload up to ${maxFiles} images or PDFs, 6 MB each.`}
+                                                            </span>
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: 6,
+                                                            flexWrap: "wrap",
+                                                            justifyContent: "flex-end",
+                                                        }}
+                                                    >
+                                                        {hasFiles && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    removeProofFile(proof)
+                                                                }
+                                                                title="Remove all files"
+                                                                style={{
+                                                                    width: 32,
+                                                                    height: 32,
+                                                                    border: "1px solid #ead3d3",
+                                                                    borderRadius: 4,
+                                                                    background: "#fff",
+                                                                    display: "inline-flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    color: "#b02020",
+                                                                    cursor: "pointer",
+                                                                }}
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        )}
+                                                        <label
+                                                            title={
+                                                                hasFiles
+                                                                    ? "Add files"
+                                                                    : "Choose files"
+                                                            }
+                                                            style={{
+                                                                display: "inline-flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                gap: 5,
+                                                                minHeight: 32,
+                                                                padding: "0 10px",
+                                                                border: "1px solid var(--color-primary, #0e2554)",
+                                                                borderRadius: 4,
+                                                                color: "var(--color-primary, #0e2554)",
+                                                                background: "#fff",
+                                                                fontSize: 11,
+                                                                fontWeight: 700,
+                                                                cursor: "pointer",
+                                                                whiteSpace: "nowrap",
+                                                            }}
+                                                        >
+                                                            <UploadCloud size={13} />
+                                                            {hasFiles ? "Add" : "Choose"}
+                                                            <input
+                                                                type="file"
+                                                                multiple
+                                                                accept={
+                                                                    proof.accept ||
+                                                                    "image/*,.pdf"
+                                                                }
+                                                                onChange={(e) => {
+                                                                    setProofFilesForKey(
+                                                                        proof.key,
+                                                                        e.target.files,
+                                                                        proof.label,
+                                                                        maxFiles,
+                                                                    );
+                                                                    e.target.value = "";
+                                                                }}
+                                                                style={{ display: "none" }}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                {hasFiles && (
+                                                    <div
+                                                        style={{
+                                                            display: "grid",
+                                                            gap: 8,
+                                                            marginTop: 8,
+                                                        }}
+                                                    >
+                                                        {files.map((item, fileIndex) => (
+                                                            <div
+                                                                key={`${proof.key}-${proofFileName(item)}-${fileIndex}`}
+                                                                style={{
+                                                                    display: "grid",
+                                                                    gridTemplateColumns:
+                                                                        "minmax(0,1fr) auto",
+                                                                    gap: 8,
+                                                                    alignItems: "center",
+                                                                    padding: "8px 10px",
+                                                                    border: "1px solid #e8e1d6",
+                                                                    borderRadius: 4,
+                                                                    background: "#fff",
+                                                                }}
+                                                            >
+                                                                <span style={{ minWidth: 0 }}>
+                                                                    <strong
+                                                                        style={{
+                                                                            display: "block",
+                                                                            fontSize: 11.5,
+                                                                            color: "#4a4a6a",
+                                                                            overflow: "hidden",
+                                                                            textOverflow: "ellipsis",
+                                                                            whiteSpace: "nowrap",
+                                                                        }}
+                                                                    >
+                                                                        {proofFileName(item)}
+                                                                    </strong>
+                                                                    <span
+                                                                        style={{
+                                                                            display: "block",
+                                                                            marginTop: 2,
+                                                                            fontSize: 10.5,
+                                                                            color: "#9090aa",
+                                                                        }}
+                                                                    >
+                                                                        {formatFileSize(
+                                                                            item.size ||
+                                                                                item.fileSize,
+                                                                        )}
+                                                                    </span>
+                                                                </span>
+                                                                <span
+                                                                    style={{
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: 6,
+                                                                    }}
+                                                                >
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            openProofPreview(
+                                                                                item,
+                                                                                proof.label,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            !canPreviewProofFile(
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                        title="View uploaded file"
+                                                                        style={{
+                                                                            width: 30,
+                                                                            height: 30,
+                                                                            border: "1px solid #d7ded7",
+                                                                            borderRadius: 4,
+                                                                            background: "#fff",
+                                                                            display: "inline-flex",
+                                                                            alignItems: "center",
+                                                                            justifyContent: "center",
+                                                                            color: "#1a7a4a",
+                                                                            cursor: canPreviewProofFile(
+                                                                                item,
+                                                                            )
+                                                                                ? "pointer"
+                                                                                : "not-allowed",
+                                                                        }}
+                                                                    >
+                                                                        <Eye size={13} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            removeProofFile(
+                                                                                proof,
+                                                                                item,
+                                                                            )
+                                                                        }
+                                                                        title="Remove this file"
+                                                                        style={{
+                                                                            width: 30,
+                                                                            height: 30,
+                                                                            border: "1px solid #ead3d3",
+                                                                            borderRadius: 4,
+                                                                            background: "#fff",
+                                                                            display: "inline-flex",
+                                                                            alignItems: "center",
+                                                                            justifyContent: "center",
+                                                                            color: "#b02020",
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                    >
+                                                                        <X size={13} />
+                                                                    </button>
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </FieldGroup>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         );
                     })}
                 </div>
@@ -2995,10 +3456,15 @@ export default function SubmitRequest({ resident, onLogout }) {
             label: f.label.replace(" (optional)", ""),
             value: fieldValueForDisplay(f, extraFields),
         })),
-        ...proofRequirements.map((proof) => ({
-            label: `Document: ${proof.label}`,
+        ...proofRequirementGroups.map((group) => ({
+            label: `Documents: ${group.label}`,
             value:
-                proofFileNames(fileListForProof(proofFiles, proof.key)) ||
+                group.items
+                    .flatMap((proof) =>
+                        fileListForRequirement(proofFiles, proof),
+                    )
+                    .map((file) => proofFileName(file))
+                    .join(", ") ||
                 "—",
         })),
         {
@@ -3021,6 +3487,153 @@ export default function SubmitRequest({ resident, onLogout }) {
         },
         { label: "Notes", value: notes.trim() || "None" },
     ];
+
+    const previewMime = proofPreview?.mimeType || "";
+    const previewName = proofPreview?.fileName || "";
+    const previewIsImage =
+        previewMime.startsWith("image/") ||
+        /\.(jpe?g|png|webp|gif)$/i.test(previewName);
+    const previewIsPdf =
+        previewMime === "application/pdf" || /\.pdf$/i.test(previewName);
+
+    const proofPreviewModal = proofPreview && (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Supporting document preview"
+            style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(12, 18, 32, 0.58)",
+                zIndex: 300,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? 14 : 24,
+            }}
+            onClick={closeProofPreview}
+        >
+            <div
+                style={{
+                    width: "min(920px, 100%)",
+                    maxHeight: "88vh",
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 18px 50px rgba(0,0,0,.24)",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div
+                    style={{
+                        padding: "12px 14px",
+                        borderBottom: "1px solid #e4dfd4",
+                        background: "#f8f6f1",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                    }}
+                >
+                    <div style={{ minWidth: 0 }}>
+                        <div
+                            style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "#9090aa",
+                                textTransform: "uppercase",
+                                letterSpacing: 0.8,
+                            }}
+                        >
+                            {proofPreview.label}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "var(--color-primary, #0e2554)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            {proofPreview.fileName}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={closeProofPreview}
+                        title="Close preview"
+                        style={{
+                            width: 34,
+                            height: 34,
+                            border: "1px solid #e4dfd4",
+                            borderRadius: 4,
+                            background: "#fff",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#4a4a6a",
+                            cursor: "pointer",
+                            flexShrink: 0,
+                        }}
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+                <div
+                    style={{
+                        padding: 14,
+                        background: "#f4f2ed",
+                        minHeight: 280,
+                        overflow: "auto",
+                    }}
+                >
+                    {previewIsImage ? (
+                        <img
+                            src={proofPreview.url}
+                            alt={proofPreview.fileName}
+                            style={{
+                                display: "block",
+                                maxWidth: "100%",
+                                maxHeight: "70vh",
+                                margin: "0 auto",
+                                objectFit: "contain",
+                                background: "#fff",
+                            }}
+                        />
+                    ) : previewIsPdf ? (
+                        <iframe
+                            src={proofPreview.url}
+                            title={proofPreview.fileName}
+                            style={{
+                                width: "100%",
+                                height: "70vh",
+                                border: "1px solid #e4dfd4",
+                                background: "#fff",
+                            }}
+                        />
+                    ) : (
+                        <div
+                            style={{
+                                background: "#fff",
+                                border: "1px solid #e4dfd4",
+                                borderRadius: 6,
+                                padding: 18,
+                                textAlign: "center",
+                                color: "#4a4a6a",
+                                fontSize: 13,
+                            }}
+                        >
+                            Preview is not available for this file type.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 
     const Step3 = (
         <div className="sr-fadein">
@@ -3629,6 +4242,7 @@ export default function SubmitRequest({ resident, onLogout }) {
                         )}
                     </div>
                 </div>
+                {proofPreviewModal}
                 {isMobile && <ResidentBottomNav active="request" />}
             </div>
         </div>

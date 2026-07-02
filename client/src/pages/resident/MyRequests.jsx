@@ -12,6 +12,9 @@ import {
     AlertCircle,
     FileCheck,
     Pencil,
+    Eye,
+    X,
+    Paperclip,
 } from "lucide-react";
 
 import requestService from "../../services/requestService";
@@ -68,6 +71,102 @@ function correctionEventTime(value) {
     });
 }
 
+function formatAttachmentSize(size = 0) {
+    const value = Number(size || 0);
+    if (!value) return "0 KB";
+    if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function attachmentFileName(attachment) {
+    return attachment?.fileName || attachment?.file_name || "Uploaded file";
+}
+
+function attachmentFileUrl(attachment) {
+    return (
+        attachment?.viewUrl ||
+        attachment?.view_url ||
+        attachment?.fileUrl ||
+        attachment?.file_url ||
+        ""
+    );
+}
+
+function attachmentMime(attachment) {
+    return attachment?.mimeType || attachment?.mime_type || "";
+}
+
+function attachmentLabel(attachment) {
+    return attachment?.label || "Supporting document";
+}
+
+function normalizeProofKey(raw = "") {
+    return String(raw || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_ -]+/g, "")
+        .replace(/[\s-]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+}
+
+function attachmentProofKey(attachment) {
+    return normalizeProofKey(attachment?.proofKey || attachment?.proof_key);
+}
+
+function requirementKeys(requirement = {}) {
+    return [
+        normalizeProofKey(requirement.key || requirement.proofKey),
+        ...(Array.isArray(requirement.legacyKeys)
+            ? requirement.legacyKeys.map(normalizeProofKey)
+            : []),
+        ...(Array.isArray(requirement.legacy_keys)
+            ? requirement.legacy_keys.map(normalizeProofKey)
+            : []),
+    ].filter(Boolean);
+}
+
+function requirementGroupKey(requirement = {}) {
+    return normalizeProofKey(
+        requirement.groupKey ||
+            requirement.group_key ||
+            requirement.key ||
+            requirement.proofKey,
+    );
+}
+
+function requirementGroupLabel(requirement = {}) {
+    return (
+        requirement.groupLabel ||
+        requirement.group_label ||
+        requirement.label ||
+        "Supporting documents"
+    );
+}
+
+function requirementLabel(requirement = {}) {
+    return requirement.label || "Supporting document";
+}
+
+function groupProofRequirements(requirements = []) {
+    const groups = new Map();
+    requirements.forEach((proof) => {
+        const groupKey = requirementGroupKey(proof);
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, {
+                key: groupKey,
+                label: requirementGroupLabel(proof),
+                items: [],
+            });
+        }
+        groups.get(groupKey).items.push(proof);
+    });
+    return [...groups.values()];
+}
+
+function attachmentMatchesRequirement(attachment, requirement) {
+    return requirementKeys(requirement).includes(attachmentProofKey(attachment));
+}
+
 function StatusBadge({ status }) {
     const normalized = String(status || "").toLowerCase();
     const map = {
@@ -111,6 +210,7 @@ export default function MyRequests({ resident, onLogout }) {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [preview, setPreview] = useState(null);
     const mountedRef = useRef(false);
 
     useEffect(() => {
@@ -163,6 +263,90 @@ export default function MyRequests({ resident, onLogout }) {
 
     const isMobile = width < 768;
     const isTablet = width >= 640 && width < 1024;
+
+    function openPreview(attachment) {
+        const url = attachmentFileUrl(attachment);
+        if (!url) {
+            setError("This uploaded file is not available for preview.");
+            return;
+        }
+        setPreview({
+            url,
+            label: attachmentLabel(attachment),
+            fileName: attachmentFileName(attachment),
+            mimeType: attachmentMime(attachment),
+        });
+    }
+
+    function closePreview() {
+        setPreview(null);
+    }
+
+    const previewName = preview?.fileName || "";
+    const previewMime = preview?.mimeType || "";
+    const previewIsImage =
+        previewMime.startsWith("image/") ||
+        /\.(jpe?g|png|webp|gif)$/i.test(previewName);
+    const previewIsPdf =
+        previewMime === "application/pdf" || /\.pdf$/i.test(previewName);
+
+    const previewModal = preview && (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Submitted document preview"
+            onClick={closePreview}
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 300,
+                background: "rgba(12,18,32,.58)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? 14 : 24,
+            }}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                    width: "min(920px, 100%)",
+                    maxHeight: "88vh",
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 18px 50px rgba(0,0,0,.24)",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+            >
+                <div style={{ padding: "12px 14px", borderBottom: "1px solid #e4dfd4", background: "#f8f6f1", display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#9090aa", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                            {preview.label}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary, #0e2554)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {preview.fileName}
+                        </div>
+                    </div>
+                    <button type="button" onClick={closePreview} title="Close preview" style={{ width: 34, height: 34, border: "1px solid #e4dfd4", borderRadius: 4, background: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#4a4a6a", cursor: "pointer", flexShrink: 0 }}>
+                        <X size={16} />
+                    </button>
+                </div>
+                <div style={{ padding: 14, background: "#f4f2ed", minHeight: 280, overflow: "auto" }}>
+                    {previewIsImage ? (
+                        <img src={preview.url} alt={preview.fileName} style={{ display: "block", maxWidth: "100%", maxHeight: "70vh", margin: "0 auto", objectFit: "contain", background: "#fff" }} />
+                    ) : previewIsPdf ? (
+                        <iframe src={preview.url} title={preview.fileName} style={{ width: "100%", height: "70vh", border: "1px solid #e4dfd4", background: "#fff" }} />
+                    ) : (
+                        <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 6, padding: 18, textAlign: "center", color: "#4a4a6a", fontSize: 13 }}>
+                            Preview is not available for this file type.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div
@@ -330,6 +514,18 @@ export default function MyRequests({ resident, onLogout }) {
                                 const denialReason =
                                     row.rejection_reason ||
                                     "No correction note was provided by staff.";
+                                const proofRequirements = Array.isArray(
+                                    row.proofRequirements,
+                                )
+                                    ? row.proofRequirements
+                                    : Array.isArray(row.proof_requirements)
+                                      ? row.proof_requirements
+                                      : [];
+                                const proofGroups =
+                                    groupProofRequirements(proofRequirements);
+                                const attachments = Array.isArray(row.attachments)
+                                    ? row.attachments
+                                    : [];
 
                                 return (
                                     <div key={row.request_id}>
@@ -454,6 +650,392 @@ export default function MyRequests({ resident, onLogout }) {
                                                 )}
                                             </div>
                                         </div>
+                                        {attachments.length > 0 && (
+                                                <div
+                                                    style={{
+                                                        margin: "0 20px 14px 70px",
+                                                        padding: "10px 12px",
+                                                        border: "1px solid #e4dfd4",
+                                                        borderRadius: 6,
+                                                        background: "#fffdf8",
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            fontSize: 10.5,
+                                                            fontWeight: 700,
+                                                            color: "var(--color-primary, #0e2554)",
+                                                            textTransform: "uppercase",
+                                                            letterSpacing: 0.7,
+                                                            marginBottom: 8,
+                                                        }}
+                                                    >
+                                                        Submitted Documents
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            display: "grid",
+                                                            gap: 8,
+                                                        }}
+                                                    >
+                                                        {proofGroups.length > 0 &&
+                                                            proofGroups.map((group) => (
+                                                                <div
+                                                                    key={group.key}
+                                                                    style={{
+                                                                        border: "1px solid #efe8dc",
+                                                                        borderRadius: 5,
+                                                                        background: "#fff",
+                                                                        padding: 9,
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            fontSize: 10.5,
+                                                                            fontWeight: 700,
+                                                                            color: "var(--color-primary, #0e2554)",
+                                                                            textTransform:
+                                                                                "uppercase",
+                                                                            letterSpacing: 0.7,
+                                                                            marginBottom: 8,
+                                                                        }}
+                                                                    >
+                                                                        {group.label}
+                                                                    </div>
+                                                                    <div
+                                                                        style={{
+                                                                            display: "grid",
+                                                                            gap: 8,
+                                                                        }}
+                                                                    >
+                                                                        {group.items.map((proof) => {
+                                                                            const files =
+                                                                                attachments.filter(
+                                                                                    (attachment) =>
+                                                                                        attachmentMatchesRequirement(
+                                                                                            attachment,
+                                                                                            proof,
+                                                                                        ),
+                                                                                );
+                                                                            if (files.length === 0) {
+                                                                                return null;
+                                                                            }
+                                                                            return files.map(
+                                                                                (attachment) => (
+                                                                                    <div
+                                                                                        key={
+                                                                                            attachment.id ||
+                                                                                            `${attachment.proofKey || attachment.proof_key}-${attachmentFileName(attachment)}`
+                                                                                        }
+                                                                                        style={{
+                                                                                            display:
+                                                                                                "grid",
+                                                                                            gridTemplateColumns:
+                                                                                                "minmax(0,1fr) auto",
+                                                                                            gap: 10,
+                                                                                            alignItems:
+                                                                                                "center",
+                                                                                            padding:
+                                                                                                "8px 9px",
+                                                                                            border:
+                                                                                                "1px solid #efe8dc",
+                                                                                            borderRadius: 5,
+                                                                                            background:
+                                                                                                "#fffdf8",
+                                                                                        }}
+                                                                                    >
+                                                                                        <div
+                                                                                            style={{
+                                                                                                display:
+                                                                                                    "flex",
+                                                                                                alignItems:
+                                                                                                    "center",
+                                                                                                gap: 9,
+                                                                                                minWidth: 0,
+                                                                                            }}
+                                                                                        >
+                                                                                            <span
+                                                                                                style={{
+                                                                                                    width: 32,
+                                                                                                    height: 32,
+                                                                                                    border:
+                                                                                                        "1px solid #e4dfd4",
+                                                                                                    borderRadius: 4,
+                                                                                                    background:
+                                                                                                        "#f8f6f1",
+                                                                                                    display:
+                                                                                                        "inline-flex",
+                                                                                                    alignItems:
+                                                                                                        "center",
+                                                                                                    justifyContent:
+                                                                                                        "center",
+                                                                                                    color: "var(--color-primary, #0e2554)",
+                                                                                                    flexShrink: 0,
+                                                                                                }}
+                                                                                            >
+                                                                                                <Paperclip
+                                                                                                    size={
+                                                                                                        14
+                                                                                                    }
+                                                                                                />
+                                                                                            </span>
+                                                                                            <span
+                                                                                                style={{
+                                                                                                    minWidth: 0,
+                                                                                                }}
+                                                                                            >
+                                                                                                <span
+                                                                                                    style={{
+                                                                                                        display:
+                                                                                                            "block",
+                                                                                                        fontSize: 10.5,
+                                                                                                        fontWeight: 700,
+                                                                                                        color: "#6f6680",
+                                                                                                        textTransform:
+                                                                                                            "uppercase",
+                                                                                                        letterSpacing: 0.6,
+                                                                                                    }}
+                                                                                                >
+                                                                                                    {requirementLabel(
+                                                                                                        proof,
+                                                                                                    )}
+                                                                                                </span>
+                                                                                                <span
+                                                                                                    style={{
+                                                                                                        display:
+                                                                                                            "block",
+                                                                                                        fontSize: 12,
+                                                                                                        color: "#1a1a2e",
+                                                                                                        overflow:
+                                                                                                            "hidden",
+                                                                                                        textOverflow:
+                                                                                                            "ellipsis",
+                                                                                                        whiteSpace:
+                                                                                                            "nowrap",
+                                                                                                    }}
+                                                                                                >
+                                                                                                    {attachmentFileName(
+                                                                                                        attachment,
+                                                                                                    )}
+                                                                                                </span>
+                                                                                                <span
+                                                                                                    style={{
+                                                                                                        display:
+                                                                                                            "block",
+                                                                                                        fontSize: 10.5,
+                                                                                                        color: "#9090aa",
+                                                                                                        marginTop: 1,
+                                                                                                    }}
+                                                                                                >
+                                                                                                    {formatAttachmentSize(
+                                                                                                        attachment.fileSize ||
+                                                                                                            attachment.file_size,
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() =>
+                                                                                                openPreview(
+                                                                                                    attachment,
+                                                                                                )
+                                                                                            }
+                                                                                            title="View submitted file"
+                                                                                            style={{
+                                                                                                display:
+                                                                                                    "inline-flex",
+                                                                                                alignItems:
+                                                                                                    "center",
+                                                                                                justifyContent:
+                                                                                                    "center",
+                                                                                                gap: 5,
+                                                                                                minHeight: 30,
+                                                                                                padding:
+                                                                                                    "0 9px",
+                                                                                                border:
+                                                                                                    "1px solid var(--color-primary, #0e2554)",
+                                                                                                borderRadius: 4,
+                                                                                                background:
+                                                                                                    "#fff",
+                                                                                                color: "var(--color-primary, #0e2554)",
+                                                                                                fontSize: 10.5,
+                                                                                                fontWeight: 700,
+                                                                                                cursor: "pointer",
+                                                                                            }}
+                                                                                        >
+                                                                                            <Eye
+                                                                                                size={
+                                                                                                    12
+                                                                                                }
+                                                                                            />
+                                                                                            View
+                                                                                        </button>
+                                                                                    </div>
+                                                                                ),
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        {proofGroups.length === 0 &&
+                                                            attachments.map(
+                                                            (attachment) => (
+                                                                <div
+                                                                    key={
+                                                                        attachment.id ||
+                                                                        `${attachment.proofKey || attachment.proof_key}-${attachmentFileName(attachment)}`
+                                                                    }
+                                                                    style={{
+                                                                        display:
+                                                                            "grid",
+                                                                        gridTemplateColumns:
+                                                                            "minmax(0,1fr) auto",
+                                                                        gap: 10,
+                                                                        alignItems:
+                                                                            "center",
+                                                                        padding:
+                                                                            "8px 9px",
+                                                                        border:
+                                                                            "1px solid #efe8dc",
+                                                                        borderRadius: 5,
+                                                                        background:
+                                                                            "#fff",
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            display:
+                                                                                "flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            gap: 9,
+                                                                            minWidth: 0,
+                                                                        }}
+                                                                    >
+                                                                        <span
+                                                                            style={{
+                                                                                width: 32,
+                                                                                height: 32,
+                                                                                border:
+                                                                                    "1px solid #e4dfd4",
+                                                                                borderRadius: 4,
+                                                                                background:
+                                                                                    "#f8f6f1",
+                                                                                display:
+                                                                                    "inline-flex",
+                                                                                alignItems:
+                                                                                    "center",
+                                                                                justifyContent:
+                                                                                    "center",
+                                                                                color: "var(--color-primary, #0e2554)",
+                                                                                flexShrink: 0,
+                                                                            }}
+                                                                        >
+                                                                            <Paperclip
+                                                                                size={
+                                                                                    14
+                                                                                }
+                                                                            />
+                                                                        </span>
+                                                                        <span
+                                                                            style={{
+                                                                                minWidth: 0,
+                                                                            }}
+                                                                        >
+                                                                            <span
+                                                                                style={{
+                                                                                    display:
+                                                                                        "block",
+                                                                                    fontSize: 10.5,
+                                                                                    fontWeight: 700,
+                                                                                    color: "#6f6680",
+                                                                                    textTransform:
+                                                                                        "uppercase",
+                                                                                    letterSpacing: 0.6,
+                                                                                }}
+                                                                            >
+                                                                                {attachmentLabel(
+                                                                                    attachment,
+                                                                                )}
+                                                                            </span>
+                                                                            <span
+                                                                                style={{
+                                                                                    display:
+                                                                                        "block",
+                                                                                    fontSize: 12,
+                                                                                    color: "#1a1a2e",
+                                                                                    overflow:
+                                                                                        "hidden",
+                                                                                    textOverflow:
+                                                                                        "ellipsis",
+                                                                                    whiteSpace:
+                                                                                        "nowrap",
+                                                                                }}
+                                                                            >
+                                                                                {attachmentFileName(
+                                                                                    attachment,
+                                                                                )}
+                                                                            </span>
+                                                                            <span
+                                                                                style={{
+                                                                                    display:
+                                                                                        "block",
+                                                                                    fontSize: 10.5,
+                                                                                    color: "#9090aa",
+                                                                                    marginTop: 1,
+                                                                                }}
+                                                                            >
+                                                                                {formatAttachmentSize(
+                                                                                    attachment.fileSize ||
+                                                                                        attachment.file_size,
+                                                                                )}
+                                                                            </span>
+                                                                        </span>
+                                                                    </div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            openPreview(
+                                                                                attachment,
+                                                                            )
+                                                                        }
+                                                                        title="View submitted file"
+                                                                        style={{
+                                                                            display:
+                                                                                "inline-flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            justifyContent:
+                                                                                "center",
+                                                                            gap: 5,
+                                                                            minHeight: 30,
+                                                                            padding:
+                                                                                "0 9px",
+                                                                            border:
+                                                                                "1px solid var(--color-primary, #0e2554)",
+                                                                            borderRadius: 4,
+                                                                            background:
+                                                                                "#fff",
+                                                                            color: "var(--color-primary, #0e2554)",
+                                                                            fontSize: 10.5,
+                                                                            fontWeight: 700,
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                    >
+                                                                        <Eye
+                                                                            size={
+                                                                                12
+                                                                            }
+                                                                        />
+                                                                        View
+                                                                    </button>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         {row.correction_history?.length > 0 && (
                                             <div
                                                 style={{
@@ -578,6 +1160,7 @@ export default function MyRequests({ resident, onLogout }) {
                     </div>
                 </div>
 
+                {previewModal}
                 {isMobile && <ResidentBottomNav active="history" />}
             </div>
         </div>

@@ -15,7 +15,6 @@ import {
     Menu,
     AlertCircle,
     Paperclip,
-    ExternalLink,
 } from "lucide-react";
 
 import {
@@ -214,6 +213,109 @@ function formatAttachmentSize(size = 0) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function attachmentProofKey(attachment) {
+    return attachment?.proofKey || attachment?.proof_key || "";
+}
+
+function normalizeProofKey(raw = "") {
+    return String(raw || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_ -]+/g, "")
+        .replace(/[\s-]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+}
+
+function attachmentFileName(attachment) {
+    return attachment?.fileName || attachment?.file_name || "Uploaded file";
+}
+
+function attachmentFileUrl(attachment) {
+    return (
+        attachment?.viewUrl ||
+        attachment?.view_url ||
+        attachment?.fileUrl ||
+        attachment?.file_url ||
+        ""
+    );
+}
+
+function attachmentMime(attachment) {
+    return attachment?.mimeType || attachment?.mime_type || "";
+}
+
+function attachmentSize(attachment) {
+    return attachment?.fileSize || attachment?.file_size || 0;
+}
+
+function requirementKey(requirement) {
+    return requirement?.key || requirement?.proofKey || "";
+}
+
+function requirementLabel(requirement) {
+    return requirement?.label || "Supporting document";
+}
+
+function requirementKeys(requirement = {}) {
+    return [
+        normalizeProofKey(requirement.key || requirement.proofKey),
+        ...(Array.isArray(requirement.legacyKeys)
+            ? requirement.legacyKeys.map(normalizeProofKey)
+            : []),
+        ...(Array.isArray(requirement.legacy_keys)
+            ? requirement.legacy_keys.map(normalizeProofKey)
+            : []),
+    ].filter(Boolean);
+}
+
+function requirementGroupKey(requirement = {}) {
+    return normalizeProofKey(
+        requirement.groupKey ||
+            requirement.group_key ||
+            requirement.key ||
+            requirement.proofKey,
+    );
+}
+
+function requirementGroupLabel(requirement = {}) {
+    return (
+        requirement.groupLabel ||
+        requirement.group_label ||
+        requirement.label ||
+        "Supporting documents"
+    );
+}
+
+function groupProofRequirements(requirements = []) {
+    const groups = new Map();
+    requirements.forEach((proof) => {
+        const groupKey = requirementGroupKey(proof);
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, {
+                key: groupKey,
+                label: requirementGroupLabel(proof),
+                required: proof.groupKey
+                    ? proof.groupRequired !== false
+                    : proof.required !== false,
+                items: [],
+            });
+        }
+        const group = groups.get(groupKey);
+        group.items.push(proof);
+        group.required =
+            group.required ||
+            (proof.groupKey
+                ? proof.groupRequired !== false
+                : proof.required !== false);
+    });
+    return [...groups.values()];
+}
+
+function attachmentMatchesRequirement(attachment, requirement) {
+    const key = normalizeProofKey(attachmentProofKey(attachment));
+    return requirementKeys(requirement).includes(key);
+}
+
 function timelineTime(value, fallback = "") {
     if (!value) return fallback;
     const d = new Date(value);
@@ -372,6 +474,7 @@ function RequestDrawer({
     const [adminExtraFields, setAdminExtraFields] = useState({});
     const [signatorySelections, setSignatorySelections] = useState({});
     const [savedSignatorySnapshot, setSavedSignatorySnapshot] = useState({});
+    const [documentPreview, setDocumentPreview] = useState(null);
 
     // Reset local state whenever a new request is opened
     useEffect(() => {
@@ -382,6 +485,7 @@ function RequestDrawer({
         setRejectReason("");
         setActionError("");
         setAdminExtraFields({});
+        setDocumentPreview(null);
         const snapshot = request.signatorySnapshot || {};
         setSavedSignatorySnapshot(snapshot);
         setSignatorySelections(
@@ -396,13 +500,20 @@ function RequestDrawer({
     // Scroll-lock + escape key
     useEffect(() => {
         document.body.style.overflow = "hidden";
-        const fn = (e) => { if (e.key === "Escape") onClose(); };
+        const fn = (e) => {
+            if (e.key !== "Escape") return;
+            if (documentPreview) {
+                setDocumentPreview(null);
+                return;
+            }
+            onClose();
+        };
         window.addEventListener("keydown", fn);
         return () => {
             document.body.style.overflow = "";
             window.removeEventListener("keydown", fn);
         };
-    }, [onClose]);
+    }, [documentPreview, onClose]);
 
     if (!request) return null;
 
@@ -425,6 +536,37 @@ function RequestDrawer({
         activeKagawads,
         signatorySelections,
     );
+    const proofRequirements = Array.isArray(request.proofRequirements)
+        ? request.proofRequirements
+        : [];
+    const missingProofRequirements = Array.isArray(
+        request.missingProofRequirements,
+    )
+        ? request.missingProofRequirements
+        : [];
+    const hasMissingRequiredProofs = missingProofRequirements.length > 0;
+    const requestAttachments = Array.isArray(request.attachments)
+        ? request.attachments
+        : [];
+    const proofRequirementGroups = groupProofRequirements(proofRequirements);
+    const knownRequirementKeys = new Set(
+        proofRequirements.flatMap((proof) => requirementKeys(proof)),
+    );
+    const otherAttachments = requestAttachments.filter(
+        (attachment) =>
+            !knownRequirementKeys.has(normalizeProofKey(attachmentProofKey(attachment))),
+    );
+    const attachmentsForRequirement = (proof) =>
+        requestAttachments.filter(
+            (attachment) => attachmentMatchesRequirement(attachment, proof),
+        );
+    const attachmentsForGroup = (group) =>
+        group.items.flatMap((proof) => attachmentsForRequirement(proof));
+    const missingGroupKeys = new Set(
+        missingProofRequirements.map((proof) =>
+            normalizeProofKey(proof.groupKey || proof.group_key || requirementKey(proof)),
+        ),
+    );
 
     const handleApiError = (err) => {
         if (err?.response?.status === 401 || err?.response?.status === 403) {
@@ -437,6 +579,12 @@ function RequestDrawer({
     // ── Approve — stay open, transition to approved ──
     const handleApprove = async () => {
         if (actionLoading) return;
+        if (hasMissingRequiredProofs) {
+            setActionError(
+                "Request cannot be approved until all required supporting documents are uploaded.",
+            );
+            return;
+        }
         setActionLoading(true);
         setActionError("");
         try {
@@ -574,6 +722,101 @@ function RequestDrawer({
         <div className="mr-section-title">{children}</div>
     );
 
+    const openDocumentPreview = (attachment, label) => {
+        const url = attachmentFileUrl(attachment);
+        setActionError("");
+        if (!url) {
+            setDocumentPreview({
+                url: "",
+                label: label || attachment.label || "Supporting document",
+                fileName: attachmentFileName(attachment),
+                mimeType: attachmentMime(attachment),
+                unavailableMessage:
+                    "This uploaded file is not available for preview yet.",
+            });
+            return;
+        }
+        setDocumentPreview({
+            url,
+            label: label || attachment.label || "Supporting document",
+            fileName: attachmentFileName(attachment),
+            mimeType: attachmentMime(attachment),
+        });
+    };
+
+    const closeDocumentPreview = () => setDocumentPreview(null);
+
+    const previewName = documentPreview?.fileName || "";
+    const previewMime = documentPreview?.mimeType || "";
+    const previewUrl = documentPreview?.url || "";
+    const hasPreviewUrl = Boolean(previewUrl);
+    const previewIsImage =
+        hasPreviewUrl &&
+        (previewMime.startsWith("image/") ||
+            /\.(jpe?g|png|webp|gif)$/i.test(previewName));
+    const previewIsPdf =
+        hasPreviewUrl &&
+        (previewMime === "application/pdf" || /\.pdf$/i.test(previewName));
+
+    const documentPreviewModal = documentPreview && (
+        <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Supporting document preview"
+            onClick={closeDocumentPreview}
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 500,
+                background: "rgba(12,18,32,.58)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: isMobile ? 14 : 24,
+            }}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                    width: "min(920px, 100%)",
+                    maxHeight: "88vh",
+                    background: "#fff",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    boxShadow: "0 18px 50px rgba(0,0,0,.24)",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+            >
+                <div style={{ padding: "12px 14px", borderBottom: "1px solid #e4dfd4", background: "#f8f6f1", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#9090aa", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                            {documentPreview.label}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary, #0e2554)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {documentPreview.fileName}
+                        </div>
+                    </div>
+                    <button type="button" onClick={closeDocumentPreview} title="Close preview" style={{ width: 34, height: 34, border: "1px solid #e4dfd4", borderRadius: 4, background: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#4a4a6a", cursor: "pointer", flexShrink: 0 }}>
+                        <X size={16} />
+                    </button>
+                </div>
+                <div style={{ padding: 14, background: "#f4f2ed", minHeight: 280, overflow: "auto" }}>
+                    {previewIsImage ? (
+                        <img src={previewUrl} alt={documentPreview.fileName} style={{ display: "block", maxWidth: "100%", maxHeight: "70vh", margin: "0 auto", objectFit: "contain", background: "#fff" }} />
+                    ) : previewIsPdf ? (
+                        <iframe src={previewUrl} title={documentPreview.fileName} style={{ width: "100%", height: "70vh", border: "1px solid #e4dfd4", background: "#fff" }} />
+                    ) : (
+                        <div style={{ background: "#fff", border: "1px solid #e4dfd4", borderRadius: 6, padding: 18, textAlign: "center", color: "#4a4a6a", fontSize: 13 }}>
+                            {documentPreview.unavailableMessage ||
+                                "Preview is not available for this file type."}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
     const renderFooter = () => {
         // ── Reject confirmation ──
         if (step === "reject") return (
@@ -604,7 +847,8 @@ function RequestDrawer({
                 <button className="mr-drawer-btn"
                     style={{ flex: 2, background: "#1a7a4a", color: "#fff" }}
                     onClick={handleApprove}
-                    disabled={actionLoading}>
+                    disabled={actionLoading || hasMissingRequiredProofs}
+                    title={hasMissingRequiredProofs ? "Required supporting documents are missing" : "Approve request"}>
                     <Check size={11} /> {actionLoading ? "Approving…" : "Approve Request"}
                 </button>
             </>
@@ -821,65 +1065,201 @@ function RequestDrawer({
 
                     <div className="mr-drawer-section">
                         <SectionTitle>Submitted Supporting Documents</SectionTitle>
-                        {request.attachments?.length > 0 ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                {request.attachments.map((attachment) => {
-                                    const url = attachment.viewUrl || attachment.fileUrl;
-                                    const isImage = String(attachment.mimeType || "").startsWith("image/");
+                        {proofRequirements.length > 0 ? (
+                            <div style={{ display: "grid", gap: 10 }}>
+                                {proofRequirementGroups.map((group) => {
+                                    const groupFiles = attachmentsForGroup(group);
+                                    const groupMissing = missingGroupKeys.has(group.key);
                                     return (
-                                        <a
-                                            key={attachment.id || `${attachment.proofKey}-${attachment.fileName}`}
-                                            href={url}
-                                            target="_blank"
-                                            rel="noreferrer"
+                                        <div
+                                            key={group.key}
                                             style={{
-                                                display: "flex",
-                                                gap: 10,
-                                                alignItems: "center",
+                                                display: "grid",
+                                                gap: 9,
                                                 padding: 10,
-                                                border: "1px solid #e4dfd4",
+                                                border: `1px solid ${groupMissing ? "#f5c6c6" : "#d7ded7"}`,
                                                 borderRadius: 6,
-                                                background: "#fffdf8",
-                                                textDecoration: "none",
+                                                background: groupMissing
+                                                    ? "#fff8f8"
+                                                    : "#f8fff9",
                                             }}
                                         >
-                                            {isImage && url ? (
-                                                <img
-                                                    src={url}
-                                                    alt=""
-                                                    style={{
-                                                        width: 46,
-                                                        height: 46,
-                                                        objectFit: "cover",
-                                                        borderRadius: 4,
-                                                        border: "1px solid #e4dfd4",
-                                                        flexShrink: 0,
-                                                    }}
-                                                />
-                                            ) : (
-                                                <span style={{ width: 46, height: 46, borderRadius: 4, border: "1px solid #e4dfd4", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary, #0e2554)", background: "#f8f6f1", flexShrink: 0 }}>
-                                                    <Paperclip size={16} />
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "space-between",
+                                                    gap: 10,
+                                                }}
+                                            >
+                                                <span style={{ minWidth: 0, flex: 1 }}>
+                                                    <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: groupMissing ? "#b02020" : "var(--color-primary, #0e2554)", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                                                        {group.label}
+                                                    </span>
+                                                    <span style={{ display: "block", fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
+                                                        {groupMissing
+                                                            ? "Missing required upload. At least one document type is needed."
+                                                            : `${groupFiles.length} submitted file${groupFiles.length === 1 ? "" : "s"}`}
+                                                    </span>
                                                 </span>
-                                            )}
-                                            <span style={{ minWidth: 0, flex: 1 }}>
-                                                <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--color-primary, #0e2554)", textTransform: "uppercase", letterSpacing: 0.8 }}>
-                                                    {attachment.label || "Supporting document"}
-                                                </span>
-                                                <span style={{ display: "block", fontSize: 12.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {attachment.fileName || "Uploaded file"}
-                                                </span>
-                                                <span style={{ display: "block", fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
-                                                    {formatAttachmentSize(attachment.fileSize)}
-                                                </span>
-                                            </span>
-                                            <ExternalLink size={13} color="#4a4a6a" />
-                                        </a>
+                                                {groupMissing && <AlertCircle size={16} color="#b02020" />}
+                                            </div>
+                                            <div style={{ display: "grid", gap: 8 }}>
+                                                {group.items.map((proof) => {
+                                                    const files = attachmentsForRequirement(proof);
+                                                    return (
+                                                        <div
+                                                            key={requirementKey(proof)}
+                                                            style={{
+                                                                border: "1px solid #e4dfd4",
+                                                                borderRadius: 5,
+                                                                background: "#fff",
+                                                                padding: 8,
+                                                            }}
+                                                        >
+                                                            <div style={{ fontSize: 10.5, fontWeight: 700, color: "#6f6680", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: files.length ? 7 : 0 }}>
+                                                                {requirementLabel(proof)}
+                                                            </div>
+                                                            {files.length > 0 ? (
+                                                                <div style={{ display: "grid", gap: 6 }}>
+                                                                    {files.map((file) => (
+                                                                        <button
+                                                                            type="button"
+                                                                            key={file.id || `${attachmentProofKey(file)}-${attachmentFileName(file)}`}
+                                                                            onClick={() =>
+                                                                                openDocumentPreview(
+                                                                                    file,
+                                                                                    requirementLabel(proof),
+                                                                                )
+                                                                            }
+                                                                            style={{
+                                                                                display: "grid",
+                                                                                gridTemplateColumns:
+                                                                                    "minmax(0,1fr) auto",
+                                                                                gap: 8,
+                                                                                alignItems: "center",
+                                                                                padding: 8,
+                                                                                border: "1px solid #efe8dc",
+                                                                                borderRadius: 4,
+                                                                                background: "#fffdf8",
+                                                                                textAlign: "left",
+                                                                                cursor: "pointer",
+                                                                            }}
+                                                                        >
+                                                                            <span style={{ minWidth: 0 }}>
+                                                                                <span style={{ display: "block", fontSize: 12, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                                                    {attachmentFileName(file)}
+                                                                                </span>
+                                                                                <span style={{ display: "block", fontSize: 10.5, color: "#9090aa", marginTop: 2 }}>
+                                                                                    {formatAttachmentSize(
+                                                                                        attachmentSize(file),
+                                                                                    )}
+                                                                                </span>
+                                                                            </span>
+                                                                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--color-primary, #0e2554)", fontSize: 11, fontWeight: 700 }}>
+                                                                                <Eye size={13} />
+                                                                                Preview
+                                                                            </span>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <div style={{ fontSize: 11.5, color: "#9090aa" }}>
+                                                                    No file uploaded for this type.
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
                                     );
                                 })}
+                                {otherAttachments.length > 0 && (
+                                    <div style={{ display: "grid", gap: 8 }}>
+                                        {otherAttachments.map((attachment) => (
+                                            <button
+                                                type="button"
+                                                key={
+                                                    attachment.id ||
+                                                    `${attachmentProofKey(attachment)}-${attachmentFileName(attachment)}`
+                                                }
+                                                onClick={() =>
+                                                    openDocumentPreview(
+                                                        attachment,
+                                                        attachment.label,
+                                                    )
+                                                }
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 9,
+                                                    padding: 9,
+                                                    border: "1px solid #e4dfd4",
+                                                    borderRadius: 6,
+                                                    background: "#fffdf8",
+                                                    textAlign: "left",
+                                                    cursor: "pointer",
+                                                }}
+                                            >
+                                                <Paperclip size={14} />
+                                                <span style={{ minWidth: 0 }}>
+                                                    <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--color-primary, #0e2554)", textTransform: "uppercase", letterSpacing: 0.7 }}>
+                                                        Other submitted document
+                                                    </span>
+                                                    <span style={{ display: "block", fontSize: 12, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        {attachmentFileName(attachment)}
+                                                    </span>
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : requestAttachments.length > 0 ? (
+                            <div style={{ display: "grid", gap: 8 }}>
+                                {requestAttachments.map((attachment) => (
+                                    <button
+                                        type="button"
+                                        key={
+                                            attachment.id ||
+                                            `${attachmentProofKey(attachment)}-${attachmentFileName(attachment)}`
+                                        }
+                                        onClick={() =>
+                                            openDocumentPreview(
+                                                attachment,
+                                                attachment.label,
+                                            )
+                                        }
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 9,
+                                            padding: 10,
+                                            border: "1px solid #e4dfd4",
+                                            borderRadius: 6,
+                                            background: "#fffdf8",
+                                            textAlign: "left",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <Paperclip size={15} />
+                                        <span style={{ minWidth: 0, flex: 1 }}>
+                                            <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--color-primary, #0e2554)", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                                                {attachment.label ||
+                                                    "Supporting document"}
+                                            </span>
+                                            <span style={{ display: "block", fontSize: 12.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                {attachmentFileName(attachment)}
+                                            </span>
+                                        </span>
+                                        <Eye size={13} color="#4a4a6a" />
+                                    </button>
+                                ))}
                             </div>
                         ) : (
                             <div style={{ background: "#f8f6f1", border: "1px solid #e4dfd4", borderRadius: 4, padding: "10px 12px", fontSize: 12, color: "#77708a", lineHeight: 1.6 }}>
-                                No supporting document was uploaded with this request.
+                                No supporting document was required or uploaded with this request.
                             </div>
                         )}
                     </div>
@@ -1061,6 +1441,7 @@ function RequestDrawer({
 
                 <div className="mr-drawer-footer">{renderFooter()}</div>
             </div>
+            {documentPreviewModal}
         </div>
     );
 }
@@ -1166,6 +1547,16 @@ export default function ManageRequests({ admin, onLogout, onNavigate: navProp })
             attachments: Array.isArray(row.attachments) && row.attachments.length > 0
                 ? row.attachments
                 : fallbackAttachments,
+            proofRequirements: Array.isArray(row.proofRequirements)
+                ? row.proofRequirements
+                : Array.isArray(row.proof_requirements)
+                  ? row.proof_requirements
+                  : [],
+            missingProofRequirements: Array.isArray(row.missingProofRequirements)
+                ? row.missingProofRequirements
+                : Array.isArray(row.missing_proof_requirements)
+                  ? row.missing_proof_requirements
+                  : [],
             correctionHistory: Array.isArray(row.correction_history)
                 ? row.correction_history
                 : [],

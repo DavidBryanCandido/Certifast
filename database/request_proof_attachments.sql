@@ -73,87 +73,102 @@ END $$;
 
 -- Common proof requirement presets stored on the templates.
 -- Resident IDs/basic residency are verified during account activation, so request proofs
--- should only be certificate-specific supporting documents.
+-- should only be certificate-specific supporting documents. Broad purpose wording
+-- in the local DOCX/charter guidance is not enough to require a hard upload.
 UPDATE certificate_templates
 SET proof_requirements = '[]'::jsonb
 WHERE template_key IN (
     'doc1-barangay-clearance',
     'doc1-certificate-residency',
-    'doc1-cohabitation'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"request_letter","label":"Request letter or agency requirement document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
+    'doc1-cohabitation',
     'doc1-household-angkas-pass',
     'doc1-lockdown-residency-certification',
     'doc1-simple-residency-loan',
     'doc2-residency-bank-record',
     'doc2-centenarian-living-veteran',
-    'doc3-senior-alive-well'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"travel_documents","label":"Travel, repatriation, or destination document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
+    'doc3-senior-alive-well',
     'doc1-acceptance-letter-quarantine',
-    'doc1-undertaking-quarantine'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"school_documents","label":"School requirement, enrollment, or assessment document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc2-residency-school-requirement';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"medical_documents","label":"Medical certificate, bill, or hospital document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
+    'doc1-undertaking-quarantine',
+    'doc2-residency-school-requirement',
     'doc1-indigency-medical',
     'doc1-endorsement-medical-assistance',
     'doc1-hearing-impairment-certification',
     'doc2-indigent-good-moral-medical',
-    'doc3-indigency-medical-assistance'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"medical_documents","label":"Medical certificate, bill, or hospital document","required":true,"accept":"image/*,.pdf"},{"key":"travel_documents","label":"Travel, repatriation, or destination document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc2-endorsement-hospital-return';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"school_documents","label":"School requirement, enrollment, or assessment document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
+    'doc3-indigency-medical-assistance',
+    'doc2-endorsement-hospital-return',
     'doc1-good-moral',
-    'doc1-indigency-educational-assistance'
+    'doc1-indigency-educational-assistance',
+    'doc2-minor-athlete-financial-assistance',
+    'doc1-indigency-spes-leap',
+    'doc1-live-birth-endorsement',
+    'doc2-parent-relationship-spes',
+    'doc3-child-details-4ps',
+    'doc3-minor-stepbrother-birth-record',
+    'doc1-guardianship',
+    'doc2-guardian-psa-certification',
+    'doc2-indigency-guardian-medical',
+    'doc3-sole-guardian-travel-assistance',
+    'doc1-burial-assistance',
+    'doc2-funeral-covered-court-indigency',
+    'doc1-no-marriage-death-claim',
+    'doc2-flooded-residence-certification',
+    'doc3-fire-damage-certification',
+    'doc3-flood-victim-financial-assistance',
+    'doc3-flood-victim-calamity-loan',
+    'doc1-extended-duty-shift',
+    'doc1-first-time-jobseeker',
+    'doc2-first-time-jobseeker-oath',
+    'doc2-unemployment-spes-certification',
+    'doc3-first-time-jobseeker-clearance',
+    'doc3-low-income-purok-leader',
+    'doc3-low-income-tricycle-driver',
+    'doc3-repatriated-ofw-unemployment',
+    'doc1-certificate-appearance',
+    'doc1-detained-bail-certification',
+    'doc1-marital-separation-certification',
+    'doc1-solo-parent-certification',
+    'doc2-general-legal-records',
+    'doc3-non-resident-persons',
+    'doc1-endorsement-toda-courtesy-call',
+    'doc2-organization-water-clearance',
+    'doc3-mlbb-tournament-permit',
+    'doc1-endorsement-financial-assistance',
+    'doc1-dswd-eligibility-certification',
+    'doc1-indigency-sibling-assistance',
+    'doc2-indigency-income-means',
+    'doc3-blank-indigency-form'
 );
 
 UPDATE certificate_templates
-SET proof_requirements = '[{"key":"school_documents","label":"School requirement, enrollment, or assessment document","required":true,"accept":"image/*,.pdf"},{"key":"assistance_documents","label":"Assistance request, referral, or supporting document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc2-minor-athlete-financial-assistance';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"school_documents","label":"School requirement, enrollment, or assessment document","required":true,"accept":"image/*,.pdf"},{"key":"employment_documents","label":"Employment, income, or job seeker document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc1-indigency-spes-leap';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"business_documents","label":"Business registration, permit application, or authorization","required":true,"accept":"image/*,.pdf"}]'::jsonb
+SET proof_requirements = $json$
+[
+  {"key":"business_registration_document","label":"Business registration document","required":false,"accept":"image/*,.pdf","groupKey":"business_documents","groupLabel":"Business registration, permit application, or authorization","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_permit_application","label":"Permit application or assessment","required":false,"accept":"image/*,.pdf","groupKey":"business_documents","groupLabel":"Business registration, permit application, or authorization","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_authorization_request","label":"Authorization letter or agency request","required":false,"accept":"image/*,.pdf","groupKey":"business_documents","groupLabel":"Business registration, permit application, or authorization","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_address_proof","label":"Proof of business address","required":false,"accept":"image/*,.pdf","groupKey":"business_documents","groupLabel":"Business registration, permit application, or authorization","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_other_document","label":"Other business document","required":false,"accept":"image/*,.pdf","groupKey":"business_documents","groupLabel":"Business registration, permit application, or authorization","groupRequired":true,"groupMinFiles":1,"legacyKeys":["business_documents"]}
+]
+$json$::jsonb
 WHERE template_key IN (
     'doc1-work-permit-certification',
-    'doc1-no-business',
     'doc1-telecom-nap-permit',
     'doc1-business-owner-bir-certification',
-    'doc2-business-closure-court-records',
     'doc2-business-assessor-permit',
     'doc2-registered-business-bank',
     'doc2-lpg-house-to-house-permit',
     'doc3-road-damage-permit',
     'doc3-bmbe-business-certificate',
-    'doc3-pandemic-business-non-operation',
-    'doc3-business-closure',
-    'doc3-renovation-non-operational-business',
     'doc3-business-new-endorsement'
 );
 
 UPDATE certificate_templates
-SET proof_requirements = '[{"key":"business_renewal_documents","label":"Previous permit or business renewal document","required":true,"accept":"image/*,.pdf"}]'::jsonb
+SET proof_requirements = $json$
+[
+  {"key":"business_previous_permit","label":"Previous permit","required":false,"accept":"image/*,.pdf","groupKey":"business_renewal_documents","groupLabel":"Previous permit or business renewal document","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_renewal_application","label":"Renewal application or assessment","required":false,"accept":"image/*,.pdf","groupKey":"business_renewal_documents","groupLabel":"Previous permit or business renewal document","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_renewal_other_document","label":"Other renewal document","required":false,"accept":"image/*,.pdf","groupKey":"business_renewal_documents","groupLabel":"Previous permit or business renewal document","groupRequired":true,"groupMinFiles":1,"legacyKeys":["business_renewal_documents"]}
+]
+$json$::jsonb
 WHERE template_key IN (
     'doc1-business-renewal-endorsement',
     'doc3-business-renewal-travel',
@@ -161,98 +176,52 @@ WHERE template_key IN (
 );
 
 UPDATE certificate_templates
-SET proof_requirements = '[{"key":"property_documents","label":"Property title, tax declaration, lease, or lot document","required":true,"accept":"image/*,.pdf"}]'::jsonb
+SET proof_requirements = $json$
+[
+  {"key":"business_closure_registration_document","label":"Business registration or previous permit","required":false,"accept":"image/*,.pdf","groupKey":"business_closure_documents","groupLabel":"Business closure or non-operation document","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_closure_non_operation_proof","label":"Closure or non-operation proof","required":false,"accept":"image/*,.pdf","groupKey":"business_closure_documents","groupLabel":"Business closure or non-operation document","groupRequired":true,"groupMinFiles":1},
+  {"key":"business_closure_other_document","label":"Other closure document","required":false,"accept":"image/*,.pdf","groupKey":"business_closure_documents","groupLabel":"Business closure or non-operation document","groupRequired":true,"groupMinFiles":1,"legacyKeys":["business_documents"]}
+]
+$json$::jsonb
+WHERE template_key IN (
+    'doc1-no-business',
+    'doc2-business-closure-court-records',
+    'doc3-pandemic-business-non-operation',
+    'doc3-business-closure',
+    'doc3-renovation-non-operational-business'
+);
+
+UPDATE certificate_templates
+SET proof_requirements = $json$
+[
+  {"key":"property_title_document","label":"Property title","required":false,"accept":"image/*,.pdf","groupKey":"property_documents","groupLabel":"Property title, tax declaration, lease, or lot document","groupRequired":true,"groupMinFiles":1},
+  {"key":"property_tax_declaration","label":"Tax declaration","required":false,"accept":"image/*,.pdf","groupKey":"property_documents","groupLabel":"Property title, tax declaration, lease, or lot document","groupRequired":true,"groupMinFiles":1},
+  {"key":"property_lease_occupancy_document","label":"Lease or occupancy document","required":false,"accept":"image/*,.pdf","groupKey":"property_documents","groupLabel":"Property title, tax declaration, lease, or lot document","groupRequired":true,"groupMinFiles":1},
+  {"key":"property_lot_boundary_document","label":"Lot or boundary document","required":false,"accept":"image/*,.pdf","groupKey":"property_documents","groupLabel":"Property title, tax declaration, lease, or lot document","groupRequired":true,"groupMinFiles":1},
+  {"key":"property_other_document","label":"Other property document","required":false,"accept":"image/*,.pdf","groupKey":"property_documents","groupLabel":"Property title, tax declaration, lease, or lot document","groupRequired":true,"groupMinFiles":1,"legacyKeys":["property_documents"]}
+]
+$json$::jsonb
 WHERE template_key IN (
     'doc1-property-ownership',
     'doc1-family-home-property',
     'doc1-lot-occupancy'
 );
 
+-- Every proof requirement is a separate upload slot. Keep older JSON rows
+-- compatible by adding the eight-file limit after all charter mappings are set.
 UPDATE certificate_templates
-SET proof_requirements = '[{"key":"birth_record","label":"Birth certificate, PSA record, or civil registry document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-live-birth-endorsement',
-    'doc2-parent-relationship-spes',
-    'doc3-child-details-4ps',
-    'doc3-minor-stepbrother-birth-record'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"guardianship_documents","label":"Birth record, guardianship proof, or authorization document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-guardianship',
-    'doc2-guardian-psa-certification'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"medical_documents","label":"Medical certificate, bill, or hospital document","required":true,"accept":"image/*,.pdf"},{"key":"guardianship_documents","label":"Birth record, guardianship proof, or authorization document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc2-indigency-guardian-medical';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"guardianship_documents","label":"Birth record, guardianship proof, or authorization document","required":true,"accept":"image/*,.pdf"},{"key":"travel_documents","label":"Travel, repatriation, or destination document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc3-sole-guardian-travel-assistance';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"death_certificate","label":"Death certificate or funeral document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-burial-assistance',
-    'doc2-funeral-covered-court-indigency'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"death_certificate","label":"Death certificate or funeral document","required":true,"accept":"image/*,.pdf"},{"key":"legal_documents","label":"Legal document, court record, or agency request","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc1-no-marriage-death-claim';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"calamity_proof","label":"Photo, incident report, or damage proof","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc2-flooded-residence-certification',
-    'doc3-fire-damage-certification',
-    'doc3-flood-victim-financial-assistance',
-    'doc3-flood-victim-calamity-loan'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"employment_documents","label":"Employment, income, or job seeker document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-extended-duty-shift',
-    'doc1-first-time-jobseeker',
-    'doc2-first-time-jobseeker-oath',
-    'doc2-unemployment-spes-certification',
-    'doc3-first-time-jobseeker-clearance',
-    'doc3-low-income-purok-leader',
-    'doc3-low-income-tricycle-driver'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"travel_documents","label":"Travel, repatriation, or destination document","required":true,"accept":"image/*,.pdf"},{"key":"employment_documents","label":"Employment, income, or job seeker document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key = 'doc3-repatriated-ofw-unemployment';
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"legal_documents","label":"Legal document, court record, or agency request","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-certificate-appearance',
-    'doc1-detained-bail-certification',
-    'doc1-marital-separation-certification',
-    'doc1-solo-parent-certification',
-    'doc2-general-legal-records',
-    'doc3-non-resident-persons'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"event_documents","label":"Event proposal, authorization, or organizer letter","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-endorsement-toda-courtesy-call',
-    'doc2-organization-water-clearance',
-    'doc3-mlbb-tournament-permit'
-);
-
-UPDATE certificate_templates
-SET proof_requirements = '[{"key":"assistance_documents","label":"Assistance request, referral, or supporting document","required":true,"accept":"image/*,.pdf"}]'::jsonb
-WHERE template_key IN (
-    'doc1-endorsement-financial-assistance',
-    'doc1-dswd-eligibility-certification',
-    'doc1-indigency-sibling-assistance',
-    'doc2-indigency-income-means',
-    'doc3-blank-indigency-form'
+SET proof_requirements = COALESCE(
+    (
+        SELECT jsonb_agg(
+            CASE
+                WHEN jsonb_typeof(item) = 'object'
+                    THEN item || '{"maxFiles":8}'::jsonb
+                ELSE item
+            END
+            ORDER BY ordinality
+        )
+        FROM jsonb_array_elements(COALESCE(proof_requirements, '[]'::jsonb))
+             WITH ORDINALITY AS proof_items(item, ordinality)
+    ),
+    '[]'::jsonb
 );

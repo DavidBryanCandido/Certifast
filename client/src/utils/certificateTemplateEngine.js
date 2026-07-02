@@ -195,123 +195,172 @@ const FIELD_ADMIN_ONLY = {
     businessNoObjection: true,
 };
 
-function proof(key, label, required = true, accept = "image/*,.pdf") {
-    return { key, label, required, accept };
+function proof(key, label, required = true, accept = "image/*,.pdf", extra = {}) {
+    return { key, label, required, accept, maxFiles: 8, ...extra };
+}
+
+function groupedProof(key, label, groupKey, groupLabel, legacyKeys = []) {
+    return proof(key, label, false, "image/*,.pdf", {
+        groupKey,
+        groupLabel,
+        groupRequired: true,
+        groupMinFiles: 1,
+        legacyKeys,
+    });
 }
 
 const PROOF_LIBRARY = {
-    requestLetter: proof(
-        "request_letter",
-        "Request letter or agency requirement document",
-    ),
-    business: proof(
+    businessRegistration: groupedProof(
+        "business_registration_document",
+        "Business registration document",
         "business_documents",
         "Business registration, permit application, or authorization",
     ),
-    businessRenewal: proof(
+    businessPermitApplication: groupedProof(
+        "business_permit_application",
+        "Permit application or assessment",
+        "business_documents",
+        "Business registration, permit application, or authorization",
+    ),
+    businessAuthorization: groupedProof(
+        "business_authorization_request",
+        "Authorization letter or agency request",
+        "business_documents",
+        "Business registration, permit application, or authorization",
+    ),
+    businessAddressProof: groupedProof(
+        "business_address_proof",
+        "Proof of business address",
+        "business_documents",
+        "Business registration, permit application, or authorization",
+    ),
+    businessOther: groupedProof(
+        "business_other_document",
+        "Other business document",
+        "business_documents",
+        "Business registration, permit application, or authorization",
+        ["business_documents"],
+    ),
+    businessRenewalPreviousPermit: groupedProof(
+        "business_previous_permit",
+        "Previous permit",
         "business_renewal_documents",
         "Previous permit or business renewal document",
     ),
-    property: proof(
+    businessRenewalApplication: groupedProof(
+        "business_renewal_application",
+        "Renewal application or assessment",
+        "business_renewal_documents",
+        "Previous permit or business renewal document",
+    ),
+    businessRenewalOther: groupedProof(
+        "business_renewal_other_document",
+        "Other renewal document",
+        "business_renewal_documents",
+        "Previous permit or business renewal document",
+        ["business_renewal_documents"],
+    ),
+    businessClosureRegistration: groupedProof(
+        "business_closure_registration_document",
+        "Business registration or previous permit",
+        "business_closure_documents",
+        "Business closure or non-operation document",
+    ),
+    businessClosureProof: groupedProof(
+        "business_closure_non_operation_proof",
+        "Closure or non-operation proof",
+        "business_closure_documents",
+        "Business closure or non-operation document",
+    ),
+    businessClosureOther: groupedProof(
+        "business_closure_other_document",
+        "Other closure document",
+        "business_closure_documents",
+        "Business closure or non-operation document",
+        ["business_documents"],
+    ),
+    propertyTitle: groupedProof(
+        "property_title_document",
+        "Property title",
         "property_documents",
         "Property title, tax declaration, lease, or lot document",
     ),
-    medical: proof("medical_documents", "Medical certificate, bill, or hospital document"),
-    school: proof("school_documents", "School requirement, enrollment, or assessment document"),
-    birth: proof("birth_record", "Birth certificate, PSA record, or civil registry document"),
-    guardianship: proof(
-        "guardianship_documents",
-        "Birth record, guardianship proof, or authorization document",
+    propertyTaxDeclaration: groupedProof(
+        "property_tax_declaration",
+        "Tax declaration",
+        "property_documents",
+        "Property title, tax declaration, lease, or lot document",
     ),
-    death: proof("death_certificate", "Death certificate or funeral document"),
-    calamity: proof("calamity_proof", "Photo, incident report, or damage proof"),
-    employment: proof("employment_documents", "Employment, income, or job seeker document"),
-    legal: proof("legal_documents", "Legal document, court record, or agency request"),
-    event: proof("event_documents", "Event proposal, authorization, or organizer letter"),
-    assistance: proof("assistance_documents", "Assistance request, referral, or supporting document"),
-    travel: proof("travel_documents", "Travel, repatriation, or destination document"),
+    propertyLeaseOccupancy: groupedProof(
+        "property_lease_occupancy_document",
+        "Lease or occupancy document",
+        "property_documents",
+        "Property title, tax declaration, lease, or lot document",
+    ),
+    propertyLotBoundary: groupedProof(
+        "property_lot_boundary_document",
+        "Lot or boundary document",
+        "property_documents",
+        "Property title, tax declaration, lease, or lot document",
+    ),
+    propertyOther: groupedProof(
+        "property_other_document",
+        "Other property document",
+        "property_documents",
+        "Property title, tax declaration, lease, or lot document",
+        ["property_documents"],
+    ),
 };
 
+const BUSINESS_PROOFS = [
+    PROOF_LIBRARY.businessRegistration,
+    PROOF_LIBRARY.businessPermitApplication,
+    PROOF_LIBRARY.businessAuthorization,
+    PROOF_LIBRARY.businessAddressProof,
+    PROOF_LIBRARY.businessOther,
+];
+
+const BUSINESS_RENEWAL_PROOFS = [
+    PROOF_LIBRARY.businessRenewalPreviousPermit,
+    PROOF_LIBRARY.businessRenewalApplication,
+    PROOF_LIBRARY.businessRenewalOther,
+];
+
+const BUSINESS_CLOSURE_PROOFS = [
+    PROOF_LIBRARY.businessClosureRegistration,
+    PROOF_LIBRARY.businessClosureProof,
+    PROOF_LIBRARY.businessClosureOther,
+];
+
+const PROPERTY_PROOFS = [
+    PROOF_LIBRARY.propertyTitle,
+    PROOF_LIBRARY.propertyTaxDeclaration,
+    PROOF_LIBRARY.propertyLeaseOccupancy,
+    PROOF_LIBRARY.propertyLotBoundary,
+    PROOF_LIBRARY.propertyOther,
+];
+
 const TEMPLATE_PROOF_REQUIREMENTS = {
-    "doc1-barangay-clearance": [],
-    "doc1-certificate-residency": [],
-    "doc1-indigency-medical": [PROOF_LIBRARY.medical],
-    "doc1-work-permit-certification": [PROOF_LIBRARY.business],
-    "doc1-good-moral": [PROOF_LIBRARY.school],
-    "doc1-live-birth-endorsement": [PROOF_LIBRARY.birth],
-    "doc1-cohabitation": [],
-    "doc1-no-business": [PROOF_LIBRARY.business],
-    "doc1-guardianship": [PROOF_LIBRARY.guardianship],
-    "doc1-business-renewal-endorsement": [PROOF_LIBRARY.businessRenewal],
-    "doc1-property-ownership": [PROOF_LIBRARY.property],
-    "doc1-certificate-appearance": [PROOF_LIBRARY.legal],
-    "doc1-endorsement-toda-courtesy-call": [PROOF_LIBRARY.event],
-    "doc1-acceptance-letter-quarantine": [PROOF_LIBRARY.travel],
-    "doc1-household-angkas-pass": [PROOF_LIBRARY.requestLetter],
-    "doc1-family-home-property": [PROOF_LIBRARY.property],
-    "doc1-first-time-jobseeker": [PROOF_LIBRARY.employment],
-    "doc1-endorsement-financial-assistance": [PROOF_LIBRARY.assistance],
-    "doc1-dswd-eligibility-certification": [PROOF_LIBRARY.assistance],
-    "doc1-lot-occupancy": [PROOF_LIBRARY.property],
-    "doc1-undertaking-quarantine": [PROOF_LIBRARY.travel],
-    "doc1-detained-bail-certification": [PROOF_LIBRARY.legal],
-    "doc1-indigency-sibling-assistance": [PROOF_LIBRARY.assistance],
-    "doc1-endorsement-medical-assistance": [PROOF_LIBRARY.medical],
-    "doc1-lockdown-residency-certification": [PROOF_LIBRARY.requestLetter],
-    "doc1-extended-duty-shift": [PROOF_LIBRARY.employment],
-    "doc1-burial-assistance": [PROOF_LIBRARY.death],
-    "doc1-indigency-educational-assistance": [PROOF_LIBRARY.school],
-    "doc1-telecom-nap-permit": [PROOF_LIBRARY.business],
-    "doc1-marital-separation-certification": [PROOF_LIBRARY.legal],
-    "doc1-business-owner-bir-certification": [PROOF_LIBRARY.business],
-    "doc1-no-marriage-death-claim": [PROOF_LIBRARY.death, PROOF_LIBRARY.legal],
-    "doc1-hearing-impairment-certification": [PROOF_LIBRARY.medical],
-    "doc1-indigency-spes-leap": [PROOF_LIBRARY.school, PROOF_LIBRARY.employment],
-    "doc1-simple-residency-loan": [PROOF_LIBRARY.requestLetter],
-    "doc1-solo-parent-certification": [PROOF_LIBRARY.legal],
-    "doc2-indigency-income-means": [PROOF_LIBRARY.assistance],
-    "doc2-flooded-residence-certification": [PROOF_LIBRARY.calamity],
-    "doc2-indigent-good-moral-medical": [PROOF_LIBRARY.medical],
-    "doc2-residency-bank-record": [PROOF_LIBRARY.requestLetter],
-    "doc2-minor-athlete-financial-assistance": [PROOF_LIBRARY.school, PROOF_LIBRARY.assistance],
-    "doc2-parent-relationship-spes": [PROOF_LIBRARY.birth],
-    "doc2-business-closure-court-records": [PROOF_LIBRARY.business],
-    "doc2-general-legal-records": [PROOF_LIBRARY.legal],
-    "doc2-centenarian-living-veteran": [PROOF_LIBRARY.requestLetter],
-    "doc2-first-time-jobseeker-oath": [PROOF_LIBRARY.employment],
-    "doc2-funeral-covered-court-indigency": [PROOF_LIBRARY.death],
-    "doc2-endorsement-hospital-return": [PROOF_LIBRARY.medical, PROOF_LIBRARY.travel],
-    "doc2-business-assessor-permit": [PROOF_LIBRARY.business],
-    "doc2-residency-school-requirement": [PROOF_LIBRARY.school],
-    "doc2-registered-business-bank": [PROOF_LIBRARY.business],
-    "doc2-guardian-psa-certification": [PROOF_LIBRARY.guardianship],
-    "doc2-indigency-guardian-medical": [PROOF_LIBRARY.medical, PROOF_LIBRARY.guardianship],
-    "doc2-organization-water-clearance": [PROOF_LIBRARY.event],
-    "doc2-unemployment-spes-certification": [PROOF_LIBRARY.employment],
-    "doc2-lpg-house-to-house-permit": [PROOF_LIBRARY.business],
-    "doc3-mlbb-tournament-permit": [PROOF_LIBRARY.event],
-    "doc3-business-renewal-travel": [PROOF_LIBRARY.businessRenewal],
-    "doc3-child-details-4ps": [PROOF_LIBRARY.birth],
-    "doc3-non-resident-persons": [PROOF_LIBRARY.legal],
-    "doc3-indigency-medical-assistance": [PROOF_LIBRARY.medical],
-    "doc3-road-damage-permit": [PROOF_LIBRARY.business],
-    "doc3-bmbe-business-certificate": [PROOF_LIBRARY.business],
-    "doc3-senior-alive-well": [PROOF_LIBRARY.requestLetter],
-    "doc3-minor-stepbrother-birth-record": [PROOF_LIBRARY.birth],
-    "doc3-fire-damage-certification": [PROOF_LIBRARY.calamity],
-    "doc3-first-time-jobseeker-clearance": [PROOF_LIBRARY.employment],
-    "doc3-repatriated-ofw-unemployment": [PROOF_LIBRARY.travel, PROOF_LIBRARY.employment],
-    "doc3-pandemic-business-non-operation": [PROOF_LIBRARY.business],
-    "doc3-sole-guardian-travel-assistance": [PROOF_LIBRARY.guardianship, PROOF_LIBRARY.travel],
-    "doc3-business-closure": [PROOF_LIBRARY.business],
-    "doc3-renovation-non-operational-business": [PROOF_LIBRARY.business],
-    "doc3-flood-victim-financial-assistance": [PROOF_LIBRARY.calamity],
-    "doc3-flood-victim-calamity-loan": [PROOF_LIBRARY.calamity],
-    "doc3-low-income-purok-leader": [PROOF_LIBRARY.employment],
-    "doc3-low-income-tricycle-driver": [PROOF_LIBRARY.employment],
-    "doc3-blank-indigency-form": [PROOF_LIBRARY.assistance],
-    "doc3-business-renewal-store": [PROOF_LIBRARY.businessRenewal],
-    "doc3-business-new-endorsement": [PROOF_LIBRARY.business],
+    "doc1-work-permit-certification": BUSINESS_PROOFS,
+    "doc1-no-business": BUSINESS_CLOSURE_PROOFS,
+    "doc1-business-renewal-endorsement": BUSINESS_RENEWAL_PROOFS,
+    "doc1-property-ownership": PROPERTY_PROOFS,
+    "doc1-family-home-property": PROPERTY_PROOFS,
+    "doc1-lot-occupancy": PROPERTY_PROOFS,
+    "doc1-telecom-nap-permit": BUSINESS_PROOFS,
+    "doc1-business-owner-bir-certification": BUSINESS_PROOFS,
+    "doc2-business-closure-court-records": BUSINESS_CLOSURE_PROOFS,
+    "doc2-business-assessor-permit": BUSINESS_PROOFS,
+    "doc2-registered-business-bank": BUSINESS_PROOFS,
+    "doc2-lpg-house-to-house-permit": BUSINESS_PROOFS,
+    "doc3-business-renewal-travel": BUSINESS_RENEWAL_PROOFS,
+    "doc3-road-damage-permit": BUSINESS_PROOFS,
+    "doc3-bmbe-business-certificate": BUSINESS_PROOFS,
+    "doc3-pandemic-business-non-operation": BUSINESS_CLOSURE_PROOFS,
+    "doc3-business-closure": BUSINESS_CLOSURE_PROOFS,
+    "doc3-renovation-non-operational-business": BUSINESS_CLOSURE_PROOFS,
+    "doc3-business-renewal-store": BUSINESS_RENEWAL_PROOFS,
+    "doc3-business-new-endorsement": BUSINESS_PROOFS,
 };
 
 // BGRY.CERT# 1.docx contains repeated First Time Jobseeker and Guardianship

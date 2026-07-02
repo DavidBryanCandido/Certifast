@@ -13,6 +13,10 @@ const {
     buildStatusNotificationMessage,
     getRequestNotificationDetails,
 } = require("../utils/requestNotificationDetails");
+const {
+    normalizeProofRequirements,
+    summarizeProofRequirements,
+} = require("../utils/requestProofRequirements");
 
 const supabase = (() => {
     const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -191,6 +195,24 @@ function ensureAdminOrSuperadmin(req, res) {
         return false;
     }
     return true;
+}
+
+function appendRequestProofSummaries(rows = []) {
+    return rows.map((row) => {
+        const { proofRequirements, missingProofRequirements } =
+            summarizeProofRequirements({
+                templateRequirements: row.proof_requirements,
+                extraFields: row.extra_fields,
+                attachments: row.attachments,
+            });
+
+        return {
+            ...row,
+            proof_requirements: proofRequirements,
+            proofRequirements,
+            missingProofRequirements,
+        };
+    });
 }
 
 async function appendCorrectionHistory(rows = []) {
@@ -425,12 +447,15 @@ async function getRecentRequests(req, res) {
                 res.date_of_birth AS resident_date_of_birth,
                 res.nationality AS resident_nationality,
                 ct.template_key,
-                COALESCE(ct.has_fee, false) AS has_fee
+                COALESCE(ct.has_fee, false) AS has_fee,
+                COALESCE(ct.proof_requirements, '[]'::jsonb) AS proof_requirements
              FROM requests r
              LEFT JOIN residents res
                ON res.resident_id = r.resident_id
               LEFT JOIN LATERAL (
-                SELECT template_key, has_fee
+                SELECT template_key,
+                       has_fee,
+                       COALESCE(to_jsonb(ct)->'proof_requirements', '[]'::jsonb) AS proof_requirements
                 FROM certificate_templates ct
                 WHERE ct.template_id = r.template_id
                    OR (r.template_id IS NULL AND ct.name = r.cert_type)
@@ -445,7 +470,9 @@ async function getRecentRequests(req, res) {
         );
 
         const rowsWithAttachments = await appendRequestAttachments(result.rows);
-        const rows = await appendCorrectionHistory(rowsWithAttachments);
+        const rowsWithProofSummaries =
+            appendRequestProofSummaries(rowsWithAttachments);
+        const rows = await appendCorrectionHistory(rowsWithProofSummaries);
         return res.json({ data: rows });
     } catch (err) {
         console.error("getRecentRequests error:", err);
@@ -460,6 +487,43 @@ async function approveRequest(req, res) {
     }
 
     try {
+        const proofResult = await pool.query(
+            `SELECT
+                r.request_id,
+                r.extra_fields,
+                COALESCE(ct.proof_requirements, '[]'::jsonb) AS proof_requirements
+             FROM requests r
+             LEFT JOIN LATERAL (
+                SELECT COALESCE(to_jsonb(ct)->'proof_requirements', '[]'::jsonb) AS proof_requirements
+                FROM certificate_templates ct
+                WHERE ct.template_id = r.template_id
+                   OR (r.template_id IS NULL AND ct.name = r.cert_type)
+                ORDER BY CASE WHEN ct.template_id = r.template_id THEN 0 ELSE 1 END,
+                         COALESCE(ct.display_order, 0),
+                         ct.template_id
+                LIMIT 1
+             ) ct ON TRUE
+             WHERE r.request_id = $1
+             LIMIT 1`,
+            [requestId],
+        );
+
+        if (proofResult.rows.length === 0) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        const [requestProofSummary] = appendRequestProofSummaries(
+            await appendRequestAttachments(proofResult.rows),
+        );
+        if (requestProofSummary.missingProofRequirements?.length > 0) {
+            return res.status(400).json({
+                message:
+                    "Request cannot be approved until all required supporting documents are uploaded.",
+                missingProofRequirements:
+                    requestProofSummary.missingProofRequirements,
+            });
+        }
+
         const result = await pool.query(
             `UPDATE requests
              SET status = 'approved',
@@ -719,9 +783,9 @@ async function getCertificateTemplates(req, res) {
                 fields: Array.isArray(row.required_fields)
                     ? row.required_fields
                     : [],
-                proofRequirements: Array.isArray(row.proof_requirements)
-                    ? row.proof_requirements
-                    : [],
+                proofRequirements: normalizeProofRequirements(
+                    row.proof_requirements,
+                ),
                 residentGuidance:
                     row.resident_guidance &&
                     typeof row.resident_guidance === "object"
@@ -911,9 +975,9 @@ async function updateCertificateTemplate(req, res) {
                 fields: Array.isArray(row.required_fields)
                     ? row.required_fields
                     : [],
-                proofRequirements: Array.isArray(row.proof_requirements)
-                    ? row.proof_requirements
-                    : [],
+                proofRequirements: normalizeProofRequirements(
+                    row.proof_requirements,
+                ),
                 residentGuidance:
                     row.resident_guidance &&
                     typeof row.resident_guidance === "object"
@@ -2023,12 +2087,15 @@ async function getManageRequests(req, res) {
                 to_jsonb(res)->>'address_city' AS resident_address_city,
                 to_jsonb(res)->>'address_province' AS resident_address_province,
                 ct.template_key,
-                COALESCE(ct.has_fee, false) AS has_fee
+                COALESCE(ct.has_fee, false) AS has_fee,
+                COALESCE(ct.proof_requirements, '[]'::jsonb) AS proof_requirements
              FROM requests r
              LEFT JOIN residents res
                ON res.resident_id = r.resident_id
              LEFT JOIN LATERAL (
-                SELECT template_key, has_fee
+                SELECT template_key,
+                       has_fee,
+                       COALESCE(to_jsonb(ct)->'proof_requirements', '[]'::jsonb) AS proof_requirements
                 FROM certificate_templates ct
                 WHERE ct.template_id = r.template_id
                    OR (r.template_id IS NULL AND ct.name = r.cert_type)
@@ -2077,7 +2144,9 @@ async function getManageRequests(req, res) {
         const rowsWithAttachments = await appendRequestAttachments(
             dataResult.rows,
         );
-        const rows = await appendCorrectionHistory(rowsWithAttachments);
+        const rowsWithProofSummaries =
+            appendRequestProofSummaries(rowsWithAttachments);
+        const rows = await appendCorrectionHistory(rowsWithProofSummaries);
         return res.json({
             data: rows,
             total,
