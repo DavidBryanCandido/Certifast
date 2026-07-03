@@ -114,8 +114,11 @@ Stores election or administration periods. Only one term is active at a time.
 | 4 | ends_on | date | YES |  |
 | 5 | is_active | boolean | NO | false |
 | 6 | notes | text | YES |  |
-| 7 | created_at | timestamp without time zone | NO | now() |
-| 8 | updated_at | timestamp without time zone | NO | now() |
+| 7 | archived_at | timestamp without time zone | YES |  |
+| 8 | archived_by | integer | YES |  |
+| 9 | archive_reason | text | YES |  |
+| 10 | created_at | timestamp without time zone | NO | now() |
+| 11 | updated_at | timestamp without time zone | NO | now() |
 
 ## public.barangay_positions
 

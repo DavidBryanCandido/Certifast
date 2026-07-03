@@ -39,8 +39,10 @@ async function createAuditLog({
                 ipAddress || null,
             ],
         );
+        return true;
     } catch (err) {
         console.error("createAuditLog error:", err);
+        return false;
     }
 }
 

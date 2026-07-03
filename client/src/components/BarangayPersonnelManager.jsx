@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertTriangle,
+    Archive,
     CalendarPlus,
     CheckCircle2,
+    ChevronDown,
+    ChevronUp,
     Pencil,
     Plus,
+    RotateCcw,
     Save,
     ShieldCheck,
     UserRound,
@@ -300,10 +304,12 @@ function PersonnelConfirmModal({
     );
 }
 
-export default function BarangayPersonnelManager({ onRosterChange }) {
+export default function BarangayPersonnelManager({ admin, onRosterChange }) {
     const assignmentFormRef = useRef(null);
     const assignmentBaselineRef = useRef("");
     const termBaselineRef = useRef("");
+    const isSuperadmin =
+        String(admin?.role || "").trim().toLowerCase() === "superadmin";
     const [data, setData] = useState({
         terms: [],
         positions: [],
@@ -321,22 +327,27 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
     const [showTermForm, setShowTermForm] = useState(false);
+    const [showArchivedTerms, setShowArchivedTerms] = useState(false);
+    const [readinessExpanded, setReadinessExpanded] = useState(false);
     const [confirmation, setConfirmation] = useState(null);
     const [termForm, setTermForm] = useState({
         termName: "",
         startsOn: "",
         endsOn: "",
         notes: "",
-        copyCurrentRoster: false,
-        isActive: true,
+        copyCurrentRoster: true,
+        isActive: false,
     });
 
     const load = useCallback(
-        async (termId = null) => {
+        async (termId = null, includeArchived = showArchivedTerms) => {
             setLoading(true);
             setError("");
             try {
-                const next = await personnelService.getPersonnelRoster(termId);
+                const next = await personnelService.getPersonnelRoster({
+                    termId,
+                    includeArchived,
+                });
                 setData(next);
                 setSelectedTermId(String(next.selectedTermId || ""));
                 onRosterChange?.(next);
@@ -350,7 +361,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                 setLoading(false);
             }
         },
-        [onRosterChange],
+        [onRosterChange, showArchivedTerms],
     );
 
     useEffect(() => {
@@ -384,6 +395,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
             ) || null,
         [data.terms, selectedTermId],
     );
+    const selectedTermIsArchived = Boolean(selectedTerm?.archivedAt);
 
     const activeTerm = useMemo(
         () =>
@@ -393,6 +405,51 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
             ) || null,
         [data.activeTermId, data.terms],
     );
+
+    const turnoverReadiness = useMemo(() => {
+        const effectiveAssignments = data.assignments.filter(
+            (assignment) =>
+                assignment.isActive !== false && assignment.isCurrentEffective,
+        );
+        const captain = effectiveAssignments.find(
+            (assignment) => assignment.positionCode === "punong_barangay",
+        );
+        const kagawads = effectiveAssignments.filter(
+            (assignment) => assignment.positionCode === "barangay_kagawad",
+        );
+        const signatoryCount = effectiveAssignments.filter(
+            (assignment) => assignment.signatoryEligible,
+        ).length;
+        const inactiveTerms = data.terms.filter(
+            (term) => !term.isActive && !term.archivedAt,
+        );
+        const archivedTerms = data.terms.filter((term) => term.archivedAt);
+
+        return {
+            hasCaptain: Boolean(captain),
+            captainName: captain?.displayName || "",
+            kagawadCount: kagawads.length,
+            signatoryCount,
+            inactiveTermCount: inactiveTerms.length,
+            archivedTermCount: archivedTerms.length,
+            selectedTermIsActive:
+                selectedTerm &&
+                String(selectedTerm.termId) === String(data.activeTermId),
+        };
+    }, [data.activeTermId, data.assignments, data.terms, selectedTerm]);
+
+    const readinessTitle = turnoverReadiness.selectedTermIsActive
+        ? "Active Term Readiness"
+        : "Draft Term Readiness";
+    const readinessDescription = turnoverReadiness.selectedTermIsActive
+        ? "Current activation checks for the active administration term."
+        : selectedTermIsArchived
+          ? "This archived draft is hidden from normal term lists until restored."
+          : "This checks the selected draft/future term. Active certificates are not affected yet.";
+
+    useEffect(() => {
+        setReadinessExpanded(!turnoverReadiness.hasCaptain);
+    }, [selectedTermId, turnoverReadiness.hasCaptain]);
 
     const closeConfirmation = useCallback(() => {
         if (!saving) setConfirmation(null);
@@ -609,8 +666,8 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                 startsOn: "",
                 endsOn: "",
                 notes: "",
-                copyCurrentRoster: false,
-                isActive: true,
+                copyCurrentRoster: true,
+                isActive: false,
             });
             setMessage("New administration term created.");
             await load(result.termId);
@@ -689,6 +746,10 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
     const performActivateSelectedTerm = async () => {
         if (!selectedTermId || String(data.activeTermId) === selectedTermId)
             return;
+        if (selectedTermIsArchived) {
+            setError("Restore this administration term before activating it.");
+            return;
+        }
         setSaving(true);
         setError("");
         try {
@@ -708,6 +769,16 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
     const requestActivateSelectedTerm = () => {
         if (!selectedTermId || String(data.activeTermId) === selectedTermId)
             return;
+        if (selectedTermIsArchived) {
+            setError("Restore this administration term before activating it.");
+            return;
+        }
+        if (!turnoverReadiness.hasCaptain) {
+            setError(
+                "Add an active Punong Barangay before activating this administration term.",
+            );
+            return;
+        }
         setConfirmation({
             type: "activate-term",
             tone: "danger",
@@ -718,10 +789,85 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                 `Current active term: ${activeTerm?.termName || "None"}`,
                 `New active term: ${selectedTerm?.termName || "Selected term"}`,
                 `Assignments in new term: ${data.assignments.length}`,
+                `Active Kagawads: ${turnoverReadiness.kagawadCount}`,
             ],
             warning:
-                "Certificate signatory choices and the current personnel roster will immediately use the selected term. Historical records will remain available.",
+                turnoverReadiness.kagawadCount < 7
+                    ? "This term has fewer than 7 active Kagawads. Activation is allowed, but review the roster before turnover if the barangay wants the full council reflected."
+                    : "Certificate signatory choices and the current personnel roster will immediately use the selected term. Historical records will remain available.",
             confirmLabel: "Make Term Active",
+        });
+    };
+
+    const performArchiveSelectedTerm = async () => {
+        if (!selectedTerm || selectedTerm.isActive || !isSuperadmin) return;
+        setSaving(true);
+        setError("");
+        try {
+            await personnelService.archivePersonnelTerm(
+                selectedTerm.termId,
+                "Archived from Personnel & Terms cleanup",
+            );
+            setMessage("Administration term archived.");
+            setShowArchivedTerms(false);
+            await load(data.activeTermId || null, false);
+        } catch (err) {
+            setError(
+                err?.response?.data?.message ||
+                    "Failed to archive administration term.",
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const performRestoreSelectedTerm = async () => {
+        if (!selectedTerm || !selectedTerm.archivedAt || !isSuperadmin) return;
+        setSaving(true);
+        setError("");
+        try {
+            await personnelService.restorePersonnelTerm(selectedTerm.termId);
+            setMessage("Administration term restored.");
+            setShowArchivedTerms(true);
+            await load(selectedTerm.termId, true);
+        } catch (err) {
+            setError(
+                err?.response?.data?.message ||
+                    "Failed to restore administration term.",
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const requestArchiveSelectedTerm = () => {
+        if (!selectedTerm || selectedTerm.isActive || !isSuperadmin) return;
+        setConfirmation({
+            type: "archive-term",
+            tone: "danger",
+            title: "Archive Administration Term?",
+            message:
+                "This hides the selected draft/test term from the normal term list without deleting assignments or history.",
+            details: [
+                `Term: ${selectedTerm.termName}`,
+                `Assignments in this term: ${data.assignments.length}`,
+            ],
+            warning:
+                "Archived terms cannot be activated until a superadmin restores them.",
+            confirmLabel: "Archive Term",
+        });
+    };
+
+    const requestRestoreSelectedTerm = () => {
+        if (!selectedTerm || !selectedTerm.archivedAt || !isSuperadmin) return;
+        setConfirmation({
+            type: "restore-term",
+            tone: "warning",
+            title: "Restore Administration Term?",
+            message:
+                "This returns the archived term to the normal term list so it can be reviewed or activated later.",
+            details: [`Term: ${selectedTerm.termName}`],
+            confirmLabel: "Restore Term",
         });
     };
 
@@ -736,6 +882,10 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
             await performSaveTerm();
         } else if (pending.type === "activate-term") {
             await performActivateSelectedTerm();
+        } else if (pending.type === "archive-term") {
+            await performArchiveSelectedTerm();
+        } else if (pending.type === "restore-term") {
+            await performRestoreSelectedTerm();
         } else if (pending.type === "discard-personnel-form") {
             setShowForm(false);
         } else if (pending.type === "discard-term-form") {
@@ -746,6 +896,44 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
             showEditForm(pending.assignment);
         }
     };
+
+    const readinessCards = [
+        {
+            label: "Active Term",
+            value: activeTerm?.termName || "None",
+            tone: activeTerm ? "good" : "warn",
+        },
+        {
+            label: "Draft/Future Terms",
+            value: turnoverReadiness.inactiveTermCount,
+            tone: turnoverReadiness.inactiveTermCount > 0 ? "good" : "muted",
+        },
+        {
+            label: "Punong Barangay",
+            value: turnoverReadiness.hasCaptain
+                ? turnoverReadiness.captainName
+                : "Missing",
+            tone: turnoverReadiness.hasCaptain ? "good" : "danger",
+        },
+        {
+            label: "Active Kagawads",
+            value: `${turnoverReadiness.kagawadCount}/7`,
+            tone: turnoverReadiness.kagawadCount >= 7 ? "good" : "warn",
+        },
+        {
+            label: "Signatory Ready",
+            value:
+                turnoverReadiness.hasCaptain &&
+                turnoverReadiness.signatoryCount > 0
+                    ? `${turnoverReadiness.signatoryCount} eligible`
+                    : "Needs review",
+            tone:
+                turnoverReadiness.hasCaptain &&
+                turnoverReadiness.signatoryCount > 0
+                    ? "good"
+                    : "warn",
+        },
+    ];
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -767,6 +955,30 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {isSuperadmin && (
+                            <label
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    padding: "8px 10px",
+                                    border: "1px solid #e4dfd4",
+                                    borderRadius: 5,
+                                    color: "#4a465a",
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={showArchivedTerms}
+                                    onChange={(event) =>
+                                        setShowArchivedTerms(event.target.checked)
+                                    }
+                                />
+                                Show archived
+                            </label>
+                        )}
                         <button
                             type="button"
                             className="st-btn-cancel"
@@ -788,7 +1000,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                         style={{
                             display: "grid",
                             gridTemplateColumns:
-                                "minmax(220px, 1fr) auto auto",
+                                "minmax(220px, 1fr) auto auto auto",
                             gap: 10,
                             alignItems: "end",
                         }}
@@ -809,6 +1021,7 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                                         value={term.termId}
                                     >
                                         {term.termName}
+                                        {term.archivedAt ? " - Archived" : ""}
                                         {term.isActive ? " — Active" : ""}
                                     </option>
                                 ))}
@@ -820,7 +1033,8 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                             disabled={
                                 saving ||
                                 !selectedTermId ||
-                                String(data.activeTermId) === selectedTermId
+                                String(data.activeTermId) === selectedTermId ||
+                                selectedTermIsArchived
                             }
                             onClick={requestActivateSelectedTerm}
                         >
@@ -829,6 +1043,28 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                                 ? "Active Term"
                                 : "Make Active"}
                         </button>
+                        {isSuperadmin && selectedTerm && !selectedTerm.isActive && (
+                            <button
+                                type="button"
+                                className="st-btn-cancel"
+                                disabled={saving}
+                                onClick={
+                                    selectedTerm.archivedAt
+                                        ? requestRestoreSelectedTerm
+                                        : requestArchiveSelectedTerm
+                                }
+                            >
+                                {selectedTerm.archivedAt ? (
+                                    <>
+                                        <RotateCcw size={13} /> Restore
+                                    </>
+                                ) : (
+                                    <>
+                                        <Archive size={13} /> Archive
+                                    </>
+                                )}
+                            </button>
+                        )}
                         <div
                             style={{
                                 border: "1px solid #d6e8dc",
@@ -845,6 +1081,166 @@ export default function BarangayPersonnelManager({ onRosterChange }) {
                             Kagawads
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div className="st-panel">
+                <div className="st-panel-header">
+                    <div>
+                        <div className="st-panel-title">
+                            {readinessTitle}
+                        </div>
+                        <div className="st-panel-desc">
+                            {readinessDescription}
+                        </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {turnoverReadiness.hasCaptain ? (
+                            <ShieldCheck size={18} color="#1a6a42" />
+                        ) : (
+                            <AlertTriangle size={18} color="#9a6810" />
+                        )}
+                        <button
+                            type="button"
+                            className="st-btn-cancel"
+                            onClick={() =>
+                                setReadinessExpanded((current) => !current)
+                            }
+                        >
+                            {readinessExpanded ? (
+                                <>
+                                    <ChevronUp size={13} /> Hide
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown size={13} /> Details
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+                <div className="st-panel-body">
+                    <div
+                        style={{
+                            border: turnoverReadiness.hasCaptain
+                                ? "1px solid #b9dec8"
+                                : "1px solid #ebd18b",
+                            background: turnoverReadiness.hasCaptain
+                                ? "#e8f5ee"
+                                : "#fff8e6",
+                            color: turnoverReadiness.hasCaptain
+                                ? "#1a6a42"
+                                : "#805b0e",
+                            borderRadius: 7,
+                            padding: "11px 12px",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            lineHeight: 1.45,
+                        }}
+                    >
+                        {selectedTerm?.termName || "Selected term"}:{" "}
+                        {turnoverReadiness.hasCaptain
+                            ? "Punong Barangay present"
+                            : "Missing Punong Barangay"}{" "}
+                        - {turnoverReadiness.kagawadCount}/7 active Kagawads -{" "}
+                        {turnoverReadiness.signatoryCount} signatory eligible
+                    </div>
+                    {readinessExpanded && (
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                    "repeat(auto-fit, minmax(170px, 1fr))",
+                                gap: 10,
+                                marginTop: 12,
+                            }}
+                        >
+                            {readinessCards.map((item) => {
+                                const palette =
+                                    item.tone === "danger"
+                                        ? {
+                                              bg: "#fff0f0",
+                                              border: "#e5b2b2",
+                                              color: "#8f2f2f",
+                                          }
+                                        : item.tone === "warn"
+                                          ? {
+                                                bg: "#fff8e6",
+                                                border: "#ebd18b",
+                                                color: "#805b0e",
+                                            }
+                                          : item.tone === "muted"
+                                            ? {
+                                                  bg: "#f7f5f0",
+                                                  border: "#e4dfd4",
+                                                  color: "#6b6678",
+                                              }
+                                            : {
+                                                  bg: "#e8f5ee",
+                                                  border: "#b9dec8",
+                                                  color: "#1a6a42",
+                                              };
+                                return (
+                                    <div
+                                        key={item.label}
+                                        style={{
+                                            border: `1px solid ${palette.border}`,
+                                            background: palette.bg,
+                                            borderRadius: 7,
+                                            padding: "11px 12px",
+                                            minHeight: 72,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: 10,
+                                                color: "#6b6678",
+                                                textTransform: "uppercase",
+                                                letterSpacing: 0.6,
+                                                fontWeight: 800,
+                                                marginBottom: 6,
+                                            }}
+                                        >
+                                            {item.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                color: palette.color,
+                                                fontSize: 13,
+                                                lineHeight: 1.35,
+                                                fontWeight: 800,
+                                                wordBreak: "break-word",
+                                            }}
+                                        >
+                                            {item.value}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    {!turnoverReadiness.selectedTermIsActive && selectedTerm && (
+                        <div
+                            style={{
+                                marginTop: 12,
+                                padding: "10px 12px",
+                                borderRadius: 6,
+                                border: "1px solid #e4dfd4",
+                                background: "#f8f6f1",
+                                color: "#4a465a",
+                                fontSize: 11.5,
+                                lineHeight: 1.45,
+                            }}
+                        >
+                            {selectedTermIsArchived
+                                ? "Viewing archived term: "
+                                : "Viewing draft/future term: "}
+                            <strong>{selectedTerm.termName}</strong>
+                            {selectedTermIsArchived
+                                ? ". Restore it before activation or roster preparation."
+                                : ". Active certificates are not affected until this term is made active."}
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -9,6 +9,8 @@ const {
     updatePersonnelAssignment,
     createPersonnelTerm,
     activatePersonnelTerm,
+    archivePersonnelTerm,
+    restorePersonnelTerm,
     saveRequestSignatories,
 } = require("../controllers/personnelController");
 const {
@@ -83,5 +85,7 @@ router.post("/personnel", adminAuth, createPersonnelAssignment);
 router.put("/personnel/:id", adminAuth, updatePersonnelAssignment);
 router.post("/personnel/terms", adminAuth, createPersonnelTerm);
 router.put("/personnel/terms/:id/activate", adminAuth, activatePersonnelTerm);
+router.put("/personnel/terms/:id/archive", adminAuth, archivePersonnelTerm);
+router.put("/personnel/terms/:id/restore", adminAuth, restorePersonnelTerm);
 
 module.exports = router;

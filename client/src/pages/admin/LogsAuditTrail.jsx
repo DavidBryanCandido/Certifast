@@ -82,6 +82,7 @@ if (!document.head.querySelector("[data-cf-logs]")) {
     .lg-badge.request  { background:#e8f5ee; color:#1a7a4a; }
     .lg-badge.walkin   { background:#f0ebff; color:#6a3db8; }
     .lg-badge.qrscan   { background:#fff3e0; color:#b86800; }
+    .lg-badge.report   { background:#e6f5f7; color:#2a7a8a; }
     .lg-badge.settings { background:#fdecea; color:#b02020; }
     .lg-badge.password { background:#fce4ec; color:#880e4f; }
     .lg-badge.profile  { background:#e8f4fd; color:#01579b; }
@@ -370,6 +371,7 @@ const TYPE_CONFIG = {
     request: { label: "Request" },
     walkin: { label: "Walk-in" },
     qrscan: { label: "QR Scan" },
+    report: { label: "Report" },
     settings: { label: "Settings" },
     password: { label: "Password" },
     profile: { label: "Profile" },
@@ -391,8 +393,20 @@ function mapLogRow(row) {
               hour: "2-digit",
               minute: "2-digit",
               second: "2-digit",
-          })
+        })
         : "-";
+
+    let description = row.description || row.action_type || "System activity";
+    if (row.type === "report" || row.action_type === "report_export") {
+        try {
+            const payload = JSON.parse(row.description || "{}");
+            if (payload?.type) {
+                description = `Exported ${payload.type}${payload.format ? ` as ${payload.format}` : ""}${payload.period ? ` (${payload.period})` : ""}`;
+            }
+        } catch {
+            description = row.description || "Generated report export";
+        }
+    }
 
     return {
         rawId: row.log_id,
@@ -402,7 +416,7 @@ function mapLogRow(row) {
         type: row.type || "request",
         actor: row.actor_name || "System",
         role: row.actor_role || "System",
-        desc: row.description || row.action_type || "System activity",
+        desc: description,
         meta:
             row.target_table && row.target_id
                 ? `${row.target_table} · #${row.target_id}`
@@ -1186,6 +1200,7 @@ export default function LogsAuditTrail({
                             </option>
                             <option value="walkin">Walk-in Issuance</option>
                             <option value="qrscan">QR Scan</option>
+                            <option value="report">Report Export</option>
                             <option value="settings">Settings Change</option>
                             <option value="password">Password Change</option>
                             <option value="profile">Profile Update</option>

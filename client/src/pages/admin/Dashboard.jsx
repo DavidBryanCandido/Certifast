@@ -107,6 +107,14 @@ const REPORT_TYPES = [
         accent: "#b86800",
         bg: "#fff3e0",
     },
+    {
+        key: "turnover_handover",
+        label: "Turnover Handover",
+        desc: "Roster, access, pending requests, and audit inventory.",
+        icon: UserCog,
+        accent: "#2a7a8a",
+        bg: "#e6f5f7",
+    },
 ];
 const REPORT_FORMATS = [
     {
@@ -138,7 +146,7 @@ const REPORT_PERIODS = [
     { key: "all", label: "All Time" },
 ];
 
-function buildCsvRows(data, type) {
+function _legacyBuildCsvRows(data, type) {
     if (!data) return [["No data available"]];
     switch (type) {
         case "requests_summary": {
@@ -175,7 +183,7 @@ function buildCsvRows(data, type) {
             return [["Report"], [type]];
     }
 }
-function buildPrintHtml(data, type, periodLabel, admin) {
+function _legacyBuildPrintHtml(data, type, periodLabel, admin) {
     const typeDef = REPORT_TYPES.find((t) => t.key === type);
     const now = new Date().toLocaleDateString("en-US", {
         year: "numeric",
@@ -215,6 +223,119 @@ th:last-child,td:last-child{text-align:right;}
 <div class="ftr"><span>CertiFast v1.0 · Barangay East Tapinac · Olongapo City</span><span>Generated ${now}</span></div>
 </body></html>`;
 }
+
+function buildCsvRows(data) {
+    if (!data) return [["No data available"]];
+
+    const output = [
+        ["Report", data.label || data.type || "Report"],
+        ["Period", data.periodLabel || data.period || ""],
+        ["Generated", data.generatedAt || ""],
+        [],
+    ];
+
+    const appendTable = (title, columns = [], rows = []) => {
+        if (title) output.push([title]);
+        output.push(columns.map((column) => column.label || column.key));
+        if (rows.length === 0) {
+            output.push(["No records"]);
+        } else {
+            rows.forEach((row) => {
+                output.push(columns.map((column) => row?.[column.key] ?? ""));
+            });
+        }
+        output.push([]);
+    };
+
+    if (Array.isArray(data.sections) && data.sections.length > 0) {
+        data.sections.forEach((section) =>
+            appendTable(section.title, section.columns || [], section.rows || []),
+        );
+        return output;
+    }
+
+    appendTable("", data.columns || [], data.rows || []);
+    return output;
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function buildHtmlTable(columns = [], rows = []) {
+    const headers = columns
+        .map((column) => `<th>${escapeHtml(column.label || column.key)}</th>`)
+        .join("");
+    const body = rows.length
+        ? rows
+              .map(
+                  (row) =>
+                      `<tr>${columns
+                          .map(
+                              (column) =>
+                                  `<td>${escapeHtml(row?.[column.key] ?? "")}</td>`,
+                          )
+                          .join("")}</tr>`,
+              )
+              .join("")
+        : `<tr><td colspan="${Math.max(columns.length, 1)}">No records</td></tr>`;
+
+    return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function buildPrintHtml(data, type, periodLabel, admin) {
+    const typeDef = REPORT_TYPES.find((item) => item.key === type);
+    const now = new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+    const adminName = admin?.name || "Administrator";
+    const reportTitle = data?.label || typeDef?.label || type;
+    const sections =
+        Array.isArray(data?.sections) && data.sections.length > 0
+            ? data.sections
+            : [
+                  {
+                      title: reportTitle,
+                      columns: data?.columns || [],
+                      rows: data?.rows || [],
+                  },
+              ];
+    const sectionHtml = sections
+        .map(
+            (section) => `
+                <h3>${escapeHtml(section.title || reportTitle)}</h3>
+                ${buildHtmlTable(section.columns || [], section.rows || [])}
+            `,
+        )
+        .join("");
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(reportTitle)} - Barangay East Tapinac</title>
+<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:'Source Serif 4',Georgia,serif;color:#1a1a2e;padding:32px;max-width:900px;margin:0 auto;}
+@media print{body{padding:16px;}@page{margin:15mm;}}
+.hdr{text-align:center;padding-bottom:18px;margin-bottom:18px;border-bottom:2px solid var(--color-accent, #c9a227);}
+h1{font-size:22px;color:var(--color-primary, #0e2554);margin-bottom:4px;}
+h3{font-size:15px;color:var(--color-primary, #0e2554);margin:18px 0 12px;}
+.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px;font-size:11.5px;color:#4a4a6a;padding:10px 14px;background:#f8f6f1;border-radius:4px;}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+th{font-size:10px;font-weight:700;color:#9090aa;text-transform:uppercase;letter-spacing:1px;padding:9px 14px;background:#f8f6f1;border-bottom:1px solid #e4dfd4;text-align:left;}
+td{padding:8px 14px;border-bottom:1px solid #f0ece4;font-size:11.5px;vertical-align:top;}
+.ftr{margin-top:32px;padding-top:14px;border-top:1px solid #e4dfd4;display:flex;justify-content:space-between;font-size:10.5px;color:#9090aa;}
+</style></head><body>
+<div class="hdr"><div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#9090aa;margin-bottom:4px;">Republic of the Philippines</div>
+<h1>Barangay East Tapinac</h1><p style="font-size:11px;color:#9090aa;">City of Olongapo, Zambales - CertiFast Certificate Management System</p></div>
+<div class="meta"><span><strong>Report:</strong> ${escapeHtml(reportTitle)}</span><span><strong>Period:</strong> ${escapeHtml(periodLabel)}</span><span><strong>Generated:</strong> ${escapeHtml(now)} by ${escapeHtml(adminName)}</span></div>
+${sectionHtml}
+<div class="ftr"><span>CertiFast v1.0 - Barangay East Tapinac - Olongapo City</span><span>Generated ${escapeHtml(now)}</span></div>
+</body></html>`;
+}
+
 function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2262,17 +2383,24 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     const handleGenerate = async () => {
         setReportGenerating(true);
         try {
-            const result = await reportsService.getOverview(reportPeriod);
             const typeDef = REPORT_TYPES.find((t) => t.key === selectedType);
             const fmtDef = REPORT_FORMATS.find((f) => f.key === selectedFormat);
             const periodLbl =
                 REPORT_PERIODS.find((p) => p.key === reportPeriod)?.label ||
                 reportPeriod;
+            const formatLabel =
+                fmtDef?.label === "Excel" ? "Excel" : fmtDef?.label?.toUpperCase();
+            const result = await reportsService.generateReport({
+                type: selectedType,
+                period: reportPeriod,
+                format: formatLabel,
+            });
+            const reportData = result?.data;
             const ts = new Date().toISOString().slice(0, 10);
             const filename = `${(typeDef?.label || "report").replace(/\s+/g, "-")}_${ts}${fmtDef?.ext}`;
 
             if (selectedFormat === "csv") {
-                const rows = buildCsvRows(result?.data, selectedType);
+                const rows = buildCsvRows(reportData);
                 const csv = rows
                     .map((r) =>
                         r
@@ -2288,7 +2416,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                     filename,
                 );
             } else if (selectedFormat === "xlsx") {
-                const rows = buildCsvRows(result?.data, selectedType);
+                const rows = buildCsvRows(reportData);
                 const tsv = rows.map((r) => r.join("\t")).join("\n");
                 triggerDownload(
                     new Blob([tsv], {
@@ -2298,7 +2426,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                 );
             } else {
                 const html = buildPrintHtml(
-                    result?.data,
+                    reportData,
                     selectedType,
                     periodLbl,
                     admin,
@@ -2312,13 +2440,18 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                 }
             }
 
+            if (result?.logged !== true) {
+                await reportsService.logExport({
+                    type: typeDef?.label || selectedType,
+                    format: formatLabel,
+                    period: periodLbl,
+                });
+            }
+
             const newEntry = {
                 id: `EXP-${String(recentExports.length + 10).padStart(3, "0")}`,
                 type: typeDef?.label,
-                format:
-                    fmtDef?.label === "Excel"
-                        ? "Excel"
-                        : fmtDef?.label?.toUpperCase(),
+                format: formatLabel,
                 period: periodLbl,
                 size: "—",
                 generatedAt: new Date().toLocaleString("en-US", {
@@ -2332,13 +2465,15 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
             };
             setRecentExports((prev) => [newEntry, ...prev].slice(0, 20));
             setReportToast({
-                msg: `${typeDef?.label} exported as ${fmtDef?.label?.toUpperCase()}.`,
+                msg: `${typeDef?.label} exported as ${formatLabel}.`,
                 type: "success",
             });
             setTimeout(() => setReportToast(null), 3500);
-        } catch {
+        } catch (err) {
             setReportToast({
-                msg: "Export failed. Please try again.",
+                msg:
+                    err?.response?.data?.message ||
+                    "Export failed. Please try again.",
                 type: "error",
             });
             setTimeout(() => setReportToast(null), 3500);

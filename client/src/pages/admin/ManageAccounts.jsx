@@ -58,7 +58,7 @@ function useMAStyles() {
         el.innerText = `
         .ma-table-row {
             display: grid;
-            grid-template-columns: 2fr 1.2fr 100px 110px 130px 48px;
+            grid-template-columns: 2fr 1.2fr 100px 110px 130px 130px 48px;
             align-items: center;
             padding: 13px 24px;
             border-bottom: 1px solid #f0ece4;
@@ -69,7 +69,7 @@ function useMAStyles() {
         .ma-table-row:last-child { border-bottom: none; }
         .ma-table-header {
             display: grid;
-            grid-template-columns: 2fr 1.2fr 100px 110px 130px 48px;
+            grid-template-columns: 2fr 1.2fr 100px 110px 130px 130px 48px;
             align-items: center;
             padding: 9px 24px;
             background: #f8f6f1;
@@ -1865,6 +1865,18 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
         (r) => r.role === "superadmin",
     ).length;
     const staffCount = rows.filter((r) => r.role === "staff").length;
+    const activeSystemOwners = rows.filter(
+        (r) => r.role === "superadmin" && r.status === "active",
+    );
+    const readySystemOwners = activeSystemOwners.filter((r) =>
+        ["verified", "legacy"].includes(String(r.auth_status || "")),
+    );
+    const pendingVerificationCount = rows.filter(
+        (r) => r.auth_status === "pending_verification",
+    ).length;
+    const unknownAuthCount = rows.filter(
+        (r) => r.auth_status === "unknown",
+    ).length;
     const totalResidents = resRows.length;
 
     // ── Staff save handler ──
@@ -2027,6 +2039,28 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
         if (s === "pending_verification")
             return <span className="ma-badge-pending">Pending Review</span>;
         return <span className="ma-badge-inactive">{status}</span>;
+    };
+
+    const authBadge = (account) => {
+        const status = String(account?.auth_status || "legacy").toLowerCase();
+        if (status === "verified") {
+            return (
+                <span className="ma-badge-active">
+                    <CheckCircle size={10} /> Verified
+                </span>
+            );
+        }
+        if (status === "pending_verification") {
+            return <span className="ma-badge-pending">Verify Email</span>;
+        }
+        if (status === "unknown") {
+            return (
+                <span className="ma-badge-inactive">
+                    <AlertTriangle size={10} /> Unknown
+                </span>
+            );
+        }
+        return <span className="ma-badge-admin">Legacy</span>;
     };
 
     return (
@@ -2249,6 +2283,132 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                 background: "#fff",
                                 border: "1px solid #e4dfd4",
                                 borderRadius: 6,
+                                padding: "16px 18px",
+                                marginBottom: 18,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: 14,
+                                    alignItems: "flex-start",
+                                    flexWrap: "wrap",
+                                    marginBottom: 12,
+                                }}
+                            >
+                                <div>
+                                    <div
+                                        style={{
+                                            fontFamily:
+                                                "'Playfair Display',serif",
+                                            fontSize: 15,
+                                            fontWeight: 700,
+                                            color: "var(--color-primary, #0e2554)",
+                                        }}
+                                    >
+                                        Turnover Access Readiness
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontSize: 11.5,
+                                            color: "#6b6678",
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        System-owner access must be verified
+                                        before old accounts are deactivated.
+                                    </div>
+                                </div>
+                                {readySystemOwners.length > 0 ? (
+                                    <span className="ma-badge-active">
+                                        <CheckCircle size={10} /> Ready
+                                    </span>
+                                ) : (
+                                    <span className="ma-badge-pending">
+                                        Needs Verified Owner
+                                    </span>
+                                )}
+                            </div>
+                            <div
+                                style={{
+                                    display: "grid",
+                                    gridTemplateColumns:
+                                        "repeat(auto-fit, minmax(160px, 1fr))",
+                                    gap: 10,
+                                }}
+                            >
+                                {[
+                                    {
+                                        label: "Active System Owners",
+                                        value: activeSystemOwners.length,
+                                        color: "#6a3db8",
+                                    },
+                                    {
+                                        label: "Ready Owners",
+                                        value: readySystemOwners.length,
+                                        color:
+                                            readySystemOwners.length > 0
+                                                ? "#1a7a4a"
+                                                : "#b86800",
+                                    },
+                                    {
+                                        label: "Pending Email Verify",
+                                        value: pendingVerificationCount,
+                                        color: "#b86800",
+                                    },
+                                    {
+                                        label: "Unknown Auth",
+                                        value: unknownAuthCount,
+                                        color: "#9090aa",
+                                    },
+                                ].map((item) => (
+                                    <div
+                                        key={item.label}
+                                        style={{
+                                            border: "1px solid #e4dfd4",
+                                            borderRadius: 6,
+                                            background: "#f8f6f1",
+                                            padding: "10px 12px",
+                                            minHeight: 66,
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                fontSize: 10,
+                                                textTransform: "uppercase",
+                                                letterSpacing: 0.8,
+                                                color: "#9090aa",
+                                                fontWeight: 800,
+                                                marginBottom: 5,
+                                            }}
+                                        >
+                                            {item.label}
+                                        </div>
+                                        <div
+                                            style={{
+                                                color: item.color,
+                                                fontSize: 20,
+                                                fontFamily:
+                                                    "'Playfair Display',serif",
+                                                fontWeight: 700,
+                                                lineHeight: 1,
+                                            }}
+                                        >
+                                            {item.value}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {isSuperAdmin && activeTab === "staff" && (
+                        <div
+                            style={{
+                                background: "#fff",
+                                border: "1px solid #e4dfd4",
+                                borderRadius: 6,
                                 overflow: "hidden",
                             }}
                         >
@@ -2449,6 +2609,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                     "Username",
                                     "Role",
                                     "Status",
+                                    "Access",
                                     "Created",
                                     "Action",
                                 ].map((h) => (
@@ -2584,6 +2745,7 @@ export default function ManageAccounts({ admin, onNavigate, onLogout }) {
                                                         : "Inactive"}
                                                 </span>
                                             </div>
+                                            <div>{authBadge(row)}</div>
                                             <div
                                                 style={{
                                                     fontSize: 12,

@@ -12,8 +12,14 @@ function authConfig() {
     };
 }
 
-export async function getPersonnelRoster(termId = null) {
-    const params = termId ? { termId } : {};
+export async function getPersonnelRoster(options = null) {
+    const normalized =
+        options && typeof options === "object" && !Array.isArray(options)
+            ? options
+            : { termId: options };
+    const params = {};
+    if (normalized.termId) params.termId = normalized.termId;
+    if (normalized.includeArchived) params.includeArchived = true;
     const res = await axios.get(`${API}/admin/personnel`, {
         ...authConfig(),
         params,
@@ -51,6 +57,24 @@ export async function createPersonnelTerm(payload) {
 export async function activatePersonnelTerm(termId) {
     const res = await axios.put(
         `${API}/admin/personnel/terms/${termId}/activate`,
+        {},
+        authConfig(),
+    );
+    return res.data;
+}
+
+export async function archivePersonnelTerm(termId, reason = "") {
+    const res = await axios.put(
+        `${API}/admin/personnel/terms/${termId}/archive`,
+        { reason },
+        authConfig(),
+    );
+    return res.data;
+}
+
+export async function restorePersonnelTerm(termId) {
+    const res = await axios.put(
+        `${API}/admin/personnel/terms/${termId}/restore`,
         {},
         authConfig(),
     );

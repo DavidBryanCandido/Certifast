@@ -24,6 +24,15 @@ const reportsService = {
         return res.data;
     },
 
+    generateReport: async ({ type, period, format }) => {
+        const res = await axios.post(
+            `${API}/reports/generate`,
+            { type, period, format },
+            { headers: { Authorization: `Bearer ${getToken()}` } },
+        );
+        return res.data;
+    },
+
     logExport: async ({ type, format, period }) => {
         const res = await axios.post(
             `${API}/reports/exports`,

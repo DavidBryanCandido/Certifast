@@ -14,14 +14,47 @@ function ensureAdmin(req, res) {
     return true;
 }
 
+function ensureSuperadmin(req, res) {
+    if (req.admin?.role !== "superadmin") {
+        res.status(403).json({ message: "Superadmin access only" });
+        return false;
+    }
+    return true;
+}
+
 function parsePositiveInteger(value) {
     const parsed = Number.parseInt(value, 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseBoolean(value) {
+    return value === true || String(value || "").toLowerCase() === "true";
+}
+
 function parseOptionalDate(value) {
     const text = String(value || "").trim();
     return text || null;
+}
+
+function isPersonnelArchiveSchemaError(err) {
+    return err?.code === "42703" || /archived_at|archived_by|archive_reason/i.test(err?.message || "");
+}
+
+async function termHasActiveCaptain(client, termId) {
+    const captainCheck = await client.query(
+        `SELECT assignment.assignment_id
+         FROM barangay_personnel_assignments assignment
+         JOIN barangay_positions position
+           ON position.position_id = assignment.position_id
+         WHERE assignment.term_id = $1
+           AND assignment.is_active = true
+           AND position.position_code = 'punong_barangay'
+           AND (assignment.starts_on IS NULL OR assignment.starts_on <= CURRENT_DATE)
+           AND (assignment.ends_on IS NULL OR assignment.ends_on >= CURRENT_DATE)
+         LIMIT 1`,
+        [termId],
+    );
+    return captainCheck.rowCount > 0;
 }
 
 function mapAssignment(row) {
@@ -58,15 +91,36 @@ function mapAssignment(row) {
 
 async function getPersonnelRoster(req, res) {
     try {
+        const includeArchived = parseBoolean(req.query.includeArchived);
         const termsResult = await pool.query(
-            `SELECT term_id, term_name, starts_on, ends_on, is_active, notes
+            `SELECT
+                term_id,
+                term_name,
+                starts_on,
+                ends_on,
+                is_active,
+                notes,
+                to_jsonb(barangay_terms)->>'archived_at' AS archived_at,
+                to_jsonb(barangay_terms)->>'archived_by' AS archived_by,
+                to_jsonb(barangay_terms)->>'archive_reason' AS archive_reason
              FROM barangay_terms
-             ORDER BY is_active DESC, starts_on DESC NULLS LAST, term_id DESC`,
+             WHERE $1::boolean
+                OR to_jsonb(barangay_terms)->>'archived_at' IS NULL
+                OR is_active = true
+             ORDER BY
+                is_active DESC,
+                (to_jsonb(barangay_terms)->>'archived_at') IS NULL DESC,
+                starts_on DESC NULLS LAST,
+                term_id DESC`,
+            [includeArchived],
         );
         const requestedTermId = parsePositiveInteger(req.query.termId);
         const activeTerm = termsResult.rows.find((row) => row.is_active);
+        const requestedTerm = termsResult.rows.find(
+            (row) => Number(row.term_id) === Number(requestedTermId),
+        );
         const selectedTermId =
-            requestedTermId || activeTerm?.term_id || termsResult.rows[0]?.term_id;
+            requestedTerm?.term_id || activeTerm?.term_id || termsResult.rows[0]?.term_id;
 
         const [positionsResult, puroksResult, assignmentsResult] =
             await Promise.all([
@@ -171,6 +225,9 @@ async function getPersonnelRoster(req, res) {
                     endsOn: row.ends_on,
                     isActive: Boolean(row.is_active),
                     notes: row.notes || "",
+                    archivedAt: row.archived_at || null,
+                    archivedBy: row.archived_by || null,
+                    archiveReason: row.archive_reason || "",
                 })),
                 positions: positionsResult.rows.map((row) => ({
                     positionId: row.position_id,
@@ -482,17 +539,10 @@ async function createPersonnelTerm(req, res) {
             `SELECT term_id
              FROM barangay_terms
              WHERE is_active = true
+               AND to_jsonb(barangay_terms)->>'archived_at' IS NULL
              LIMIT 1`,
         );
-        const activate = body.isActive !== false;
-        if (activate) {
-            await client.query(
-                `UPDATE barangay_terms
-                 SET is_active = false,
-                     updated_at = now()
-                 WHERE is_active = true`,
-            );
-        }
+        const activate = body.isActive === true;
 
         const termResult = await client.query(
             `INSERT INTO barangay_terms (
@@ -508,7 +558,7 @@ async function createPersonnelTerm(req, res) {
                 termName,
                 parseOptionalDate(body.startsOn),
                 parseOptionalDate(body.endsOn),
-                activate,
+                false,
                 String(body.notes || "").trim() || null,
             ],
         );
@@ -546,6 +596,30 @@ async function createPersonnelTerm(req, res) {
                     parseOptionalDate(body.startsOn),
                     currentActiveResult.rows[0].term_id,
                 ],
+            );
+        }
+
+        if (activate) {
+            const hasCaptain = await termHasActiveCaptain(client, termId);
+            if (!hasCaptain) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    message:
+                        "Add an active Punong Barangay before activating this administration term.",
+                });
+            }
+            await client.query(
+                `UPDATE barangay_terms
+                 SET is_active = false,
+                     updated_at = now()
+                 WHERE is_active = true`,
+            );
+            await client.query(
+                `UPDATE barangay_terms
+                 SET is_active = true,
+                     updated_at = now()
+                 WHERE term_id = $1`,
+                [termId],
             );
         }
 
@@ -591,6 +665,37 @@ async function activatePersonnelTerm(req, res) {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
+        const termCheck = await client.query(
+            `SELECT
+                term_id,
+                term_name,
+                to_jsonb(barangay_terms)->>'archived_at' AS archived_at
+             FROM barangay_terms
+             WHERE term_id = $1
+             FOR UPDATE`,
+            [termId],
+        );
+        if (termCheck.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Term not found" });
+        }
+        if (termCheck.rows[0].archived_at) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message:
+                    "Restore this administration term before activating it.",
+            });
+        }
+
+        const hasCaptain = await termHasActiveCaptain(client, termId);
+        if (!hasCaptain) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message:
+                    "Add an active Punong Barangay before activating this administration term.",
+            });
+        }
+
         await client.query(
             `UPDATE barangay_terms
              SET is_active = false,
@@ -626,6 +731,157 @@ async function activatePersonnelTerm(req, res) {
     } catch (err) {
         await client.query("ROLLBACK");
         console.error("activatePersonnelTerm error:", err);
+        if (err?.code === "42P01" || err?.code === "42703") {
+            return res.status(503).json({
+                message:
+                    "Run database/barangay_personnel_management.sql in Supabase first",
+            });
+        }
+        return res.status(500).json({ message: "Server error" });
+    } finally {
+        client.release();
+    }
+}
+
+async function archivePersonnelTerm(req, res) {
+    if (!ensureSuperadmin(req, res)) return;
+
+    const termId = parsePositiveInteger(req.params.id);
+    if (!termId) {
+        return res.status(400).json({ message: "Invalid term ID" });
+    }
+
+    const reason = String(req.body?.reason || "").trim() || null;
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const termCheck = await client.query(
+            `SELECT term_id, term_name, is_active, archived_at
+             FROM barangay_terms
+             WHERE term_id = $1
+             FOR UPDATE`,
+            [termId],
+        );
+        if (termCheck.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Term not found" });
+        }
+
+        const term = termCheck.rows[0];
+        if (term.is_active) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message: "The active administration term cannot be archived.",
+            });
+        }
+        if (term.archived_at) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message: "This administration term is already archived.",
+            });
+        }
+
+        await client.query(
+            `UPDATE barangay_terms
+             SET archived_at = now(),
+                 archived_by = $2,
+                 archive_reason = $3,
+                 updated_at = now()
+             WHERE term_id = $1`,
+            [termId, req.admin.id || null, reason],
+        );
+        await client.query("COMMIT");
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "personnel_term_archive",
+            targetTable: "barangay_terms",
+            targetId: termId,
+            description: `Archived barangay administration term ${term.term_name}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({ message: "Administration term archived" });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("archivePersonnelTerm error:", err);
+        if (isPersonnelArchiveSchemaError(err)) {
+            return res.status(503).json({
+                message:
+                    "Run database/barangay_terms_archive.sql in Supabase first",
+            });
+        }
+        return res.status(500).json({ message: "Server error" });
+    } finally {
+        client.release();
+    }
+}
+
+async function restorePersonnelTerm(req, res) {
+    if (!ensureSuperadmin(req, res)) return;
+
+    const termId = parsePositiveInteger(req.params.id);
+    if (!termId) {
+        return res.status(400).json({ message: "Invalid term ID" });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const termCheck = await client.query(
+            `SELECT term_id, term_name, archived_at
+             FROM barangay_terms
+             WHERE term_id = $1
+             FOR UPDATE`,
+            [termId],
+        );
+        if (termCheck.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Term not found" });
+        }
+
+        const term = termCheck.rows[0];
+        if (!term.archived_at) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message: "This administration term is not archived.",
+            });
+        }
+
+        await client.query(
+            `UPDATE barangay_terms
+             SET archived_at = NULL,
+                 archived_by = NULL,
+                 archive_reason = NULL,
+                 updated_at = now()
+             WHERE term_id = $1`,
+            [termId],
+        );
+        await client.query("COMMIT");
+
+        await createAuditLog({
+            actorId: req.admin.id,
+            actorName: req.admin.username,
+            actorRole: req.admin.role,
+            actionType: "personnel_term_restore",
+            targetTable: "barangay_terms",
+            targetId: termId,
+            description: `Restored barangay administration term ${term.term_name}`,
+            ipAddress: req.ip,
+        });
+
+        return res.json({ message: "Administration term restored" });
+    } catch (err) {
+        await client.query("ROLLBACK");
+        console.error("restorePersonnelTerm error:", err);
+        if (isPersonnelArchiveSchemaError(err)) {
+            return res.status(503).json({
+                message:
+                    "Run database/barangay_terms_archive.sql in Supabase first",
+            });
+        }
         return res.status(500).json({ message: "Server error" });
     } finally {
         client.release();
@@ -688,5 +944,7 @@ module.exports = {
     updatePersonnelAssignment,
     createPersonnelTerm,
     activatePersonnelTerm,
+    archivePersonnelTerm,
+    restorePersonnelTerm,
     saveRequestSignatories,
 };

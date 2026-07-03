@@ -2469,6 +2469,7 @@ export default function Settings({ admin, onNavigate, onLogout }) {
 
                     {activeTab === "personnel" && (
                         <BarangayPersonnelManager
+                            admin={admin}
                             onRosterChange={setPersonnelRoster}
                         />
                     )}

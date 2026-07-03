@@ -21,6 +21,7 @@ import {
     AlertCircle,
     Loader2,
     ChevronRight,
+    ShieldCheck,
 } from "lucide-react";
 import {
     AdminSidebar,
@@ -160,6 +161,14 @@ const REPORT_TYPES = [
         accent: "#b86800",
         bg: "#fff3e0",
     },
+    {
+        key: "turnover_handover",
+        label: "Turnover Handover",
+        desc: "Administration, roster, access, pending requests, and audit inventory.",
+        icon: ShieldCheck,
+        accent: "#2a7a8a",
+        bg: "#e6f5f7",
+    },
 ];
 
 const FORMATS = [
@@ -238,32 +247,35 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
     const handleGenerate = async () => {
         setGenerating(true);
         try {
-            // Fetch report data from existing endpoint
-            const result = await reportsService.getOverview(selectedPeriod);
-
-            // Build filename
             const typeDef  = REPORT_TYPES.find(t => t.key === selectedType);
             const fmtDef   = FORMATS.find(f => f.key === selectedFormat);
             const periodLabel = PERIODS.find(p => p.key === selectedPeriod)?.label || selectedPeriod;
+            const formatLabel = fmtDef?.label === "Excel" ? "Excel" : fmtDef?.label?.toUpperCase();
+            const result = await reportsService.generateReport({
+                type: selectedType,
+                period: selectedPeriod,
+                format: formatLabel,
+            });
+            const reportData = result?.data;
             const now      = new Date();
             const stamp    = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}`;
             const filename = `${typeDef?.label?.replace(/\s+/g,"-").toLowerCase()}_${stamp}${fmtDef?.ext}`;
 
             if (selectedFormat === "csv") {
                 // ── CSV export ──
-                const rows = buildCsvRows(result?.data, selectedType);
+                const rows = buildCsvRows(reportData);
                 const csv  = rows.map(r => r.map(c => `"${String(c ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
                 const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
                 triggerDownload(blob, filename);
             } else if (selectedFormat === "xlsx") {
                 // ── Simple XLSX-like TSV download (tab-delimited) ──
-                const rows = buildCsvRows(result?.data, selectedType);
+                const rows = buildCsvRows(reportData);
                 const tsv  = rows.map(r => r.join("\t")).join("\n");
                 const blob = new Blob([tsv], { type: "application/vnd.ms-excel;charset=utf-8;" });
                 triggerDownload(blob, filename);
             } else {
                 // ── PDF: open print dialog with styled HTML ──
-                const html = buildPrintHtml(result?.data, selectedType, periodLabel, admin);
+                const html = buildPrintHtml(reportData, selectedType, periodLabel, admin);
                 const win  = window.open("", "_blank");
                 if (win) {
                     win.document.write(html);
@@ -273,21 +285,18 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
                 }
             }
 
-            // Log export server-side, then reflect it in local list immediately
-            try {
+            if (result?.logged !== true) {
                 await reportsService.logExport({
                     type: typeDef?.label || selectedType,
-                    format: fmtDef?.label === "Excel" ? "Excel" : fmtDef?.label?.toUpperCase(),
+                    format: formatLabel,
                     period: periodLabel,
                 });
-            } catch {
-                // Keep UI non-blocking if audit log insert fails
             }
 
             const newEntry = {
                 id: `EXP-${String(recentExports.length + 10).padStart(3,"0")}`,
                 type: typeDef?.label,
-                format: fmtDef?.label === "Excel" ? "Excel" : fmtDef?.label?.toUpperCase(),
+                format: formatLabel,
                 period: periodLabel,
                 size: "—",
                 generatedAt: new Date().toLocaleString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"2-digit", minute:"2-digit" }),
@@ -295,10 +304,13 @@ export default function Reports({ admin, onLogout, onNavigate: navProp }) {
             };
             setRecentExports(prev => [newEntry, ...prev].slice(0, 20));
 
-            showToast(`${typeDef?.label} exported as ${fmtDef?.label?.toUpperCase()}.`, "success");
+            showToast(`${typeDef?.label} exported as ${formatLabel}.`, "success");
         } catch (err) {
             console.error("Generate error:", err);
-            showToast("Export failed. Please try again.", "error");
+            showToast(
+                err?.response?.data?.message || "Export failed. Please try again.",
+                "error",
+            );
         } finally {
             setGenerating(false);
         }
@@ -555,7 +567,7 @@ const td = {
 // =============================================================
 // CSV row builder
 // =============================================================
-function buildCsvRows(data, type) {
+function _legacyBuildCsvRows(data, type) {
     if (!data) return [["No data available"]];
 
     switch (type) {
@@ -582,7 +594,7 @@ function buildCsvRows(data, type) {
 // =============================================================
 // Print HTML builder (for PDF)
 // =============================================================
-function buildPrintHtml(data, type, periodLabel, admin) {
+function _legacyBuildPrintHtml(data, type, periodLabel, admin) {
     const typeDef  = REPORT_TYPES.find(t => t.key === type);
     const now      = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
     const adminName = admin?.name || "Administrator";
@@ -650,6 +662,139 @@ function buildPrintHtml(data, type, periodLabel, admin) {
     <div class="footer">
         <span>CertiFast v1.0 &nbsp;·&nbsp; Barangay East Tapinac &nbsp;·&nbsp; Olongapo City</span>
         <span>Generated ${now}</span>
+    </div>
+</body>
+</html>`;
+}
+
+function buildCsvRows(data) {
+    if (!data) return [["No data available"]];
+
+    const output = [
+        ["Report", data.label || data.type || "Report"],
+        ["Period", data.periodLabel || data.period || ""],
+        ["Generated", data.generatedAt || ""],
+        [],
+    ];
+
+    const appendTable = (title, columns = [], rows = []) => {
+        if (title) output.push([title]);
+        output.push(columns.map((column) => column.label || column.key));
+        if (rows.length === 0) {
+            output.push(["No records"]);
+        } else {
+            rows.forEach((row) => {
+                output.push(columns.map((column) => row?.[column.key] ?? ""));
+            });
+        }
+        output.push([]);
+    };
+
+    if (Array.isArray(data.sections) && data.sections.length > 0) {
+        data.sections.forEach((section) =>
+            appendTable(section.title, section.columns || [], section.rows || []),
+        );
+        return output;
+    }
+
+    appendTable("", data.columns || [], data.rows || []);
+    return output;
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function buildHtmlTable(columns = [], rows = []) {
+    const headers = columns
+        .map((column) => `<th>${escapeHtml(column.label || column.key)}</th>`)
+        .join("");
+    const body = rows.length
+        ? rows
+              .map(
+                  (row) =>
+                      `<tr>${columns
+                          .map(
+                              (column) =>
+                                  `<td>${escapeHtml(row?.[column.key] ?? "")}</td>`,
+                          )
+                          .join("")}</tr>`,
+              )
+              .join("")
+        : `<tr><td colspan="${Math.max(columns.length, 1)}">No records</td></tr>`;
+
+    return `<table><thead><tr>${headers}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function buildPrintHtml(data, type, periodLabel, admin) {
+    const typeDef = REPORT_TYPES.find((item) => item.key === type);
+    const now = new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+    const adminName = admin?.name || "Administrator";
+    const reportTitle = data?.label || typeDef?.label || type;
+    const sections =
+        Array.isArray(data?.sections) && data.sections.length > 0
+            ? data.sections
+            : [
+                  {
+                      title: reportTitle,
+                      columns: data?.columns || [],
+                      rows: data?.rows || [],
+                  },
+              ];
+    const sectionHtml = sections
+        .map(
+            (section) => `
+                <h3>${escapeHtml(section.title || reportTitle)}</h3>
+                ${buildHtmlTable(section.columns || [], section.rows || [])}
+            `,
+        )
+        .join("");
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(reportTitle)} - Barangay East Tapinac</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Serif+4:wght@400;600&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Source Serif 4',serif; color:#1a1a2e; background:#fff; padding:32px; max-width:900px; margin:0 auto; }
+    @media print { body { padding:16px; } @page { margin:15mm; } }
+    .header { text-align:center; padding-bottom:18px; margin-bottom:18px; border-bottom:2px solid var(--color-accent, #c9a227); }
+    .header h1 { font-family:'Playfair Display',serif; font-size:22px; color:var(--color-primary, #0e2554); margin-bottom:4px; }
+    .header p  { font-size:11px; color:#9090aa; }
+    .meta { display:flex; justify-content:space-between; gap:12px; margin-bottom:22px; font-size:11.5px; color:#4a4a6a; padding:10px 14px; background:#f8f6f1; border-radius:4px; flex-wrap:wrap; }
+    h3 { font-family:'Playfair Display',serif; font-size:15px; color:var(--color-primary, #0e2554); margin:18px 0 12px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:20px; }
+    th { font-size:10px; font-weight:700; color:#9090aa; text-transform:uppercase; letter-spacing:1px; padding:9px 12px; background:#f8f6f1; border-bottom:1px solid #e4dfd4; text-align:left; }
+    td { padding:8px 12px; border-bottom:1px solid #f0ece4; font-size:11.5px; vertical-align:top; }
+    .footer { margin-top:32px; padding-top:14px; border-top:1px solid #e4dfd4; display:flex; justify-content:space-between; font-size:10.5px; color:#9090aa; }
+</style>
+</head>
+<body>
+    <div class="header">
+        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#9090aa;margin-bottom:4px;">Republic of the Philippines</div>
+        <h1>Barangay East Tapinac</h1>
+        <p>City of Olongapo, Zambales &nbsp;Â·&nbsp; CertiFast Certificate Management System</p>
+    </div>
+    <div class="meta">
+        <span><strong>Report:</strong> ${escapeHtml(reportTitle)}</span>
+        <span><strong>Period:</strong> ${escapeHtml(periodLabel)}</span>
+        <span><strong>Generated:</strong> ${escapeHtml(now)} by ${escapeHtml(adminName)}</span>
+    </div>
+    ${sectionHtml}
+    <div class="footer">
+        <span>CertiFast v1.0 &nbsp;Â·&nbsp; Barangay East Tapinac &nbsp;Â·&nbsp; Olongapo City</span>
+        <span>Generated ${escapeHtml(now)}</span>
     </div>
 </body>
 </html>`;

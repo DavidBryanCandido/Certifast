@@ -175,6 +175,9 @@ function mapAuditType(actionType, targetTable) {
     if (act.includes("logout")) return "logout";
     if (act.includes("walk")) return "walkin";
     if (act.includes("qr")) return "qrscan";
+    if (act.includes("report") || table === "reports") return "report";
+    if (act.includes("personnel") || table.startsWith("barangay_"))
+        return "settings";
     if (act.includes("setting") || table === "system_settings")
         return "settings";
     if (act.includes("request") || table === "requests") return "request";
@@ -274,6 +277,46 @@ async function hasAnotherVerifiedActiveSuperadmin(excludedAdminId) {
     }
 
     return false;
+}
+
+async function mapAccountAuthStatus(row) {
+    const { supabase_auth_id: authUserId, ...account } = row;
+
+    if (!authUserId) {
+        return {
+            ...account,
+            auth_status: "legacy",
+            email_verified: null,
+        };
+    }
+
+    if (!supabase) {
+        return {
+            ...account,
+            auth_status: "unknown",
+            email_verified: null,
+        };
+    }
+
+    const { data, error } = await supabase.auth.admin.getUserById(authUserId);
+    if (error) {
+        console.error(
+            "Supabase admin account verification lookup failed:",
+            error.message,
+        );
+        return {
+            ...account,
+            auth_status: "unknown",
+            email_verified: null,
+        };
+    }
+
+    const verified = Boolean(data?.user?.email_confirmed_at);
+    return {
+        ...account,
+        auth_status: verified ? "verified" : "pending_verification",
+        email_verified: verified,
+    };
 }
 
 // Helper to create notifications for residents
@@ -2381,8 +2424,14 @@ async function getAuditLogs(req, res) {
             where.push("LOWER(COALESCE(al.action_type, '')) LIKE '%walk%'");
         } else if (type === "qrscan") {
             where.push("LOWER(COALESCE(al.action_type, '')) LIKE '%qr%'");
+        } else if (type === "report") {
+            where.push(
+                "(LOWER(COALESCE(al.action_type, '')) LIKE '%report%' OR COALESCE(al.target_table, '') = 'reports')",
+            );
         } else if (type === "settings") {
-            where.push("LOWER(COALESCE(al.action_type, '')) LIKE '%setting%'");
+            where.push(
+                "(LOWER(COALESCE(al.action_type, '')) LIKE '%setting%' OR LOWER(COALESCE(al.action_type, '')) LIKE '%personnel%' OR COALESCE(al.target_table, '') LIKE 'barangay_%')",
+            );
         } else if (type === "request") {
             where.push(
                 "(LOWER(COALESCE(al.action_type, '')) LIKE '%request%' OR COALESCE(al.target_table, '') = 'requests')",
@@ -2515,12 +2564,14 @@ async function getAccounts(req, res) {
                 ${colOrNull("role", "text")},
                 ${colOrNull("status", "text")},
                 ${colOrNull("created_at", "timestamp")},
-                ${colOrNull("last_login", "timestamp")}
+                ${colOrNull("last_login", "timestamp")},
+                ${colOrNull("supabase_auth_id", "uuid")}
              FROM admin_accounts
              ORDER BY created_at DESC NULLS LAST, admin_id DESC NULLS LAST`,
         );
 
-        return res.json({ data: result.rows });
+        const data = await Promise.all(result.rows.map(mapAccountAuthStatus));
+        return res.json({ data });
     } catch (err) {
         console.error("getAccounts error:", err);
         return res.status(500).json({ message: "Server error" });
