@@ -41,6 +41,7 @@ const {
     resetAccountPassword,
     deactivateAccount,
     getManageRequests,
+    issueRequestCertificate,
     markRequestReady,
     releaseRequest,
     getBarangaySettings,
@@ -71,6 +72,7 @@ router.post("/requests/:id/reject", adminAuth, rejectRequest);
 router.put("/requests/:id/extra-fields", adminAuth, updateRequestExtraFields);
 router.post("/requests/:id/extra-fields", adminAuth, updateRequestExtraFields);
 router.put("/requests/:id/signatories", adminAuth, saveRequestSignatories);
+router.post("/requests/:id/issue-certificate", adminAuth, issueRequestCertificate);
 router.post("/requests/:id/mark-ready", adminAuth, markRequestReady);
 router.post("/requests/:id/release", adminAuth, releaseRequest);
 router.get("/certificates/templates", adminAuth, getCertificateTemplates);

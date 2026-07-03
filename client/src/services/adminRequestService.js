@@ -61,6 +61,15 @@ const adminRequestService = {
         return res.data;
     },
 
+    issueCertificate: async (requestId) => {
+        const res = await axios.post(
+            `${API}/admin/requests/${requestId}/issue-certificate`,
+            {},
+            getAdminHeaders(),
+        );
+        return res.data;
+    },
+
     markReady: async (requestId) => {
         const res = await axios.post(
             `${API}/admin/requests/${requestId}/mark-ready`,

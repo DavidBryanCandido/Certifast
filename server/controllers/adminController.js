@@ -75,6 +75,170 @@ function makeWalkInDocId(certificateId) {
     return `WI-${y}${m}${d}-${String(certificateId).padStart(6, "0")}`;
 }
 
+function makeRequestCertificateDocId(certificateId, issuedDate) {
+    const stamp = String(issuedDate || "")
+        .replace(/\D/g, "")
+        .slice(0, 8);
+    const datePart = stamp || "00000000";
+    return `REQ-${datePart}-${String(certificateId).padStart(6, "0")}`;
+}
+
+const BARANGAY_TIME_ZONE = "Asia/Manila";
+
+const BUSINESS_VALIDITY_TEMPLATE_KEYS = new Set([
+    "doc1-work-permit-certification",
+    "doc1-business-renewal-endorsement",
+    "doc1-telecom-nap-permit",
+    "doc1-business-owner-bir-certification",
+    "doc2-business-assessor-permit",
+    "doc2-registered-business-bank",
+    "doc2-organization-water-clearance",
+    "doc2-lpg-house-to-house-permit",
+    "doc3-business-renewal-travel",
+    "doc3-road-damage-permit",
+    "doc3-bmbe-business-certificate",
+    "doc3-business-renewal-store",
+    "doc3-business-new-endorsement",
+]);
+
+function normalizeTemplateKey(templateKey) {
+    return String(templateKey || "").trim().toLowerCase();
+}
+
+function getBarangayDateString(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: BARANGAY_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(safeDate);
+    const lookup = Object.fromEntries(
+        parts
+            .filter((part) => part.type !== "literal")
+            .map((part) => [part.type, part.value]),
+    );
+    return `${lookup.year}-${lookup.month}-${lookup.day}`;
+}
+
+function normalizeSqlDate(value) {
+    if (!value) return "";
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString().slice(0, 10);
+    }
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match ? match[0] : "";
+}
+
+function addCalendarMonths(dateText, months) {
+    const source = normalizeSqlDate(dateText) || getBarangayDateString();
+    const match = source.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return source;
+
+    const year = Number.parseInt(match[1], 10);
+    const monthIndex = Number.parseInt(match[2], 10) - 1;
+    const day = Number.parseInt(match[3], 10);
+    const targetMonthSeed = new Date(
+        Date.UTC(year, monthIndex + Number(months || 0), 1),
+    );
+    const targetYear = targetMonthSeed.getUTCFullYear();
+    const targetMonthIndex = targetMonthSeed.getUTCMonth();
+    const lastDay = new Date(
+        Date.UTC(targetYear, targetMonthIndex + 1, 0),
+    ).getUTCDate();
+    const targetDay = Math.min(day, lastDay);
+
+    return [
+        targetYear,
+        String(targetMonthIndex + 1).padStart(2, "0"),
+        String(targetDay).padStart(2, "0"),
+    ].join("-");
+}
+
+function getCertificateValidityRule(templateKey) {
+    const normalizedTemplateKey = normalizeTemplateKey(templateKey);
+    if (BUSINESS_VALIDITY_TEMPLATE_KEYS.has(normalizedTemplateKey)) {
+        return {
+            months: 12,
+            rule: "business_1_year",
+            label: "1 year",
+        };
+    }
+    return {
+        months: 1,
+        rule: "standard_1_month",
+        label: "1 month",
+    };
+}
+
+function buildCertificateValidity({
+    templateKey = "",
+    issuedAt = new Date(),
+    issuedDate = "",
+    validUntil = "",
+    validityMonths = null,
+    validityRule = "",
+} = {}) {
+    const rule = getCertificateValidityRule(templateKey);
+    const storedMonths = Number.parseInt(validityMonths, 10);
+    const months =
+        validityMonths !== null &&
+        validityMonths !== undefined &&
+        validityMonths !== "" &&
+        Number.isFinite(storedMonths) &&
+        storedMonths > 0
+            ? storedMonths
+            : rule.months;
+    const resolvedIssuedDate =
+        normalizeSqlDate(issuedDate) || getBarangayDateString(issuedAt);
+    const resolvedValidUntil =
+        normalizeSqlDate(validUntil) ||
+        addCalendarMonths(resolvedIssuedDate, months);
+
+    return {
+        issuedDate: resolvedIssuedDate,
+        validUntil: resolvedValidUntil,
+        validityMonths: months,
+        validityRule:
+            String(validityRule || "").trim() ||
+            (months === 12 ? "business_1_year" : rule.rule),
+        validityLabel: months === 12 ? "1 year" : rule.label,
+    };
+}
+
+function withValidityFields(extraFields = {}, validity = {}) {
+    return {
+        ...(extraFields || {}),
+        dateIssued: validity.issuedDate,
+        validUntil: validity.validUntil,
+        expirationDate: validity.validUntil,
+        validityMonths: validity.validityMonths,
+        validityRule: validity.validityRule,
+    };
+}
+
+function isCertificateValiditySchemaError(err) {
+    return (
+        err?.code === "42703" ||
+        /issued_date|valid_until|validity_months|validity_rule/i.test(
+            err?.message || "",
+        )
+    );
+}
+
+function formatResidentAddressFromRow(row = {}) {
+    return [
+        row.resident_address_house,
+        row.resident_address_street,
+        row.resident_address_city,
+        row.resident_address_province,
+    ]
+        .map((part) => String(part || "").trim())
+        .filter(Boolean)
+        .join(", ");
+}
+
 async function appendRequestAttachments(rows = []) {
     const ids = rows
         .map((row) => Number.parseInt(row.request_id, 10))
@@ -1070,6 +1234,10 @@ async function issueWalkIn(req, res) {
             .json({ message: err?.message || "Unable to resolve signatories" });
     }
 
+    const templateKey = extraFields?.templateKey || extraFields?.template_key || "";
+    const validity = buildCertificateValidity({ templateKey });
+    const issuedExtraFields = withValidityFields(extraFields || {}, validity);
+
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -1086,6 +1254,10 @@ async function issueWalkIn(req, res) {
                 signatory_snapshot,
                 issued_by,
                 issued_at,
+                issued_date,
+                valid_until,
+                validity_months,
+                validity_rule,
                 source,
                 qr_code_data
             )
@@ -1100,24 +1272,40 @@ async function issueWalkIn(req, res) {
                 $6::jsonb,
                 $7,
                 NOW(),
+                $8::date,
+                $9::date,
+                $10,
+                $11,
                 'walkin',
-                $8
+                $12
             )
-            RETURNING certificate_id, issued_at`,
+            RETURNING certificate_id, issued_at, issued_date, valid_until, validity_months, validity_rule`,
             [
                 String(certType).trim(),
                 String(residentName).trim(),
                 String(address).trim(),
                 String(purpose).trim(),
-                JSON.stringify(extraFields || {}),
+                JSON.stringify(issuedExtraFields),
                 JSON.stringify(signatorySnapshot),
                 req.admin.id,
+                validity.issuedDate,
+                validity.validUntil,
+                validity.validityMonths,
+                validity.validityRule,
                 `walkin:${String(certType).trim()}:${String(residentName).trim()}`,
             ],
         );
 
         const certificateId = insertResult.rows[0].certificate_id;
         const issuedAt = insertResult.rows[0].issued_at;
+        const returnedValidity = buildCertificateValidity({
+            templateKey,
+            issuedAt,
+            issuedDate: insertResult.rows[0].issued_date,
+            validUntil: insertResult.rows[0].valid_until,
+            validityMonths: insertResult.rows[0].validity_months,
+            validityRule: insertResult.rows[0].validity_rule,
+        });
         const docId = makeWalkInDocId(certificateId);
 
         await client.query(
@@ -1144,6 +1332,11 @@ async function issueWalkIn(req, res) {
             id: `#WI-${String(certificateId).padStart(3, "0")}`,
             docId,
             issuedAt,
+            issuedDate: returnedValidity.issuedDate,
+            validUntil: returnedValidity.validUntil,
+            validityMonths: returnedValidity.validityMonths,
+            validityRule: returnedValidity.validityRule,
+            validityLabel: returnedValidity.validityLabel,
             signatorySnapshot,
             entry: {
                 id: `#WI-${String(certificateId).padStart(3, "0")}`,
@@ -1160,6 +1353,12 @@ async function issueWalkIn(req, res) {
     } catch (err) {
         await client.query("ROLLBACK");
         console.error("issueWalkIn error:", err);
+        if (isCertificateValiditySchemaError(err)) {
+            return res.status(503).json({
+                message:
+                    "Run database/certificate_validity_dates.sql in Supabase first",
+            });
+        }
         if (err?.code === "42P01" || err?.code === "42703") {
             return res.status(503).json({
                 message:
@@ -1236,6 +1435,10 @@ async function getWalkInReprint(req, res) {
                     '{}'::jsonb
                 ) AS signatory_snapshot,
                 ic.issued_at,
+                to_jsonb(ic)->>'issued_date' AS issued_date,
+                to_jsonb(ic)->>'valid_until' AS valid_until,
+                (to_jsonb(ic)->>'validity_months')::int AS validity_months,
+                to_jsonb(ic)->>'validity_rule' AS validity_rule,
                 COALESCE(a.full_name, a.username, 'Staff') AS issued_by_name
              FROM issued_certificates ic
              LEFT JOIN admin_accounts a
@@ -1253,6 +1456,16 @@ async function getWalkInReprint(req, res) {
         }
 
         const row = result.rows[0];
+        const templateKey =
+            row.extra_fields?.templateKey || row.extra_fields?.template_key || "";
+        const validity = buildCertificateValidity({
+            templateKey,
+            issuedAt: row.issued_at,
+            issuedDate: row.issued_date,
+            validUntil: row.valid_until,
+            validityMonths: row.validity_months,
+            validityRule: row.validity_rule,
+        });
         return res.json({
             data: {
                 id: `#WI-${String(row.certificate_id).padStart(3, "0")}`,
@@ -1261,7 +1474,7 @@ async function getWalkInReprint(req, res) {
                 name: row.resident_name,
                 address: row.address || "",
                 purpose: row.purpose || "",
-                extraFields: row.extra_fields || {},
+                extraFields: withValidityFields(row.extra_fields || {}, validity),
                 signatorySnapshot: row.signatory_snapshot || {},
                 templateKey:
                     row.extra_fields?.templateKey ||
@@ -1269,11 +1482,317 @@ async function getWalkInReprint(req, res) {
                     "",
                 issuedBy: row.issued_by_name,
                 issuedAt: row.issued_at,
+                issuedDate: validity.issuedDate,
+                validUntil: validity.validUntil,
+                validityMonths: validity.validityMonths,
+                validityRule: validity.validityRule,
+                validityLabel: validity.validityLabel,
             },
         });
     } catch (err) {
         console.error("getWalkInReprint error:", err);
+        if (isCertificateValiditySchemaError(err)) {
+            return res.status(503).json({
+                message:
+                    "Run database/certificate_validity_dates.sql in Supabase first",
+            });
+        }
         return res.status(500).json({ message: "Server error" });
+    }
+}
+
+async function issueRequestCertificate(req, res) {
+    const requestId = Number.parseInt(req.params.id, 10);
+    if (!Number.isFinite(requestId) || requestId <= 0) {
+        return res.status(400).json({ message: "Invalid request ID" });
+    }
+
+    const client = await pool.connect();
+    let committed = false;
+    let auditLog = null;
+    let responseStatus = 200;
+    let responseBody = null;
+
+    try {
+        await client.query("BEGIN");
+
+        const requestResult = await client.query(
+            `SELECT
+                r.request_id,
+                r.cert_type,
+                r.purpose,
+                r.status,
+                r.template_id,
+                r.extra_fields,
+                COALESCE(
+                    to_jsonb(r)->'signatory_snapshot',
+                    '{}'::jsonb
+                ) AS signatory_snapshot,
+                COALESCE(res.full_name, 'Unknown Resident') AS resident_name,
+                res.address_house AS resident_address_house,
+                res.address_street AS resident_address_street,
+                to_jsonb(res)->>'address_city' AS resident_address_city,
+                to_jsonb(res)->>'address_province' AS resident_address_province,
+                ct.template_key
+             FROM requests r
+             LEFT JOIN residents res
+               ON res.resident_id = r.resident_id
+             LEFT JOIN LATERAL (
+                SELECT template_key
+                FROM certificate_templates ct
+                WHERE ct.template_id = r.template_id
+                   OR (r.template_id IS NULL AND ct.name = r.cert_type)
+                ORDER BY CASE WHEN ct.template_id = r.template_id THEN 0 ELSE 1 END,
+                         COALESCE(ct.display_order, 0),
+                         ct.template_id
+                LIMIT 1
+             ) ct ON TRUE
+             WHERE r.request_id = $1
+             FOR UPDATE OF r`,
+            [requestId],
+        );
+
+        if (requestResult.rowCount === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        const request = requestResult.rows[0];
+        const status = String(request.status || "").toLowerCase();
+        if (!["approved", "ready", "released"].includes(status)) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                message:
+                    "Request must be approved, ready, or released before printing",
+            });
+        }
+
+        const requestExtraFields = request.extra_fields || {};
+        const templateKey =
+            request.template_key ||
+            requestExtraFields.templateKey ||
+            requestExtraFields.template_key ||
+            "";
+        const signatorySnapshot = request.signatory_snapshot || {};
+
+        const existingResult = await client.query(
+            `SELECT
+                certificate_id,
+                doc_id,
+                extra_fields,
+                signatory_snapshot,
+                issued_at,
+                issued_date,
+                valid_until,
+                validity_months,
+                validity_rule
+             FROM issued_certificates
+             WHERE request_id = $1
+               AND (source = 'online' OR source IS NULL)
+             ORDER BY certificate_id ASC
+             LIMIT 1
+             FOR UPDATE`,
+            [requestId],
+        );
+
+        if (existingResult.rowCount > 0) {
+            const row = existingResult.rows[0];
+            const validity = buildCertificateValidity({
+                templateKey,
+                issuedAt: row.issued_at,
+                issuedDate: row.issued_date,
+                validUntil: row.valid_until,
+                validityMonths: row.validity_months,
+                validityRule: row.validity_rule,
+            });
+            const mergedExtraFields = withValidityFields(
+                row.extra_fields || requestExtraFields,
+                validity,
+            );
+            const savedSnapshot =
+                row.signatory_snapshot &&
+                Object.keys(row.signatory_snapshot).length
+                    ? row.signatory_snapshot
+                    : signatorySnapshot;
+
+            await client.query(
+                `UPDATE issued_certificates
+                 SET issued_date = $2::date,
+                     valid_until = $3::date,
+                     validity_months = $4,
+                     validity_rule = $5,
+                     extra_fields = $6::jsonb,
+                     source = 'online'
+                 WHERE certificate_id = $1`,
+                [
+                    row.certificate_id,
+                    validity.issuedDate,
+                    validity.validUntil,
+                    validity.validityMonths,
+                    validity.validityRule,
+                    JSON.stringify(mergedExtraFields),
+                ],
+            );
+
+            await client.query("COMMIT");
+            committed = true;
+
+            auditLog = {
+                actorId: req.admin.id,
+                actorName: req.admin.username,
+                actorRole: req.admin.role,
+                actionType: "request_certificate_reprint",
+                targetTable: "issued_certificates",
+                targetId: row.certificate_id,
+                description: `Reprinted certificate for request #${requestId}`,
+                ipAddress: req.ip,
+            };
+            responseBody = {
+                message: "Certificate reprint prepared",
+                certificateId: row.certificate_id,
+                docId: row.doc_id,
+                issuedAt: row.issued_at,
+                issuedDate: validity.issuedDate,
+                validUntil: validity.validUntil,
+                validityMonths: validity.validityMonths,
+                validityRule: validity.validityRule,
+                validityLabel: validity.validityLabel,
+                signatorySnapshot: savedSnapshot,
+                extraFields: mergedExtraFields,
+            };
+        } else {
+            const validity = buildCertificateValidity({ templateKey });
+            const issuedExtraFields = withValidityFields(
+                requestExtraFields,
+                validity,
+            );
+            const insertResult = await client.query(
+                `INSERT INTO issued_certificates (
+                    request_id,
+                    doc_id,
+                    cert_type,
+                    resident_name,
+                    address,
+                    purpose,
+                    extra_fields,
+                    signatory_snapshot,
+                    issued_by,
+                    issued_at,
+                    issued_date,
+                    valid_until,
+                    validity_months,
+                    validity_rule,
+                    source,
+                    qr_code_data
+                )
+                VALUES (
+                    $1,
+                    'PENDING',
+                    $2,
+                    $3,
+                    $4,
+                    $5,
+                    $6::jsonb,
+                    $7::jsonb,
+                    $8,
+                    NOW(),
+                    $9::date,
+                    $10::date,
+                    $11,
+                    $12,
+                    'online',
+                    $13
+                )
+                RETURNING certificate_id, issued_at, issued_date, valid_until, validity_months, validity_rule`,
+                [
+                    requestId,
+                    request.cert_type,
+                    request.resident_name,
+                    formatResidentAddressFromRow(request),
+                    request.purpose || "",
+                    JSON.stringify(issuedExtraFields),
+                    JSON.stringify(signatorySnapshot),
+                    req.admin.id,
+                    validity.issuedDate,
+                    validity.validUntil,
+                    validity.validityMonths,
+                    validity.validityRule,
+                    `request:${requestId}`,
+                ],
+            );
+
+            const issuedRow = insertResult.rows[0];
+            const returnedValidity = buildCertificateValidity({
+                templateKey,
+                issuedAt: issuedRow.issued_at,
+                issuedDate: issuedRow.issued_date,
+                validUntil: issuedRow.valid_until,
+                validityMonths: issuedRow.validity_months,
+                validityRule: issuedRow.validity_rule,
+            });
+            const docId = makeRequestCertificateDocId(
+                issuedRow.certificate_id,
+                returnedValidity.issuedDate,
+            );
+
+            await client.query(
+                `UPDATE issued_certificates
+                 SET doc_id = $2
+                 WHERE certificate_id = $1`,
+                [issuedRow.certificate_id, docId],
+            );
+
+            await client.query("COMMIT");
+            committed = true;
+
+            auditLog = {
+                actorId: req.admin.id,
+                actorName: req.admin.username,
+                actorRole: req.admin.role,
+                actionType: "request_certificate_issue",
+                targetTable: "issued_certificates",
+                targetId: issuedRow.certificate_id,
+                description: `Issued certificate for request #${requestId}`,
+                ipAddress: req.ip,
+            };
+            responseStatus = 201;
+            responseBody = {
+                message: "Certificate issue record created",
+                certificateId: issuedRow.certificate_id,
+                docId,
+                issuedAt: issuedRow.issued_at,
+                issuedDate: returnedValidity.issuedDate,
+                validUntil: returnedValidity.validUntil,
+                validityMonths: returnedValidity.validityMonths,
+                validityRule: returnedValidity.validityRule,
+                validityLabel: returnedValidity.validityLabel,
+                signatorySnapshot,
+                extraFields: issuedExtraFields,
+            };
+        }
+
+        if (auditLog) {
+            await createAuditLog(auditLog);
+        }
+        return res.status(responseStatus).json(responseBody);
+    } catch (err) {
+        if (!committed) {
+            try {
+                await client.query("ROLLBACK");
+            } catch (rollbackErr) {
+                console.error("issueRequestCertificate rollback error:", rollbackErr);
+            }
+        }
+        console.error("issueRequestCertificate error:", err);
+        if (isCertificateValiditySchemaError(err)) {
+            return res.status(503).json({
+                message:
+                    "Run database/certificate_validity_dates.sql in Supabase first",
+            });
+        }
+        return res.status(500).json({ message: "Server error" });
+    } finally {
+        client.release();
     }
 }
 
@@ -3157,6 +3676,7 @@ module.exports = {
     resetAccountPassword,
     deactivateAccount,
     getManageRequests,
+    issueRequestCertificate,
     markRequestReady,
     releaseRequest,
     getBarangaySettings,

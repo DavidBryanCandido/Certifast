@@ -1473,9 +1473,15 @@ export default function WalkInIssuance({
                     ...formData,
                     docId: result?.docId || result?.id || nextDocId,
                     issuedAt: result?.issuedAt || new Date(),
+                    issuedDate: result?.issuedDate,
+                    validUntil: result?.validUntil,
+                    validityLabel: result?.validityLabel,
                     extraFields: {
                         ...formData,
                         templateKey: selectedCert.templateKey || "",
+                        dateIssued: result?.issuedDate,
+                        validUntil: result?.validUntil,
+                        expirationDate: result?.validUntil,
                     },
                     signatories:
                         result?.signatorySnapshot || signatorySnapshot,
@@ -1577,7 +1583,20 @@ p { margin: 4px 0; font-size: 14px; }
                     purpose: data.purpose,
                     docId: data.docId || data.id,
                     issuedAt: data.issuedAt || new Date(),
-                    extraFields: data.extraFields || {},
+                    issuedDate: data.issuedDate,
+                    validUntil: data.validUntil,
+                    validityLabel: data.validityLabel,
+                    extraFields: {
+                        ...(data.extraFields || {}),
+                        dateIssued:
+                            data.issuedDate || data.extraFields?.dateIssued,
+                        validUntil:
+                            data.validUntil || data.extraFields?.validUntil,
+                        expirationDate:
+                            data.validUntil ||
+                            data.extraFields?.expirationDate ||
+                            data.extraFields?.validUntil,
+                    },
                     signatories: data.signatorySnapshot || {},
                 },
                 settings: certificateSettings,

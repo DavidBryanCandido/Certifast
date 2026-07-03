@@ -747,6 +747,7 @@ function RequestDrawer({
     const [adminExtraFields, setAdminExtraFields] = useState({});
     const [signatorySelections, setSignatorySelections] = useState({});
     const [savedSignatorySnapshot, setSavedSignatorySnapshot] = useState({});
+    const [issuedCertificate, setIssuedCertificate] = useState(null);
     const [documentPreview, setDocumentPreview] = useState(null);
 
     useEffect(() => {
@@ -757,6 +758,7 @@ function RequestDrawer({
         setRejectReason("");
         setActionError("");
         setAdminExtraFields({});
+        setIssuedCertificate(null);
         setDocumentPreview(null);
         const snapshot = request.signatorySnapshot || {};
         setSavedSignatorySnapshot(snapshot);
@@ -874,24 +876,53 @@ function RequestDrawer({
         }
     };
 
-    const buildCertificateTemplateHtml = (signatorySnapshot) =>
-        buildCertificatePrintHtml({
+    const buildCertificateTemplateHtml = (signatorySnapshot, issue = {}) => {
+        const issueExtraFields = issue?.extraFields || {};
+        const issuedAt =
+            issue?.issuedAt ||
+            issue?.issuedDate ||
+            issueExtraFields.dateIssued ||
+            new Date();
+        const validityExtraFields = {
+            ...mergedExtraFields,
+            ...issueExtraFields,
+            dateIssued:
+                issue?.issuedDate ||
+                issueExtraFields.dateIssued ||
+                mergedExtraFields.dateIssued,
+            validUntil:
+                issue?.validUntil ||
+                issueExtraFields.validUntil ||
+                mergedExtraFields.validUntil,
+            expirationDate:
+                issue?.validUntil ||
+                issueExtraFields.expirationDate ||
+                issueExtraFields.validUntil ||
+                mergedExtraFields.expirationDate,
+        };
+        const printSignatories = issue?.signatorySnapshot || signatorySnapshot;
+        return buildCertificatePrintHtml({
             certType: request.certType,
             templateKey: request.templateKey,
             data: {
                 ...request,
+                docId: issue?.docId || request.docId,
                 residentName: request.name,
                 age: request.age || "",
                 dateOfBirth: request.dateOfBirth,
                 date_of_birth: request.dateOfBirth,
                 civilStatus: request.civil,
                 nationality: request.nationality,
-                extraFields: mergedExtraFields,
-                signatories: signatorySnapshot,
-                issuedAt: new Date(),
+                extraFields: validityExtraFields,
+                signatories: printSignatories,
+                issuedAt,
+                issuedDate: issue?.issuedDate,
+                validUntil: issue?.validUntil,
+                validityLabel: issue?.validityLabel,
             },
             settings: certificateSettings,
         });
+    };
 
     const openCertificatePrintWindow = (
         signatorySnapshot =
@@ -899,6 +930,7 @@ function RequestDrawer({
                 ? savedSignatorySnapshot
                 : localSignatorySnapshot,
         existingWindow = null,
+        issue = {},
     ) => {
         const win = existingWindow || window.open("", "_blank");
         if (!win) {
@@ -907,7 +939,7 @@ function RequestDrawer({
         }
 
         win.document.open();
-        win.document.write(buildCertificateTemplateHtml(signatorySnapshot));
+        win.document.write(buildCertificateTemplateHtml(signatorySnapshot, issue));
         win.document.close();
         win.focus();
         setTimeout(() => win.print(), 350);
@@ -943,9 +975,16 @@ function RequestDrawer({
                 request.rawId,
                 signatorySelections,
             );
-            const snapshot = result?.data || localSignatorySnapshot;
+            const issue = await adminRequestService.issueCertificate(
+                request.rawId,
+            );
+            const snapshot =
+                issue?.signatorySnapshot ||
+                result?.data ||
+                localSignatorySnapshot;
             setSavedSignatorySnapshot(snapshot);
-            openCertificatePrintWindow(snapshot, win);
+            setIssuedCertificate(issue);
+            openCertificatePrintWindow(snapshot, win, issue);
             setHasPrinted(true);
         } catch (err) {
             win.close();
@@ -956,7 +995,7 @@ function RequestDrawer({
     };
 
     const handleReprint = () => {
-        openCertificatePrintWindow();
+        openCertificatePrintWindow(undefined, null, issuedCertificate || {});
     };
 
     const SectionTitle = ({ children }) => (

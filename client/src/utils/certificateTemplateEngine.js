@@ -195,7 +195,13 @@ const FIELD_ADMIN_ONLY = {
     businessNoObjection: true,
 };
 
-function proof(key, label, required = true, accept = "image/*,.pdf", extra = {}) {
+function proof(
+    key,
+    label,
+    required = true,
+    accept = "image/*,.pdf",
+    extra = {},
+) {
     return { key, label, required, accept, maxFiles: 8, ...extra };
 }
 
@@ -975,7 +981,8 @@ const TEMPLATE_ALIASES = {
     "unemployment / spes certification": "doc2-unemployment-spes-certification",
     "lpg house-to-house activity permit": "doc2-lpg-house-to-house-permit",
     "barangay permit: mlbb tournament": "doc3-mlbb-tournament-permit",
-    "business renewal endorsement: travel services": "doc3-business-renewal-travel",
+    "business renewal endorsement: travel services":
+        "doc3-business-renewal-travel",
     "4ps child details certification": "doc3-child-details-4ps",
     "non-resident persons certificate": "doc3-non-resident-persons",
     "indigency: medical assistance": "doc3-indigency-medical-assistance",
@@ -1330,11 +1337,25 @@ function centeredLines(lines, className = "cf-centered-lines") {
         </div>`;
 }
 
-function validityBlock(data, validFallback = "December 31, 2026") {
+function validityBlock(data, validFallback = "________________") {
+    const issuedFallback = formatDate(
+        data?.issuedDate || data?.issued_date || data?.issuedAt || new Date(),
+    );
+    const validSource =
+        data?.validUntil ||
+        data?.valid_until ||
+        data?.expirationDate ||
+        data?.extraFields?.validUntil ||
+        data?.extraFields?.expirationDate ||
+        data?.extra_fields?.validUntil ||
+        data?.extra_fields?.expirationDate;
+    const resolvedValidFallback =
+        validFallback ||
+        (validSource ? formatDate(validSource) : "________________");
     return `
         <div class="cf-validity-block">
-            <div>DATE ISSUED: ${escapeHtml(dateFieldText(data, "dateIssued", formatDate(data?.issuedAt || new Date())))}</div>
-            <div>VALID UNTIL: ${escapeHtml(dateFieldText(data, "validUntil", validFallback))}</div>
+            <div>DATE ISSUED: ${escapeHtml(dateFieldText(data, "dateIssued", issuedFallback))}</div>
+            <div>VALID UNTIL: ${escapeHtml(dateFieldText(data, "validUntil", resolvedValidFallback))}</div>
         </div>`;
 }
 
@@ -1564,198 +1585,573 @@ function sourceTemplateLayout(
 // in BGRY.CERT# 1-3. Values are Word points, not visual estimates.
 const SOURCE_TEMPLATE_LAYOUTS = {
     "doc1-endorsement-toda-courtesy-call": sourceTemplateLayout(
-        1, 148.7, 581.6, "Calibri", 11, "Calibri", 11, "left",
+        1,
+        148.7,
+        581.6,
+        "Calibri",
+        11,
+        "Calibri",
+        11,
+        "left",
         { titleGap: 0, paragraphAfter: 12, templateType: "letter" },
     ),
     "doc1-acceptance-letter-quarantine": sourceTemplateLayout(
-        1, 189.8, 487.1, "Calibri", 11, "Times New Roman", 18, "left",
+        1,
+        189.8,
+        487.1,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc1-household-angkas-pass": sourceTemplateLayout(
-        1, 193.6, 517.1, "Calibri", 11, "Times New Roman", 18, "left",
+        1,
+        193.6,
+        517.1,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc1-family-home-property": sourceTemplateLayout(
-        1, 181.4, 461.9, "Calibri", 11, "Times New Roman", 18, "left",
+        1,
+        181.4,
+        461.9,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc1-first-time-jobseeker": sourceTemplateLayout(
-        1, 209.4, 485.3, "Calibri", 11, "Times New Roman", 18,
+        1,
+        209.4,
+        485.3,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc1-no-business": sourceTemplateLayout(
-        1, 207.6, 453.5, "Calibri", 12, "Times New Roman", 18, "left",
+        1,
+        207.6,
+        453.5,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc1-work-permit-certification": sourceTemplateLayout(
-        1, 205.7, 486.2, "Calibri", 11, "Times New Roman", 18, "left",
+        1,
+        205.7,
+        486.2,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc1-endorsement-financial-assistance": sourceTemplateLayout(
-        1, 148.7, 604, "Calibri", 11, "Calibri", 11, "left",
+        1,
+        148.7,
+        604,
+        "Calibri",
+        11,
+        "Calibri",
+        11,
+        "left",
         { titleGap: 0, templateType: "letter" },
     ),
     "doc1-dswd-eligibility-certification": sourceTemplateLayout(
-        1, 204.8, 461, "Calibri", 11, "Times New Roman", 20, "left",
+        1,
+        204.8,
+        461,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
+        "left",
     ),
     "doc1-guardianship": sourceTemplateLayout(
-        1, 193.6, 404.9, "Calibri", 11, "Times New Roman", 20, "left",
+        1,
+        193.6,
+        404.9,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
+        "left",
     ),
     "doc1-barangay-clearance": sourceTemplateLayout(
-        1, 216, 535.8, "Calibri", 11, "Times New Roman", 20, "center",
+        1,
+        216,
+        535.8,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
+        "center",
         { titleGap: 37, paragraphAfter: 12, salutationGap: 32 },
     ),
     "doc1-lot-occupancy": sourceTemplateLayout(
-        1, 213.2, 655.5, "Calibri", 11, "Times New Roman", 20,
+        1,
+        213.2,
+        655.5,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
     ),
     "doc1-undertaking-quarantine": sourceTemplateLayout(
-        1, 216, 631.2, "Calibri", 10, "Times New Roman", 16,
+        1,
+        216,
+        631.2,
+        "Calibri",
+        10,
+        "Times New Roman",
+        16,
     ),
     "doc1-detained-bail-certification": sourceTemplateLayout(
-        1, 220.7, 518, "Calibri", 13, "Times New Roman", 18,
+        1,
+        220.7,
+        518,
+        "Calibri",
+        13,
+        "Times New Roman",
+        18,
     ),
     "doc1-indigency-sibling-assistance": sourceTemplateLayout(
-        1, 202.9, 535.8, "Times New Roman", 12, "Times New Roman", 18, "center",
+        1,
+        202.9,
+        535.8,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "center",
         { titleGap: 48, salutationGap: 14 },
     ),
     "doc1-endorsement-medical-assistance": sourceTemplateLayout(
-        1, 165.5, 589.1, "Calibri", 12, "Calibri", 10, "left",
+        1,
+        165.5,
+        589.1,
+        "Calibri",
+        12,
+        "Calibri",
+        10,
+        "left",
         { titleGap: 0, templateType: "letter" },
     ),
     "doc1-lockdown-residency-certification": sourceTemplateLayout(
-        1, 184.2, 458.2, "Calibri", 12, "Times New Roman", 20,
+        1,
+        184.2,
+        458.2,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-good-moral": sourceTemplateLayout(
-        1, 178.6, 518, "Times New Roman", 12, "Times New Roman", 20,
+        1,
+        178.6,
+        518,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-extended-duty-shift": sourceTemplateLayout(
-        1, 161.8, 461.9, "Cambria", 12, "Cambria", 12, "left",
+        1,
+        161.8,
+        461.9,
+        "Cambria",
+        12,
+        "Cambria",
+        12,
+        "left",
         { titleGap: 0, templateType: "memo" },
     ),
     "doc1-burial-assistance": sourceTemplateLayout(
-        1, 188.9, 433.9, "Calibri", 11, "Times New Roman", 20,
+        1,
+        188.9,
+        433.9,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
     ),
     "doc1-certificate-residency": sourceTemplateLayout(
-        1, 191.7, 461, "Calibri", 12, "Times New Roman", 20,
+        1,
+        191.7,
+        461,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-telecom-nap-permit": sourceTemplateLayout(
-        1, 206.6, 412.4, "Calibri", 11, "Times New Roman", 20,
+        1,
+        206.6,
+        412.4,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
     ),
     "doc1-cohabitation": sourceTemplateLayout(
-        1, 193.6, 432, "Calibri", 12, "Times New Roman", 20,
+        1,
+        193.6,
+        432,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-live-birth-endorsement": sourceTemplateLayout(
-        1, 214.1, 572.2, "Calibri", 12, "Times New Roman", 20,
+        1,
+        214.1,
+        572.2,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-indigency-medical": sourceTemplateLayout(
-        1, 219.8, 511.5, "Calibri", 12, "Times New Roman", 20, "left",
+        1,
+        219.8,
+        511.5,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
+        "left",
     ),
     "doc1-property-ownership": sourceTemplateLayout(
-        1, 166.4, 576, "Calibri", 11, "Times New Roman", 20,
+        1,
+        166.4,
+        576,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
     ),
     "doc1-business-renewal-endorsement": sourceTemplateLayout(
-        1, 148.7, 531.1, "Calibri", 12, "Times New Roman", 16, "left",
+        1,
+        148.7,
+        531.1,
+        "Calibri",
+        12,
+        "Times New Roman",
+        16,
+        "left",
         { titleGap: 0, paragraphIndent: 0, templateType: "business" },
     ),
     "doc1-certificate-appearance": sourceTemplateLayout(
-        1, 204.8, 425.5, "Calibri", 12, "Times New Roman", 20,
+        1,
+        204.8,
+        425.5,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-indigency-educational-assistance": sourceTemplateLayout(
-        1, 199.1, 476, "Calibri", 11, "Times New Roman", 20,
+        1,
+        199.1,
+        476,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
     ),
     "doc1-marital-separation-certification": sourceTemplateLayout(
-        1, 214.1, 500.2, "Calibri", 12, "Times New Roman", 20,
+        1,
+        214.1,
+        500.2,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-business-owner-bir-certification": sourceTemplateLayout(
-        1, 217.9, 461, "Calibri", 13, "Times New Roman", 20,
+        1,
+        217.9,
+        461,
+        "Calibri",
+        13,
+        "Times New Roman",
+        20,
     ),
     "doc1-no-marriage-death-claim": sourceTemplateLayout(
-        1, 245, 549.8, "Calibri", 12, "Times New Roman", 20, "center",
+        1,
+        245,
+        549.8,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
+        "center",
         { titleGap: 45, salutationGap: 10 },
     ),
     "doc1-hearing-impairment-certification": sourceTemplateLayout(
-        1, 234.7, 528.3, "Calibri", 12, "Times New Roman", 20,
+        1,
+        234.7,
+        528.3,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc1-indigency-spes-leap": sourceTemplateLayout(
-        1, 216.9, 512.4, "Times New Roman", 11, "Times New Roman", 20,
+        1,
+        216.9,
+        512.4,
+        "Times New Roman",
+        11,
+        "Times New Roman",
+        20,
     ),
     "doc1-simple-residency-loan": sourceTemplateLayout(
-        1, 216, 489, "Calibri", 11, "Times New Roman", 20, "center",
+        1,
+        216,
+        489,
+        "Calibri",
+        11,
+        "Times New Roman",
+        20,
+        "center",
         { bodyAlign: "justify" },
     ),
     "doc1-solo-parent-certification": sourceTemplateLayout(
-        1, 219.8, 528.3, "Calibri", 12, "Times New Roman", 18,
+        1,
+        219.8,
+        528.3,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
     ),
 
     "doc2-indigency-income-means": sourceTemplateLayout(
-        2, 200.1, 577.8, "Calibri", 12, "Times New Roman", 18, "center",
+        2,
+        200.1,
+        577.8,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
+        "center",
         { bodyAlign: "justify" },
     ),
     "doc2-flooded-residence-certification": sourceTemplateLayout(
-        2, 204.8, 508.7, "Calibri", 11, "Times New Roman", 18,
+        2,
+        204.8,
+        508.7,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-indigent-good-moral-medical": sourceTemplateLayout(
-        2, 194.5, 488.1, "Calibri", 11, "Times New Roman", 18,
+        2,
+        194.5,
+        488.1,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-residency-bank-record": sourceTemplateLayout(
-        2, 201.9, 460, "Times New Roman", 11, "Times New Roman", 18,
+        2,
+        201.9,
+        460,
+        "Times New Roman",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-minor-athlete-financial-assistance": sourceTemplateLayout(
-        2, 195.4, 475, "Calibri", 11, "Times New Roman", 18,
+        2,
+        195.4,
+        475,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-parent-relationship-spes": sourceTemplateLayout(
-        2, 191.7, 537.7, "Calibri", 11, "Times New Roman", 18,
+        2,
+        191.7,
+        537.7,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-business-closure-court-records": sourceTemplateLayout(
-        2, 193.6, 449.8, "Calibri", 11, "Times New Roman", 18,
+        2,
+        193.6,
+        449.8,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-general-legal-records": sourceTemplateLayout(
-        2, 201.1, 448.9, "Calibri", 12, "Times New Roman", 18,
+        2,
+        201.1,
+        448.9,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
     ),
     "doc2-centenarian-living-veteran": sourceTemplateLayout(
-        2, 216, 502.1, "Calibri", 12, "Times New Roman", 18,
+        2,
+        216,
+        502.1,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
     ),
     "doc2-first-time-jobseeker-oath": sourceTemplateLayout(
-        2, 175.8, null, "Georgia", 8, "Georgia", 14, "center",
+        2,
+        175.8,
+        null,
+        "Georgia",
+        8,
+        "Georgia",
+        14,
+        "center",
         { titleBold: true, paragraphIndent: 0 },
     ),
     "doc2-funeral-covered-court-indigency": sourceTemplateLayout(
-        2, 210.4, 473.1, "Calibri", 11, "Times New Roman", 18, "center",
+        2,
+        210.4,
+        473.1,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "center",
         { bodyAlign: "justify" },
     ),
     "doc2-endorsement-hospital-return": sourceTemplateLayout(
-        2, 178.6, 638.7, "Cambria", 11, "Cambria", 11, "left",
+        2,
+        178.6,
+        638.7,
+        "Cambria",
+        11,
+        "Cambria",
+        11,
+        "left",
         { titleGap: 0, bodyAlign: "justify", templateType: "letter" },
     ),
     "doc2-business-assessor-permit": sourceTemplateLayout(
-        2, 196.4, 493.7, "Calibri", 11, "Times New Roman", 18,
+        2,
+        196.4,
+        493.7,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
     ),
     "doc2-residency-school-requirement": sourceTemplateLayout(
-        2, 184.2, 514.3, "Calibri", 12, "Times New Roman", 20,
+        2,
+        184.2,
+        514.3,
+        "Calibri",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc2-registered-business-bank": sourceTemplateLayout(
-        2, 216.9, 537.7, "Calibri", 12, "Times New Roman", 18, "center",
+        2,
+        216.9,
+        537.7,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
+        "center",
         { bodyAlign: "justify" },
     ),
     "doc2-guardian-psa-certification": sourceTemplateLayout(
-        2, 216, 537.7, "Calibri", 12, "Times New Roman", 18,
+        2,
+        216,
+        537.7,
+        "Calibri",
+        12,
+        "Times New Roman",
+        18,
     ),
     "doc2-indigency-guardian-medical": sourceTemplateLayout(
-        2, 232.9, 536.8, "Calibri", 12, "Bookman Old Style", 16, "center",
+        2,
+        232.9,
+        536.8,
+        "Calibri",
+        12,
+        "Bookman Old Style",
+        16,
+        "center",
         { bodyAlign: "justify" },
     ),
     "doc2-organization-water-clearance": sourceTemplateLayout(
-        2, 224.4, 522.7, "Times New Roman", 12, "Times New Roman", 18, "center",
+        2,
+        224.4,
+        522.7,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "center",
         { bodyAlign: "justify" },
     ),
     "doc2-unemployment-spes-certification": sourceTemplateLayout(
-        2, 213.2, 524.5, "Times New Roman", 12, "Times New Roman", 20,
+        2,
+        213.2,
+        524.5,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        20,
     ),
     "doc2-lpg-house-to-house-permit": sourceTemplateLayout(
-        2, 209.4, 649.8, "Times New Roman", 11, "Times New Roman", 20, "center",
+        2,
+        209.4,
+        649.8,
+        "Times New Roman",
+        11,
+        "Times New Roman",
+        20,
+        "center",
         { bodyAlign: "justify" },
     ),
 
     "doc3-mlbb-tournament-permit": sourceTemplateLayout(
-        3, 175.8, 520.8, "Calibri", 11, "Calibri", 18, "left",
+        3,
+        175.8,
+        520.8,
+        "Calibri",
+        11,
+        "Calibri",
+        18,
+        "left",
         { titleGap: 44, paragraphAfter: 26 },
     ),
     "doc3-business-renewal-travel": sourceTemplateLayout(
-        3, 158.1, 616.2, "Calibri", 12, "Times New Roman", 16, "left",
+        3,
+        158.1,
+        616.2,
+        "Calibri",
+        12,
+        "Times New Roman",
+        16,
+        "left",
         {
             titleGap: 0,
             paragraphIndent: 0,
@@ -1764,72 +2160,212 @@ const SOURCE_TEMPLATE_LAYOUTS = {
         },
     ),
     "doc3-child-details-4ps": sourceTemplateLayout(
-        3, 175.8, 460, "Calibri", 11, "Times New Roman", 18, "left",
+        3,
+        175.8,
+        460,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
         { bodyAlign: "justify" },
     ),
     "doc3-non-resident-persons": sourceTemplateLayout(
-        3, 215.1, 562, "Times New Roman", 12, "Times New Roman", 18, "left",
+        3,
+        215.1,
+        562,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "left",
         { bodyAlign: "justify" },
     ),
     "doc3-indigency-medical-assistance": sourceTemplateLayout(
-        3, 209.4, 534.8, "Times New Roman", 11, "Times New Roman", 18, "left",
+        3,
+        209.4,
+        534.8,
+        "Times New Roman",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-road-damage-permit": sourceTemplateLayout(
-        3, 215.1, 466.6, "Times New Roman", 11, "Times New Roman", 18, "left",
+        3,
+        215.1,
+        466.6,
+        "Times New Roman",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-bmbe-business-certificate": sourceTemplateLayout(
-        3, 234.7, 669.5, "Calibri", 11, "Times New Roman", 18, "left",
+        3,
+        234.7,
+        669.5,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-senior-alive-well": sourceTemplateLayout(
-        3, 219.8, 533.9, "Times New Roman", 12, "Times New Roman", 18, "left",
+        3,
+        219.8,
+        533.9,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-minor-stepbrother-birth-record": sourceTemplateLayout(
-        3, 226.3, 556.3, "Times New Roman", 11, "Times New Roman", 18, "left",
+        3,
+        226.3,
+        556.3,
+        "Times New Roman",
+        11,
+        "Times New Roman",
+        18,
+        "left",
         { bodyAlign: "justify" },
     ),
     "doc3-fire-damage-certification": sourceTemplateLayout(
-        3, 196.4, 459.1, "Times New Roman", 12, "Times New Roman", 18, "justify",
+        3,
+        196.4,
+        459.1,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "justify",
         { bodyAlign: "justify" },
     ),
     "doc3-first-time-jobseeker-clearance": sourceTemplateLayout(
-        3, 204.8, 461.9, "Times New Roman", 12, "Times New Roman", 18, "left",
+        3,
+        204.8,
+        461.9,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "left",
         { bodyAlign: "justify" },
     ),
     "doc3-repatriated-ofw-unemployment": sourceTemplateLayout(
-        3, 208.5, 484.4, "Times New Roman", 12, "Times New Roman", 18, "justify",
+        3,
+        208.5,
+        484.4,
+        "Times New Roman",
+        12,
+        "Times New Roman",
+        18,
+        "justify",
     ),
     "doc3-pandemic-business-non-operation": sourceTemplateLayout(
-        3, 189.8, 460, "Times New Roman", 13, "Times New Roman", 18, "left",
+        3,
+        189.8,
+        460,
+        "Times New Roman",
+        13,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-sole-guardian-travel-assistance": sourceTemplateLayout(
-        3, 185.1, 538.6, "Times New Roman", 13, "Times New Roman", 18, "left",
+        3,
+        185.1,
+        538.6,
+        "Times New Roman",
+        13,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-business-closure": sourceTemplateLayout(
-        3, 192.6, 494.6, "Times New Roman", 13, "Times New Roman", 18, "left",
+        3,
+        192.6,
+        494.6,
+        "Times New Roman",
+        13,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-renovation-non-operational-business": sourceTemplateLayout(
-        3, 192.6, 432, "Times New Roman", 13, "Times New Roman", 18, "left",
+        3,
+        192.6,
+        432,
+        "Times New Roman",
+        13,
+        "Times New Roman",
+        18,
+        "left",
     ),
     "doc3-flood-victim-financial-assistance": sourceTemplateLayout(
-        3, 173.9, 573.2, "Times New Roman", 13, "Times New Roman", 18, "left",
+        3,
+        173.9,
+        573.2,
+        "Times New Roman",
+        13,
+        "Times New Roman",
+        18,
+        "left",
         { titleBold: true },
     ),
     "doc3-flood-victim-calamity-loan": sourceTemplateLayout(
-        3, 168.3, 565.7, "Times New Roman", 13, "Times New Roman", 18, "left",
+        3,
+        168.3,
+        565.7,
+        "Times New Roman",
+        13,
+        "Times New Roman",
+        18,
+        "left",
         { titleBold: true },
     ),
     "doc3-low-income-purok-leader": sourceTemplateLayout(
-        3, 179.6, 476.9, "Times New Roman", 14, "Times New Roman", 20, "left",
+        3,
+        179.6,
+        476.9,
+        "Times New Roman",
+        14,
+        "Times New Roman",
+        20,
+        "left",
     ),
     "doc3-low-income-tricycle-driver": sourceTemplateLayout(
-        3, 176.8, 491.9, "Times New Roman", 14, "Times New Roman", 20, "left",
+        3,
+        176.8,
+        491.9,
+        "Times New Roman",
+        14,
+        "Times New Roman",
+        20,
+        "left",
     ),
     "doc3-blank-indigency-form": sourceTemplateLayout(
-        3, 144, 442.3, "Calibri", 11, "Times New Roman", 18, "left",
+        3,
+        144,
+        442.3,
+        "Calibri",
+        11,
+        "Times New Roman",
+        18,
+        "left",
         { bodyAlign: "justify" },
     ),
     "doc3-business-renewal-store": sourceTemplateLayout(
-        3, 144, 562, "Calibri", 12, "Times New Roman", 16, "center",
+        3,
+        144,
+        562,
+        "Calibri",
+        12,
+        "Times New Roman",
+        16,
+        "center",
         {
             titleBold: true,
             titleGap: 0,
@@ -1839,7 +2375,14 @@ const SOURCE_TEMPLATE_LAYOUTS = {
         },
     ),
     "doc3-business-new-endorsement": sourceTemplateLayout(
-        3, 144, 621.8, "Calibri", 12, "Times New Roman", 16, "center",
+        3,
+        144,
+        621.8,
+        "Calibri",
+        12,
+        "Times New Roman",
+        16,
+        "center",
         {
             titleBold: true,
             titleGap: 0,
@@ -2119,7 +2662,10 @@ const TEMPLATES = {
             const area = value(data, "propertyArea", "________________");
             return `
                 ${paragraphs([
-                    { className: "salutation", html: "TO WHOM IT MAY CONCERN:" },
+                    {
+                        className: "salutation",
+                        html: "TO WHOM IT MAY CONCERN:",
+                    },
                     `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, ${escapeHtml(value(data, "nationality", "Filipino"))} Citizen is the owner of a LOT located at ${strong(propertyLocation)} with Land TD No: ${strong(taxDeclaration)} measuring approx. ${strong(area)} more particularly described to with:`,
                     `BORDER SIZE: ${strong(value(data, "borderSize", "________________"))}`,
                 ])}
@@ -2207,15 +2753,14 @@ const TEMPLATES = {
     "doc1-household-angkas-pass": {
         title: "BARANGAY CERTIFICATION",
         signatures: "captain-right",
-        fields: [
-            "companionName",
-            "companionRole",
-            "companionTwoRole",
-        ],
+        fields: ["companionName", "companionRole", "companionTwoRole"],
         render(data) {
             return `
                 ${paragraphs([
-                    { className: "salutation", html: "TO WHOM IT MAY CONCERN:" },
+                    {
+                        className: "salutation",
+                        html: "TO WHOM IT MAY CONCERN:",
+                    },
                     "This is to certify that:",
                 ])}
                 ${householdMembersTable(data)}
@@ -2888,7 +3433,10 @@ const TEMPLATES = {
         render(data) {
             return `
                 ${paragraphs([
-                    { className: "salutation", html: "TO WHOM IT MAY CONCERN:" },
+                    {
+                        className: "salutation",
+                        html: "TO WHOM IT MAY CONCERN:",
+                    },
                     `This is to certify that ${strong(`${personPrefix(data)} ${upper(personName(data))}`)}, ${legalAgePhrase(data)} with postal address at ${strong(address(data))}, with no derogatory record on file pursuant to Rep. Act No. 7160, otherwise known as the Local Government Code of 1991.`,
                     `This further certifies that the above-named is ${strong(value(data, "relationship", "Grandmother/legal guardian"))} of the below mentioned for ${strong(upper(value(data, "purposeDetail", purpose(data))))}, with the following details:`,
                 ])}
@@ -3055,7 +3603,11 @@ const TEMPLATES = {
     "doc3-non-resident-persons": {
         title: "BARANGAY CERTIFICATE",
         signatures: "kagawad1-right",
-        fields: ["nonResidentNames", "requestingOfficerName", "requestingOfficerTitle"],
+        fields: [
+            "nonResidentNames",
+            "requestingOfficerName",
+            "requestingOfficerTitle",
+        ],
         render(data) {
             const names = splitListValue(value(data, "nonResidentNames", ""), [
                 "Chaehun Bae",
@@ -3074,7 +3626,10 @@ const TEMPLATES = {
             );
             return `
                 ${paragraphs([
-                    { className: "salutation", html: "TO WHOM IT MAY CONCERN;" },
+                    {
+                        className: "salutation",
+                        html: "TO WHOM IT MAY CONCERN;",
+                    },
                     "This is to certify that the below named persons are Non-Resident of Brgy. East Tapinac, Olongapo City.",
                 ])}
                 ${centeredLines(names)}
@@ -3122,10 +3677,15 @@ const TEMPLATES = {
             "expirationDate",
         ],
         render(data) {
+            const expiry = dateFieldText(
+                data,
+                "expirationDate",
+                dateFieldText(data, "validUntil", "________________"),
+            );
             return `
                 ${paragraphs([
                     { className: "salutation", html: "TO WHOM IT MY CONCERN:" },
-                    `This Certificate, which is effective for two (2) year, entitles the registered Barangay Micro Business Enterprise (BMBE) to all the benefits and incentive, subject to the terms and conditions, of Republic Act No. 9178, signed by President Gloria Macapagal Arroyo on 13 November 2002, and the implementing rules and regulations there of issued by Secretary of Trade and Industry MAR ROXAS on 07 February 2003. This certificate will expire on ${strong(dateFieldText(data, "expirationDate", "________________"))}.`,
+                    `This Certificate, which is effective for one (1) year, entitles the registered Barangay Micro Business Enterprise (BMBE) to all the benefits and incentive, subject to the terms and conditions, of Republic Act No. 9178, signed by President Gloria Macapagal Arroyo on 13 November 2002, and the implementing rules and regulations there of issued by Secretary of Trade and Industry MAR ROXAS on 07 February 2003. This certificate will expire on ${strong(expiry)}.`,
                     "GRANTED TO:",
                 ])}
                 <div class="cf-form-lines cf-granted-lines">
@@ -3139,7 +3699,13 @@ const TEMPLATES = {
     "doc3-senior-alive-well": {
         title: "BARANGAY CERTIFICATE",
         signatures: "captain-right",
-        fields: ["age", "aliveStatus", "claimantName", "claimantRelationship", "requirementName"],
+        fields: [
+            "age",
+            "aliveStatus",
+            "claimantName",
+            "claimantRelationship",
+            "requirementName",
+        ],
         render(data) {
             return paragraphs([
                 { className: "salutation", html: "TO WHON IT MY CONCERN:" },
@@ -3216,7 +3782,12 @@ const TEMPLATES = {
     "doc3-pandemic-business-non-operation": {
         title: "BARANGAY CERTIFICATE",
         signatures: "captain-right",
-        fields: ["businessName", "businessAddress", "businessOwnerName", "businessStatusPeriod"],
+        fields: [
+            "businessName",
+            "businessAddress",
+            "businessOwnerName",
+            "businessStatusPeriod",
+        ],
         render(data) {
             return paragraphs([
                 { className: "salutation", html: "To whom may it concern;" },
@@ -3254,7 +3825,10 @@ const TEMPLATES = {
         render(data) {
             return `
                 ${paragraphs([
-                    { className: "salutation", html: "To whom may it concern;" },
+                    {
+                        className: "salutation",
+                        html: "To whom may it concern;",
+                    },
                     `This is to certify that upon actual verification and inspection of this Office, it was found out that the business establishment registered as ${strong(upper(value(data, "businessName", "________________")))} located at ${strong(value(data, "businessAddress", address(data)))} and under the management and proprietorship of ${strong(upper(value(data, "businessOwnerName", personName(data))))} has ceased its business operation last ${strong(dateFieldText(data, "businessClosureDate", "________________"))}.`,
                     `This certification is being issued upon the request of ${strong(upper(value(data, "businessOwnerName", personName(data))))} for whatever legal intent this may serve.`,
                 ])}
@@ -3272,8 +3846,16 @@ const TEMPLATES = {
             "businessPurpose",
         ],
         render(data) {
-            const start = dateFieldText(data, "renovationStartDate", "________________");
-            const end = dateFieldText(data, "renovationEndDate", "________________");
+            const start = dateFieldText(
+                data,
+                "renovationStartDate",
+                "________________",
+            );
+            const end = dateFieldText(
+                data,
+                "renovationEndDate",
+                "________________",
+            );
             return paragraphs([
                 { className: "salutation", html: "To whom may it concern;" },
                 `This is to certify that ${strong(upper(value(data, "businessName", "________________")))}, Located at ${strong(value(data, "businessAddress", address(data)))}, had undergone general repair/ renovation from ${strong(start)} to ${strong(end)}. Accordingly, it was not fit for occupancy, hence, not operational.`,
@@ -3327,7 +3909,12 @@ const TEMPLATES = {
     "doc3-low-income-tricycle-driver": {
         title: "CERTIFICATION OF LOW-INCOME",
         signatures: "kagawad1-right",
-        fields: ["occupation", "incomeStartYear", "monthlyIncome", "purposeDetail"],
+        fields: [
+            "occupation",
+            "incomeStartYear",
+            "monthlyIncome",
+            "purposeDetail",
+        ],
         render(data) {
             return paragraphs([
                 { className: "salutation", html: "To Whom It May Concern;" },
@@ -3570,9 +4157,10 @@ function sourceLayoutStyle(layout) {
 function buildHeader(settings, templateKey, layout) {
     const documentLayout =
         SOURCE_DOCUMENT_LAYOUTS[layout.doc] || SOURCE_DOCUMENT_LAYOUTS[1];
-    const bagongPilipinasLogo = layout.doc === 3
-        ? `<img class="cf-logo cf-logo-bagong" src="${escapeHtml(settings.bagong_pilipinas_logo_url || DEFAULT_SETTINGS.bagong_pilipinas_logo_url)}" alt="" />`
-        : "";
+    const bagongPilipinasLogo =
+        layout.doc === 3
+            ? `<img class="cf-logo cf-logo-bagong" src="${escapeHtml(settings.bagong_pilipinas_logo_url || DEFAULT_SETTINGS.bagong_pilipinas_logo_url)}" alt="" />`
+            : "";
 
     return `
         <header class="cf-cert-header">
@@ -3691,7 +4279,7 @@ function baseStyles(layout) {
         .cf-header-rule {
             width: 100%;
             border-top: 1px solid #000;
-            margin: 18pt auto 0;
+            margin: 24pt auto 0;
         }
         .cf-office {
             font-family: "Times New Roman", Times, serif;
@@ -3811,11 +4399,7 @@ function baseStyles(layout) {
             text-indent: 0;
         }
         .cf-template-doc1-business-renewal-endorsement .cf-signature-layer .cf-validity-block {
-            margin-top: 138pt;
-            font-family: Calibri, Arial, sans-serif;
-            font-size: 9pt;
-            font-weight: 400;
-            line-height: 12pt;
+            margin: 0;
         }
         .cf-business-endorsement {
             font-family: var(--cf-body-font);
@@ -3926,18 +4510,23 @@ function baseStyles(layout) {
             margin: -0.04in 0 0.18in;
         }
         .cf-validity-block {
-            font-size: 11pt;
-            font-weight: 700;
-            line-height: 1.45;
-            margin: 0.04in 0 0;
+            position: absolute;
+            left: var(--cf-content-left);
+            bottom: 22pt;
+            z-index: 2;
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 6pt;
+            font-weight: 400;
+            line-height: 1.15;
+            margin: 0;
             text-align: left;
+            color: #111;
         }
         section:has(.cf-business-endorsement) .cf-validity-block {
-            margin-top: 75pt;
-            font-family: Calibri, Arial, sans-serif;
-            font-size: 8pt;
+            margin: 0;
+            font-size: 6pt;
             font-weight: 400;
-            line-height: 11pt;
+            line-height: 1.15;
         }
         .cf-letter-date {
             font-size: var(--cf-body-size);
@@ -4286,9 +4875,38 @@ export function buildCertificatePrintHtml({
     const titleHtml = template.hideTitle
         ? ""
         : `<h1 class="cf-cert-title">${escapeHtml(title)}</h1>`;
+    const incomingExtraFields = data?.extraFields || data?.extra_fields || {};
+    const issuedDateValue =
+        data?.issuedDate ||
+        data?.issued_date ||
+        data?.dateIssued ||
+        incomingExtraFields.dateIssued;
+    const validUntilValue =
+        data?.validUntil ||
+        data?.valid_until ||
+        data?.expirationDate ||
+        incomingExtraFields.validUntil ||
+        incomingExtraFields.expirationDate;
+    const normalizedExtraFields = {
+        ...incomingExtraFields,
+        ...(issuedDateValue ? { dateIssued: issuedDateValue } : {}),
+        ...(validUntilValue
+            ? {
+                  validUntil: validUntilValue,
+                  expirationDate: validUntilValue,
+              }
+            : {}),
+    };
     const renderData = {
         ...data,
-        extraFields: data?.extraFields || data?.extra_fields || {},
+        ...(issuedDateValue ? { dateIssued: issuedDateValue } : {}),
+        ...(validUntilValue
+            ? {
+                  validUntil: validUntilValue,
+                  expirationDate: validUntilValue,
+              }
+            : {}),
+        extraFields: normalizedExtraFields,
     };
     const body = template.render(renderData);
     const hasRespectfulClosing = /Respectfully\s*,/i.test(
@@ -4304,14 +4922,17 @@ export function buildCertificatePrintHtml({
         template.signatures || "captain-right",
         renderData?.signatories ||
             renderData?.signatorySnapshot ||
-        renderData?.extraFields?.signatories ||
-        renderData?.extraFields?.signatorySnapshot ||
-        mergedSettings?.signatories ||
-        {},
+            renderData?.extraFields?.signatories ||
+            renderData?.extraFields?.signatorySnapshot ||
+            mergedSettings?.signatories ||
+            {},
     );
     const postSignatures = template.renderPostSignatures
         ? template.renderPostSignatures(renderData)
         : "";
+    const defaultValidityBlock = /cf-validity-block/i.test(postSignatures)
+        ? ""
+        : validityBlock(renderData, "");
     const printScript = autoPrint
         ? `<script>window.addEventListener("load", () => setTimeout(() => window.print(), 250));</script>`
         : "";
@@ -4351,6 +4972,7 @@ export function buildCertificatePrintHtml({
                 ${postSignatures}
             </div>
         </section>
+        ${defaultValidityBlock}
     </main>
     ${printScript}
 </body>
