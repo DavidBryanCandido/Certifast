@@ -79,10 +79,13 @@ const adminRequestService = {
         return res.data;
     },
 
-    releaseRequest: async (requestId) => {
+    releaseRequest: async (requestId, options = {}) => {
+        const body = options.residentId
+            ? { resident_id: options.residentId }
+            : {};
         const res = await axios.post(
             `${API}/admin/requests/${requestId}/release`,
-            {},
+            body,
             getAdminHeaders(),
         );
         return res.data;

@@ -2110,6 +2110,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
 
         return {
             rawId: row.request_id,
+            residentId: row.resident_id,
             id: `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
             name: row.resident_name || "Unknown Resident",
             certType: row.cert_type || "Certificate Request",
@@ -2218,6 +2219,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                             normalizeAge(extraFields.age);
                         return {
                             rawId: row.request_id,
+                            residentId: row.resident_id,
                             id: `#REQ-${String(row.request_id || "").padStart(4, "0")}`,
                             name: row.resident_name || "Unknown Resident",
                             certType: row.cert_type || "Certificate Request",
@@ -2522,11 +2524,13 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
     };
 
     // Handle QR release confirmation from the scanner modal
-    const handleQRRelease = async () => {
+    const handleQRRelease = async (verification = {}) => {
         if (!qrReleaseData || qrReleaseLoading) return;
         setQrReleaseLoading(true);
         try {
-            await adminRequestService.releaseRequest(qrReleaseData.rawId);
+            await adminRequestService.releaseRequest(qrReleaseData.rawId, {
+                residentId: verification.residentId,
+            });
             await loadDashboardData();
             setQrReleaseData(null);
             setSelectedRequest(null);
@@ -2676,6 +2680,7 @@ export default function Dashboard({ admin, onLogout, onNavigate: navProp }) {
                         onNavigate={handleNavigate}
                         isMobile={isMobile}
                         releaseRequestId={qrReleaseData.rawId}
+                        releaseResidentId={qrReleaseData.residentId}
                         onReleaseConfirm={handleQRRelease}
                         releaseHasFee={qrReleaseData.hasFee}
                     />

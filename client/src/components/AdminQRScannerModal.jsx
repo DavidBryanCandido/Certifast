@@ -78,6 +78,29 @@ function requestRawId(request) {
     return match ? Number(match[1]) : null;
 }
 
+function parseResidentId(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    const certifastMatch = text.match(/^certifast:resident:(.+)$/i);
+    const residentCode = (certifastMatch ? certifastMatch[1] : text)
+        .trim()
+        .replace(/^#/, "")
+        .toUpperCase();
+    const prefixedMatch = residentCode.match(/^RES-(\d+)$/);
+    const parsed = prefixedMatch
+        ? Number.parseInt(prefixedMatch[1], 10)
+        : Number.parseInt(residentCode, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function extractResidentCode(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text) return null;
+    const certifastMatch = text.match(/^certifast:resident:(.+)$/i);
+    if (certifastMatch) return certifastMatch[1].trim();
+    return parseResidentId(text) ? text : null;
+}
+
 function isOngoingStatus(status) {
     return ["pending", "approved", "ready", "processing"].includes(
         String(status || "").toLowerCase(),
@@ -147,6 +170,7 @@ export default function AdminQRScannerModal({
     onReleaseConfirm = null,
     releaseHasFee    = false,
     releaseRequestId = null,
+    releaseResidentId = null,
 }) {
     const [state, setState]       = useState("idle");
     const [scanData, setScanData] = useState(null);
@@ -193,6 +217,15 @@ export default function AdminQRScannerModal({
 
     async function handleRequestPermission() {
         setState("granting");
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setErrorMsg(
+                window.isSecureContext
+                    ? "This browser does not support camera scanning."
+                    : "Camera scanning requires HTTPS, or localhost during development.",
+            );
+            setState("denied");
+            return;
+        }
         let stream;
         try {
             stream = await navigator.mediaDevices.getUserMedia({
@@ -237,7 +270,7 @@ export default function AdminQRScannerModal({
                     canvas.height = video.videoHeight;
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+                    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "attemptBoth" });
                     if (code?.data) {
                         pausedRef.current = true;
                         handleDetected(code.data);
@@ -269,8 +302,8 @@ export default function AdminQRScannerModal({
         setState("loading");
         await new Promise((r) => setTimeout(r, 650));
 
-        const match = rawValue.match(/^certifast:resident:(.+)$/);
-        if (!match) {
+        const residentCode = extractResidentCode(rawValue);
+        if (!residentCode) {
             setErrorMsg(`"${rawValue.slice(0, 60)}${rawValue.length > 60 ? "…" : ""}"`);
             setState("error");
             return;
@@ -290,7 +323,7 @@ export default function AdminQRScannerModal({
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-                body: JSON.stringify({ resident_id: match[1] }),
+                body: JSON.stringify({ resident_id: residentCode }),
             });
 
             const payload = await res.json().catch(() => ({}));
@@ -325,7 +358,11 @@ export default function AdminQRScannerModal({
         if (!onReleaseConfirm || releaseLoading) return;
         setReleaseLoading(true);
         try {
-            await onReleaseConfirm();
+            await onReleaseConfirm({
+                residentId: parseResidentId(scanData?.resident?.resident_id),
+                scanData,
+                request: releaseTargetRequest,
+            });
             // onReleaseConfirm closes the modal from the parent
         } catch {
             setReleaseLoading(false);
@@ -353,13 +390,20 @@ export default function AdminQRScannerModal({
     const releaseTargetRequest =
         residentRequests.find(
             (request) => requestRawId(request) === Number(releaseRequestId),
-        ) ||
-        scanData?.latestRequest ||
-        residentRequests[0] ||
-        null;
+        ) || null;
     const primaryRequest = onReleaseConfirm
-        ? releaseTargetRequest
+        ? releaseTargetRequest || scanData?.latestRequest || residentRequests[0]
         : scanData?.latestRequest;
+    const scannedResidentId = parseResidentId(scanData?.resident?.resident_id);
+    const expectedResidentId = parseResidentId(releaseResidentId);
+    const releaseResidentMatches =
+        !onReleaseConfirm ||
+        !expectedResidentId ||
+        (scannedResidentId && scannedResidentId === expectedResidentId);
+    const canConfirmRelease =
+        Boolean(onReleaseConfirm) &&
+        releaseResidentMatches &&
+        Boolean(releaseTargetRequest);
     const filteredRequests = residentRequests.filter((request, index) => {
         const status = String(request.status || "").toLowerCase();
         if (requestFilter === "all") return true;
@@ -628,6 +672,22 @@ export default function AdminQRScannerModal({
                                 {/* Release context: fee warning + confirm button */}
                                 {onReleaseConfirm ? (
                                     <>
+                                        {!releaseResidentMatches && (
+                                            <div style={{ background: "#fdecea", border: "1.5px solid #f5c6c6", borderRadius: 6, padding: "11px 14px", display: "flex", gap: 10, alignItems: "center", marginBottom: 14 }}>
+                                                <AlertCircle size={15} color="#b02020" strokeWidth={2} style={{ flexShrink: 0 }} />
+                                                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#7a2020" }}>
+                                                    This QR belongs to a different resident. Scan the requester's QR card before releasing.
+                                                </span>
+                                            </div>
+                                        )}
+                                        {releaseResidentMatches && !releaseTargetRequest && (
+                                            <div style={{ background: "#fdecea", border: "1.5px solid #f5c6c6", borderRadius: 6, padding: "11px 14px", display: "flex", gap: 10, alignItems: "center", marginBottom: 14 }}>
+                                                <AlertCircle size={15} color="#b02020" strokeWidth={2} style={{ flexShrink: 0 }} />
+                                                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#7a2020" }}>
+                                                    This resident does not own the selected request. Scan the correct QR card before releasing.
+                                                </span>
+                                            </div>
+                                        )}
                                         {releaseHasFee && (
                                             <div style={{ background: "#fff3e0", border: "1.5px solid #f0b84a", borderRadius: 6, padding: "11px 14px", display: "flex", gap: 10, alignItems: "center", marginBottom: 14 }}>
                                                 <AlertCircle size={15} color="#b86800" strokeWidth={2} style={{ flexShrink: 0 }} />
@@ -642,8 +702,8 @@ export default function AdminQRScannerModal({
                                             </button>
                                             <button
                                                 onClick={handleConfirmRelease}
-                                                disabled={releaseLoading}
-                                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 16px", background: releaseLoading ? "#aaa" : "linear-gradient(135deg,#1a7a4a,#0f5234)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, letterSpacing: 0.5, cursor: releaseLoading ? "default" : "pointer" }}>
+                                                disabled={releaseLoading || !canConfirmRelease}
+                                                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "10px 16px", background: releaseLoading || !canConfirmRelease ? "#aaa" : "linear-gradient(135deg,#1a7a4a,#0f5234)", color: "#fff", border: "none", borderRadius: 4, fontFamily: "'Playfair Display',serif", fontSize: 12, fontWeight: 700, letterSpacing: 0.5, cursor: releaseLoading || !canConfirmRelease ? "default" : "pointer" }}>
                                                 <Check size={13} /> {releaseLoading ? "Releasing…" : "Confirm Release"}
                                             </button>
                                         </div>

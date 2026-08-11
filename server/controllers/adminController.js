@@ -630,6 +630,7 @@ async function getRecentRequests(req, res) {
         const result = await pool.query(
             `SELECT
                 r.request_id,
+                r.resident_id,
                 r.cert_type,
                 r.purpose,
                 r.rejection_reason,
@@ -2005,19 +2006,29 @@ async function getResidentById(req, res) {
     }
 }
 
+function parseResidentCode(value) {
+    let raw = String(value || "").trim();
+    if (!raw) return null;
+    const payloadMatch = raw.match(/^certifast:resident:(.+)$/i);
+    if (payloadMatch) raw = payloadMatch[1].trim();
+    const normalized = raw.replace(/^#/, "").toUpperCase();
+    const match = normalized.match(/^RES-(\d+)$/);
+    const parsedResidentId = match
+        ? Number.parseInt(match[1], 10)
+        : Number.parseInt(normalized, 10);
+    return Number.isFinite(parsedResidentId) && parsedResidentId > 0
+        ? parsedResidentId
+        : null;
+}
+
 async function scanResidentQr(req, res) {
     const residentCode = String(req.body?.resident_id || "").trim();
     if (!residentCode) {
         return res.status(400).json({ message: "resident_id is required" });
     }
 
-    const normalized = residentCode.replace(/^#/, "").toUpperCase();
-    const match = normalized.match(/^RES-(\d+)$/);
-    const parsedResidentId = match
-        ? Number.parseInt(match[1], 10)
-        : Number.parseInt(normalized, 10);
-
-    if (!Number.isFinite(parsedResidentId) || parsedResidentId <= 0) {
+    const parsedResidentId = parseResidentCode(residentCode);
+    if (!parsedResidentId) {
         return res.status(400).json({
             message: "Invalid resident_id format. Use RES-XXXX or numeric ID",
         });
@@ -2051,6 +2062,7 @@ async function scanResidentQr(req, res) {
         const requestResult = await pool.query(
             `SELECT
                 r.request_id,
+                r.resident_id,
                 r.cert_type,
                 r.status,
                 r.purpose,
@@ -2623,6 +2635,7 @@ async function getManageRequests(req, res) {
                 pool.query(
                     `SELECT
                 r.request_id,
+                r.resident_id,
                 r.cert_type,
                 r.purpose,
                 r.status,
@@ -2793,15 +2806,58 @@ async function releaseRequest(req, res) {
     if (!Number.isFinite(requestId) || requestId <= 0) {
         return res.status(400).json({ message: "Invalid request ID" });
     }
+    const scannedResidentRaw =
+        req.body?.resident_id ?? req.body?.scanned_resident_id ?? "";
+    if (!scannedResidentRaw) {
+        return res.status(400).json({
+            message: "Scanned resident_id is required to release a request",
+        });
+    }
+    const scannedResidentId = scannedResidentRaw
+        ? parseResidentCode(scannedResidentRaw)
+        : null;
+    if (!scannedResidentId) {
+        return res.status(400).json({
+            message: "Invalid scanned resident_id format",
+        });
+    }
 
     try {
+        const requestCheck = await pool.query(
+            `SELECT request_id, resident_id, status
+             FROM requests
+             WHERE request_id = $1
+             LIMIT 1`,
+            [requestId],
+        );
+
+        if (requestCheck.rows.length === 0) {
+            return res.status(404).json({ message: "Request not found" });
+        }
+
+        const existingRequest = requestCheck.rows[0];
+        if (
+            scannedResidentId &&
+            Number(existingRequest.resident_id) !== scannedResidentId
+        ) {
+            return res.status(409).json({
+                message:
+                    "Scanned resident QR does not match this request owner",
+            });
+        }
+
+        if (String(existingRequest.status || "").toLowerCase() !== "ready") {
+            return res.status(400).json({
+                message: "Request cannot be released in its current status",
+            });
+        }
+
         const result = await pool.query(
             `UPDATE requests
              SET status = 'released',
                  released_by = $2,
                  released_at = NOW()
              WHERE request_id = $1
-               AND status = 'ready'
              RETURNING request_id, resident_id, status, released_at`,
             [requestId, req.admin.id],
         );
